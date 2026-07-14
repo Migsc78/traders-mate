@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { env } from "./env.js";
+import { env, clientOrigins } from "./env.js";
 import { searchRouter } from "./routes/search.js";
 import { leadsRouter } from "./routes/leads.js";
 import { searchRunsRouter } from "./routes/searchRuns.js";
@@ -21,6 +21,7 @@ import { errorHandler, notFound } from "./middleware/error.js";
 import { tickFollowUps } from "./services/quotes/followups.js";
 
 const app = express();
+const allowedOrigins = clientOrigins();
 
 // Stripe webhook needs the RAW body for signature verification (before json parsing).
 app.use("/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRouter);
@@ -36,7 +37,15 @@ app.use("/c", redirectRouter);
 app.use(widgetRouter); // GET /widget.js
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-app.use(cors({ origin: env.CLIENT_ORIGIN }));
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Non-browser clients (no Origin) or exact allow-list match.
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+  })
+);
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (_req, res) => {

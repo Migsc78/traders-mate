@@ -55,3 +55,10 @@ const schema = z.object({
 
 export const env = schema.parse(process.env);
 export type Env = typeof env;
+
+/** Comma-separated CLIENT_ORIGIN support (local + Vercel). */
+export function clientOrigins(): string[] {
+  return env.CLIENT_ORIGIN.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
