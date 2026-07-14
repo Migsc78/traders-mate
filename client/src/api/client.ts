@@ -3,16 +3,18 @@ import { searchWithProgress } from "./sse";
 import { apiUrl } from "./base";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(apiUrl(url), {
+  const fullUrl = apiUrl(url);
+  const res = await fetch(fullUrl, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
+    const base = String(import.meta.env.VITE_API_BASE || "").replace(/\/$/, "");
     throw new Error(
-      !import.meta.env.VITE_API_BASE
+      !base
         ? "API returned HTML instead of JSON — set VITE_API_BASE on Vercel to your Railway URL and redeploy."
-        : `API returned non-JSON (${res.status}). Check Railway is up and CLIENT_ORIGIN allows this Vercel domain.`
+        : `API returned non-JSON (${res.status}) from ${fullUrl}. Open ${base}/api/health — you should see {"ok":true}. If that fails, VITE_API_BASE is wrong or the Railway API is down.`
     );
   }
   if (!res.ok) {
