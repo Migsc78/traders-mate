@@ -1,0 +1,366 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WebsiteClass {
+  NONE
+  SOCIAL_ONLY
+  DIRECTORY_ONLY
+  PROPER
+  PROPER_DEAD
+}
+
+enum WebsiteCheck {
+  OK
+  DEAD
+  SKIPPED
+  AMBIGUOUS
+}
+
+enum BizStatus {
+  OPERATIONAL
+  CLOSED_TEMPORARILY
+  CLOSED_PERMANENTLY
+  UNKNOWN
+}
+
+enum OutreachStatus {
+  NEW
+  SCREENED
+  CONTACTED
+  INTERESTED
+  DEMO_SENT
+  SOLD
+  DEAD
+  DO_NOT_CONTACT
+}
+
+enum DomainState {
+  AVAILABLE
+  TAKEN
+  UNKNOWN
+}
+
+enum ClientStatus {
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum Channel {
+  WHATSAPP
+  SMS
+  BOTH
+}
+
+enum EnquiryStatus {
+  ROUTED
+  HELD
+  FAILED
+}
+
+model Lead {
+  id                 String         @id @default(cuid())
+  placeId            String         @unique
+  displayName        String
+  occupation         String
+  town               String
+  formattedAddress   String?
+  lat                Float?
+  lng                Float?
+  phone              String?
+  phoneIsMobile      Boolean        @default(false)
+  email              String?
+  googleMapsUri      String?
+
+  primaryType        String?
+  editorialSummary   String?
+  openingHours       String?        // JSON string[] of weekday lines
+  googleReviews      Json?          // [{ author, text, rating, publishTime? }]
+
+  websiteUri         String?
+  websiteClass       WebsiteClass
+  websiteCheck       WebsiteCheck   @default(SKIPPED)
+
+  businessStatus     BizStatus      @default(UNKNOWN)
+  rating             Float?
+  userRatingCount    Int            @default(0)
+  lastReviewAt       DateTime?
+  photoCount         Int            @default(0)
+
+  domainSuggested    String?
+  domainAvailable    DomainState    @default(UNKNOWN)
+  affiliateUrl       String?
+
+  qualified          Boolean        @default(false)
+  disqualifiedReason String?
+  priorityScore      Int            @default(0)
+
+  outreachStatus     OutreachStatus @default(NEW)
+  tpsCheckedAt       DateTime?
+  notes              String?
+
+  siteSlug           String?
+  siteGeneratedAt    DateTime?
+
+  lastFetchedAt      DateTime       @default(now())
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  searchRunId        String?
+  searchRun          SearchRun?     @relation(fields: [searchRunId], references: [id])
+
+  @@index([occupation, town])
+  @@index([qualified, priorityScore])
+  @@index([websiteClass])
+  @@index([outreachStatus])
+}
+
+model SearchRun {
+  id          String   @id @default(cuid())
+  occupation  String
+  town        String?
+  centerLat   Float?
+  centerLng   Float?
+  radiusM     Int?
+  resultCount Int      @default(0)
+  newCount    Int      @default(0)
+  createdAt   DateTime @default(now())
+  leads       Lead[]
+}
+
+// A converted client (the paying tradie) — the CRM tenant we route leads to.
+model Client {
+  id               String       @id @default(cuid())
+  leadId           String?      @unique // origin prospect from the lead engine, if any — unique so a lead can't be converted twice
+  businessName     String
+  tradeTitle       String?
+  town             String?
+  postcode         String? // tradie's business postcode — used to compute distance to a lead's job
+  routeKey         String       @unique // public key baked into the site/widget
+  destPhone        String // tradie's own number (forwarding model), E.164 or 0-prefixed
+  destChannel      Channel      @default(SMS)
+  status           ClientStatus @default(ACTIVE)
+  stripeCustomerId String?
+  stripeSubId      String?
+  allowedOrigins   String[]     @default([]) // domains permitted to POST via the widget
+  tradieNotifyTpl  String? // custom message the tradie receives
+  customerAckTpl   String? // custom auto-reply the customer sees
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  enquiries        Enquiry[]
+  priceBookItems   PriceBookItem[]
+  voiceNotes       VoiceNote[]
+  quotes           Quote[]
+  sessions         ClientSession[]
+  assets           ClientAsset[]
+
+  @@index([status])
+}
+
+// A routed customer enquiry (the actual lead delivered to a client).
+model Enquiry {
+  id           String        @id @default(cuid())
+  clientId     String
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  message      String?
+  postcode     String? // customer's job postcode, if given
+  distanceMiles Float? // computed distance from client.postcode, if both are known
+  photoUrls    String[]      @default([])
+  source       String        @default("site") // site | widget | hosted | qr
+  status       EnquiryStatus @default(ROUTED)
+  deliveredAt  DateTime?
+  deliveryInfo String?
+  createdAt    DateTime      @default(now())
+
+  quotes       Quote[]
+  voiceNotes   VoiceNote[]
+
+  @@index([clientId, createdAt])
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  DELETED
+}
+
+enum VoiceNoteStatus {
+  UPLOADED
+  TRANSCRIBING
+  READY
+  FAILED
+}
+
+enum FollowUpKind {
+  QUOTE_D2
+  QUOTE_D5
+  QUOTE_D10
+}
+
+enum FollowUpStatus {
+  PENDING
+  SENT
+  SKIPPED
+  CANCELLED
+}
+
+enum PriceUnit {
+  EACH
+  HOUR
+  DAY
+  JOB
+  METRE
+}
+
+model PriceBookItem {
+  id             String    @id @default(cuid())
+  clientId       String
+  client         Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sku            String?
+  label          String
+  tradeTag       String?
+  unit           PriceUnit @default(JOB)
+  unitPricePence Int
+  vatRate        Float     @default(20)
+  isCallout      Boolean   @default(false)
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  quoteLines     QuoteLine[]
+
+  @@index([clientId, active])
+}
+
+model VoiceNote {
+  id          String          @id @default(cuid())
+  clientId    String
+  client      Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enquiryId   String?
+  enquiry     Enquiry?        @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  audioUrl    String?
+  transcript  String?
+  status      VoiceNoteStatus @default(UPLOADED)
+  durationSec Int?
+  rawExtract  Json?
+  error       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  quotes      Quote[]
+
+  @@index([clientId, createdAt])
+  @@index([enquiryId])
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  clientId        String
+  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enquiryId       String?
+  enquiry         Enquiry?    @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  voiceNoteId     String?
+  voiceNote       VoiceNote?  @relation(fields: [voiceNoteId], references: [id], onDelete: SetNull)
+  status          QuoteStatus @default(DRAFT)
+  currency        String      @default("GBP")
+  vatInclusive    Boolean     @default(true)
+  subtotalPence   Int         @default(0)
+  vatPence        Int         @default(0)
+  totalPence      Int         @default(0)
+  publicToken     String      @unique
+  customerNote    String?
+  assumptions     String?
+  pdfUrl          String?
+  sentAt          DateTime?
+  decidedAt       DateTime?
+  validUntil      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  lines           QuoteLine[]
+  followUps       FollowUp[]
+
+  @@index([clientId, status, createdAt])
+  @@index([enquiryId])
+}
+
+model QuoteLine {
+  id              String         @id @default(cuid())
+  quoteId         String
+  quote           Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  sort            Int            @default(0)
+  label           String
+  qty             Float          @default(1)
+  unit            PriceUnit      @default(JOB)
+  unitPricePence  Int
+  vatRate         Float          @default(20)
+  priceBookItemId String?
+  priceBookItem   PriceBookItem? @relation(fields: [priceBookItemId], references: [id], onDelete: SetNull)
+  source          String         @default("MANUAL") // VOICE | BOOK | MANUAL
+  createdAt       DateTime       @default(now())
+
+  @@index([quoteId])
+}
+
+model FollowUp {
+  id           String         @id @default(cuid())
+  quoteId      String
+  quote        Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  kind         FollowUpKind
+  status       FollowUpStatus @default(PENDING)
+  runAt        DateTime
+  sentAt       DateTime?
+  bodySnapshot String?
+  createdAt    DateTime       @default(now())
+
+  @@index([status, runAt])
+  @@index([quoteId])
+}
+
+model ClientSession {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([clientId])
+  @@index([expiresAt])
+}
+
+enum ClientAssetKind {
+  LOGO
+  SHOWCASE
+  JOB
+  OTHER
+}
+
+/// Brand + portfolio images for website generation and quotes.
+model ClientAsset {
+  id        String          @id @default(cuid())
+  clientId  String
+  client    Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  kind      ClientAssetKind @default(SHOWCASE)
+  url       String
+  filename  String?
+  caption   String?
+  sort      Int             @default(0)
+  createdAt DateTime        @default(now())
+
+  @@index([clientId, kind])
+}

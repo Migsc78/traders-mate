@@ -1,0 +1,420 @@
+import { Router, type Request, type Response, type NextFunction } from "express";
+import { z } from "zod";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { prisma } from "../db.js";
+import { ApiError } from "../middleware/error.js";
+import { sendMessage } from "../services/messaging/sender.js";
+import { storeAudio } from "../services/storage/store.js";
+import { createMagicLogin, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
+import {
+  deactivatePriceBookItem,
+  ensurePriceBook,
+  listPriceBook,
+  quoteLineInclude,
+  savePriceBookItems,
+  upsertPriceBookRows,
+} from "../services/quotes/priceBook.js";
+import { buildDraftQuoteFromTranscript, recomputeQuoteTotals } from "../services/quotes/draft.js";
+import { scheduleQuoteFollowUps, cancelQuoteFollowUps } from "../services/quotes/followups.js";
+import { formatGbp } from "../services/quotes/money.js";
+import { transcribeWithWhisper } from "../services/quotes/whisper.js";
+import { claudeConfigured, openaiConfigured } from "../settings.js";
+
+export const tradieRouter = Router();
+
+function bearer(req: Request): string | null {
+  const h = req.headers.authorization;
+  if (h?.startsWith("Bearer ")) return h.slice(7).trim();
+  const cookie = req.headers.cookie || "";
+  const m = cookie.match(/(?:^|;\s*)tm_session=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+async function requireClient(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const session = await resolveSession(bearer(req));
+    if (!session) throw new ApiError(401, "unauthorized", "Sign in via magic link");
+    (req as Request & { clientId: string }).clientId = session.clientId;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+function clientId(req: Request): string {
+  return (req as Request & { clientId: string }).clientId;
+}
+
+// ---- Auth (public) ----
+tradieRouter.post("/auth/magic", async (req, res, next) => {
+  try {
+    const body = z.object({ routeKey: z.string().min(3).optional(), phone: z.string().min(6).optional() }).parse(req.body ?? {});
+    if (!body.routeKey && !body.phone) throw new ApiError(400, "missing", "Provide routeKey or phone");
+
+    const client = body.routeKey
+      ? await prisma.client.findUnique({ where: { routeKey: body.routeKey } })
+      : await prisma.client.findFirst({
+          where: { destPhone: { contains: body.phone!.replace(/\D/g, "").slice(-10) } },
+          orderBy: { createdAt: "desc" },
+        });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    if (client.status === "CANCELLED") throw new ApiError(403, "cancelled", "Account cancelled");
+
+    const { url } = await createMagicLogin(client.id);
+    await sendMessage({
+      to: client.destPhone,
+      channel: client.destChannel,
+      body: `Your TradersMate login link (expires in 30 min):\n${url}`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/auth/consume", async (req, res, next) => {
+  try {
+    const { token } = z.object({ token: z.string().min(10) }).parse(req.body ?? {});
+    const { consumeMagicToken } = await import("../services/quotes/magicAuth.js");
+    const result = await consumeMagicToken(token);
+    if (!result) throw new ApiError(401, "invalid_token", "Link expired or invalid — request a new one");
+    await ensurePriceBook(result.clientId);
+    res.json({
+      sessionToken: result.sessionToken,
+      clientId: result.clientId,
+      caps: { claude: claudeConfigured(), whisper: openaiConfigured() },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.get("/me", requireClient, async (req, res, next) => {
+  try {
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    await ensurePriceBook(client.id, client.tradeTitle);
+    res.json({
+      id: client.id,
+      businessName: client.businessName,
+      tradeTitle: client.tradeTitle,
+      town: client.town,
+      routeKey: client.routeKey,
+      caps: { claude: claudeConfigured(), whisper: openaiConfigured() },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Jobs (enquiries) ----
+tradieRouter.get("/jobs", requireClient, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const enquiries = await prisma.enquiry.findMany({
+      where: { clientId: cid },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        quotes: {
+          where: { status: { not: "DELETED" } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, status: true, totalPence: true },
+        },
+      },
+    });
+    res.json(
+      enquiries.map((e) => ({
+        id: e.id,
+        name: e.name,
+        phone: e.phone,
+        message: e.message,
+        postcode: e.postcode,
+        distanceMiles: e.distanceMiles,
+        photoUrls: e.photoUrls,
+        status: e.status,
+        createdAt: e.createdAt,
+        latestQuote: e.quotes[0] || null,
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.get("/jobs/:enquiryId", requireClient, async (req, res, next) => {
+  try {
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: clientId(req) },
+      include: {
+        quotes: {
+          where: { status: { not: "DELETED" } },
+          orderBy: { createdAt: "desc" },
+          include: { lines: quoteLineInclude },
+        },
+      },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
+    res.json(enquiry);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Voice / notes → draft ----
+tradieRouter.post("/jobs/:enquiryId/notes", requireClient, async (req, res, next) => {
+  try {
+    const body = z.object({ transcript: z.string().min(3).max(8000) }).parse(req.body ?? {});
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: clientId(req) },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
+    await ensurePriceBook(clientId(req));
+
+    const voice = await prisma.voiceNote.create({
+      data: {
+        clientId: clientId(req),
+        enquiryId: enquiry.id,
+        transcript: body.transcript,
+        status: "READY",
+      },
+    });
+    const quote = await buildDraftQuoteFromTranscript({
+      clientId: clientId(req),
+      enquiryId: enquiry.id,
+      voiceNoteId: voice.id,
+      transcript: body.transcript,
+    });
+    res.status(201).json(quote);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/jobs/:enquiryId/voice", requireClient, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        contentType: z.string().min(3).max(40),
+        dataBase64: z.string().min(10),
+        durationSec: z.number().optional(),
+      })
+      .parse(req.body ?? {});
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: clientId(req) },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
+
+    const b64 = body.dataBase64.includes(",") ? body.dataBase64.slice(body.dataBase64.indexOf(",") + 1) : body.dataBase64;
+    const buf = Buffer.from(b64, "base64");
+    const stored = await storeAudio(body.contentType, buf);
+
+    const voice = await prisma.voiceNote.create({
+      data: {
+        clientId: clientId(req),
+        enquiryId: enquiry.id,
+        audioUrl: stored.url,
+        status: "TRANSCRIBING",
+        durationSec: body.durationSec ?? null,
+      },
+    });
+
+    try {
+      const filename = path.basename(stored.path || "job.webm");
+      const fileBuf = stored.path ? await fs.readFile(stored.path) : buf;
+      const transcript = await transcribeWithWhisper(fileBuf, filename, body.contentType);
+      await ensurePriceBook(clientId(req));
+      const quote = await buildDraftQuoteFromTranscript({
+        clientId: clientId(req),
+        enquiryId: enquiry.id,
+        voiceNoteId: voice.id,
+        transcript,
+      });
+      res.status(201).json({ voiceNoteId: voice.id, transcript, quote });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Voice processing failed";
+      await prisma.voiceNote.update({
+        where: { id: voice.id },
+        data: { status: "FAILED", error: msg.slice(0, 400) },
+      });
+      throw new ApiError(400, "voice_failed", msg);
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+const priceBookItemSchema = z.object({
+  id: z.string().optional(),
+  sku: z.string().nullable().optional(),
+  label: z.string().min(1),
+  unit: z.enum(["EACH", "HOUR", "DAY", "JOB", "METRE"]),
+  unitPricePence: z.number().int().min(0),
+  vatRate: z.number().min(0).max(100).default(20),
+  isCallout: z.boolean().optional(),
+  active: z.boolean().optional(),
+});
+
+const importRowSchema = z.object({
+  sku: z.string().nullable().optional(),
+  label: z.string().min(1),
+  unit: z.string().optional(),
+  unitPriceGbp: z.number().optional(),
+  unitPricePence: z.number().int().min(0).optional(),
+  vatRate: z.number().min(0).max(100).optional(),
+  isCallout: z.boolean().optional(),
+  active: z.boolean().optional(),
+});
+
+// ---- Price book ----
+tradieRouter.get("/price-book", requireClient, async (req, res, next) => {
+  try {
+    res.json(await listPriceBook(clientId(req)));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.put("/price-book", requireClient, async (req, res, next) => {
+  try {
+    const body = z.object({ items: z.array(priceBookItemSchema) }).parse(req.body ?? {});
+    res.json(await savePriceBookItems(clientId(req), body.items));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/price-book/import", requireClient, async (req, res, next) => {
+  try {
+    const body = z.object({ rows: z.array(importRowSchema).max(500) }).parse(req.body ?? {});
+    res.json(await upsertPriceBookRows(clientId(req), body.rows));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.delete("/price-book/:id", requireClient, async (req, res, next) => {
+  try {
+    const row = await deactivatePriceBookItem(clientId(req), req.params.id);
+    if (!row) throw new ApiError(404, "not_found", "Price book item not found");
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Quotes ----
+tradieRouter.get("/quotes/:id", requireClient, async (req, res, next) => {
+  try {
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      include: { lines: quoteLineInclude, enquiry: true },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+    res.json(quote);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.put("/quotes/:id/lines", requireClient, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        vatInclusive: z.boolean().optional(),
+        customerNote: z.string().max(2000).nullable().optional(),
+        lines: z.array(
+          z.object({
+            label: z.string().min(1),
+            qty: z.number().positive(),
+            unit: z.enum(["EACH", "HOUR", "DAY", "JOB", "METRE"]),
+            unitPricePence: z.number().int().min(0),
+            vatRate: z.number().min(0).max(100).default(20),
+            source: z.string().optional(),
+          })
+        ),
+      })
+      .parse(req.body ?? {});
+
+    const existing = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+    });
+    if (!existing) throw new ApiError(404, "not_found", "Quote not found");
+    if (existing.status !== "DRAFT") throw new ApiError(400, "not_draft", "Only draft quotes can be edited");
+
+    await prisma.quoteLine.deleteMany({ where: { quoteId: existing.id } });
+    await prisma.quoteLine.createMany({
+      data: body.lines.map((l, i) => ({
+        quoteId: existing.id,
+        sort: i,
+        label: l.label,
+        qty: l.qty,
+        unit: l.unit,
+        unitPricePence: l.unitPricePence,
+        vatRate: l.vatRate,
+        source: l.source || "MANUAL",
+      })),
+    });
+    if (body.vatInclusive !== undefined || body.customerNote !== undefined) {
+      await prisma.quote.update({
+        where: { id: existing.id },
+        data: {
+          vatInclusive: body.vatInclusive ?? existing.vatInclusive,
+          customerNote: body.customerNote === undefined ? existing.customerNote : body.customerNote,
+        },
+      });
+    }
+    const updated = await recomputeQuoteTotals(existing.id);
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/quotes/:id/approve", requireClient, async (req, res, next) => {
+  try {
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      include: { lines: true, enquiry: true, client: true },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+    if (quote.status !== "DRAFT") throw new ApiError(400, "not_draft", "Quote already sent");
+    if (!quote.lines.length) throw new ApiError(400, "empty", "Add at least one line");
+    if (quote.lines.some((l) => l.unitPricePence <= 0)) {
+      throw new ApiError(400, "unpriced", "Set a price on every line before sending");
+    }
+    if (!quote.enquiry?.phone) throw new ApiError(400, "no_customer", "No customer phone on this job");
+
+    const publicUrl = `${appPublicUrl()}/q/${quote.publicToken}`;
+    const body = `Hi ${quote.enquiry.name}, your quote from ${quote.client.businessName} is ready: ${formatGbp(quote.totalPence)}. View & accept: ${publicUrl}`;
+    await sendMessage({ to: quote.enquiry.phone, channel: "SMS", body });
+
+    const sentAt = new Date();
+    const updated = await prisma.quote.update({
+      where: { id: quote.id },
+      data: { status: "SENT", sentAt },
+      include: { lines: quoteLineInclude },
+    });
+    await scheduleQuoteFollowUps(quote.id, sentAt);
+    res.json({ ...updated, publicUrl });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.delete("/quotes/:id", requireClient, async (req, res, next) => {
+  try {
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+    if (quote.status !== "DRAFT") throw new ApiError(400, "not_draft", "Only drafts can be deleted");
+    await prisma.quote.update({ where: { id: quote.id }, data: { status: "DELETED" } });
+    await cancelQuoteFollowUps(quote.id);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
