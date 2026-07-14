@@ -26,7 +26,15 @@ const schema = z.object({
   SEARCH_RATE_MAX: z.coerce.number().default(20),
 
   // Public base URL of the intake service (form actions / redirects / widget).
-  PUBLIC_BASE_URL: z.string().default("http://localhost:4000"),
+  PUBLIC_BASE_URL: z
+    .string()
+    .default("http://localhost:4000")
+    .transform((v) => {
+      const t = v.trim().replace(/\/$/, "");
+      if (!t) return "http://localhost:4000";
+      if (/^https?:\/\//i.test(t)) return t;
+      return `https://${t}`;
+    }),
 
   // Twilio (forwarding model). Absent creds -> logging stub, so the flow still works.
   TWILIO_ACCOUNT_SID: z.string().default(""),

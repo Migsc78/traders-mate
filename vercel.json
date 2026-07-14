@@ -4,6 +4,10 @@
   "outputDirectory": "client/dist",
   "framework": null,
   "rewrites": [
+    {
+      "source": "/q/:path*",
+      "destination": "https://traders-mate-production.up.railway.app/q/:path*"
+    },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ]
 }

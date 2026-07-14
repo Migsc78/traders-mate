@@ -29,7 +29,13 @@ function getRecentRedemption(magicHash: string): { sessionToken: string; clientI
 export function appPublicUrl(): string {
   const fromEnv = env.APP_PUBLIC_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  return env.CLIENT_ORIGIN.replace(/\/$/, "");
+  // CLIENT_ORIGIN may be comma-separated (local + Vercel). Prefer a non-localhost origin for SMS links.
+  const origins = env.CLIENT_ORIGIN.split(",")
+    .map((o) => o.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  const preferred =
+    origins.find((o) => !/localhost|127\.0\.0\.1/i.test(o)) ?? origins[0] ?? "http://localhost:5173";
+  return preferred;
 }
 
 export function hashToken(raw: string): string {

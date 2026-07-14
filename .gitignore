@@ -13,5 +13,7 @@ server/generated-sites/
 .vite/
 *.tmp
 .cursor/
-
 .fuse_hidden*
+.tmp/
+*.dump
+

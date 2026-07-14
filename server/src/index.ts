@@ -74,6 +74,7 @@ app.get("/api/health", (_req, res) => {
     twilioConfigured: twilioConfigured(),
     claudeConfigured: claudeConfigured(),
     publicBaseUrl: env.PUBLIC_BASE_URL,
+    appPublicUrl: env.APP_PUBLIC_URL?.trim() || null,
     clientOrigins: [...allowedOrigins],
     time: new Date().toISOString(),
   });
