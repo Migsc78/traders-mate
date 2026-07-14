@@ -1,4 +1,5 @@
 import type { JobProgress, SearchSummary } from "../types";
+import { apiUrl } from "./base";
 
 function parseSseChunk(chunk: string): { event: string; data: string } | null {
   const lines = chunk.split("\n");
@@ -16,7 +17,7 @@ export async function postSse<TComplete>(
   body: unknown,
   onProgress?: (progress: JobProgress) => void
 ): Promise<TComplete> {
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

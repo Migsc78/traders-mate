@@ -1,8 +1,9 @@
 import type { Lead, LeadFilters, LeadsResponse, SearchSummary, JobProgress } from "../types";
 import { searchWithProgress } from "./sse";
+import { apiUrl } from "./base";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
@@ -141,7 +142,7 @@ export const api = {
   generateSite: (id: string) =>
     request<{ slug: string; previewUrl: string }>(`/api/leads/${id}/site`, { method: "POST", body: JSON.stringify({}) }),
 
-  downloadSiteUrl: (id: string) => `/api/leads/${id}/site/html`,
+  downloadSiteUrl: (id: string) => apiUrl(`/api/leads/${id}/site/html`),
 
   listClients: () => request<import("../types").Client[]>("/api/clients"),
 
@@ -260,7 +261,7 @@ export const api = {
     request<{ url: string; stub: boolean }>(`/api/billing/checkout/${id}`, { method: "POST", body: JSON.stringify({}) }),
 
   exportCsv: async (ids?: string[]) => {
-    const res = await fetch("/api/leads/export", {
+    const res = await fetch(apiUrl("/api/leads/export"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),

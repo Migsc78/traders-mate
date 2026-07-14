@@ -1,3 +1,5 @@
+import { apiUrl } from "./base";
+
 const SESSION_KEY = "tm_tradie_session";
 
 export function getTradieSession(): string | null {
@@ -11,7 +13,7 @@ export function setTradieSession(token: string | null) {
 
 async function tRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getTradieSession();
-  const res = await fetch(`/api/t${path}`, {
+  const res = await fetch(apiUrl(`/api/t${path}`), {
     ...init,
     headers: {
       "Content-Type": "application/json",
