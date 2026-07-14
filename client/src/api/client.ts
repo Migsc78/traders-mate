@@ -7,6 +7,14 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      !import.meta.env.VITE_API_BASE
+        ? "API returned HTML instead of JSON — set VITE_API_BASE on Vercel to your Railway URL and redeploy."
+        : `API returned non-JSON (${res.status}). Check Railway is up and CLIENT_ORIGIN allows this Vercel domain.`
+    );
+  }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
