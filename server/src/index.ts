@@ -21,7 +21,33 @@ import { errorHandler, notFound } from "./middleware/error.js";
 import { tickFollowUps } from "./services/quotes/followups.js";
 
 const app = express();
-const allowedOrigins = clientOrigins();
+const allowedOrigins = new Set(clientOrigins().map((o) => o.replace(/\/$/, "")));
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  const normalized = origin.replace(/\/$/, "");
+  if (allowedOrigins.has(normalized)) return true;
+  try {
+    const host = new URL(origin).hostname;
+    if (host === "localhost" || host === "127.0.0.1") return true;
+    // Admin UI is hosted on Vercel (prod + preview deployments).
+    if (host.endsWith(".vercel.app")) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+const crmCors = cors({
+  origin(origin, cb) {
+    if (isAllowedOrigin(origin)) return cb(null, true);
+    console.warn("[cors] blocked origin:", origin);
+    return cb(null, false);
+  },
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400,
+});
 
 // Stripe webhook needs the RAW body for signature verification (before json parsing).
 app.use("/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRouter);
@@ -37,15 +63,8 @@ app.use("/c", redirectRouter);
 app.use(widgetRouter); // GET /widget.js
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-app.use(
-  cors({
-    origin(origin, cb) {
-      // Non-browser clients (no Origin) or exact allow-list match.
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(null, false);
-    },
-  })
-);
+// CRM / admin API — allow configured origins + *.vercel.app
+app.use("/api", crmCors);
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (_req, res) => {
@@ -55,6 +74,7 @@ app.get("/api/health", (_req, res) => {
     twilioConfigured: twilioConfigured(),
     claudeConfigured: claudeConfigured(),
     publicBaseUrl: env.PUBLIC_BASE_URL,
+    clientOrigins: [...allowedOrigins],
     time: new Date().toISOString(),
   });
 });
