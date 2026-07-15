@@ -7,6 +7,7 @@ import SearchPage from "./pages/SearchPage";
 import LeadsPage from "./pages/LeadsPage";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
+import LeadDetailPage from "./pages/LeadDetailPage";
 import TradieAuthPage from "./pages/tradie/TradieAuthPage";
 import TradieJobsPage from "./pages/tradie/TradieJobsPage";
 import TradieJobPage from "./pages/tradie/TradieJobPage";
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route index element={<Navigate to="/search" replace />} />
             <Route path="search" element={<SearchPage />} />
             <Route path="leads" element={<LeadsPage />} />
+            <Route path="leads/:leadId" element={<LeadDetailPage />} />
             <Route path="clients" element={<ClientsPage />} />
             <Route path="clients/:clientId" element={<ClientDetailPage />} />
           </Route>

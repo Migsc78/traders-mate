@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { Lead, LeadFilters, OutreachStatus } from "../types";
+import type { LeadFilters, OutreachStatus } from "../types";
 import FilterBar from "../components/FilterBar";
 import LeadsTable from "../components/LeadsTable";
-import LeadDrawer from "../components/LeadDrawer";
 import ScoreLegend from "../components/ScoreLegend";
 import ProgressOverlay from "../components/ProgressOverlay";
 
@@ -21,11 +20,11 @@ const DEFAULT_FILTERS: LeadFilters = {
 export default function LeadsPage() {
   const [searchParams] = useSearchParams();
   const searchRunId = searchParams.get("searchRunId") ?? undefined;
+  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [filters, setFilters] = useState<LeadFilters>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [openLead, setOpenLead] = useState<Lead | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState("");
   const [refreshPercent, setRefreshPercent] = useState(0);
@@ -50,13 +49,6 @@ export default function LeadsPage() {
 
   const leads = data?.data ?? [];
 
-  useEffect(() => {
-    setOpenLead((current) => {
-      if (!current) return current;
-      return leads.find((l: Lead) => l.id === current.id) ?? current;
-    });
-  }, [leads]);
-
   const toggleSelect = (id: string) =>
     setSelected((s) => {
       const next = new Set(s);
@@ -66,8 +58,8 @@ export default function LeadsPage() {
 
   const toggleAll = () =>
     setSelected((s) => {
-      if (leads.every((l: Lead) => s.has(l.id))) return new Set<string>();
-      return new Set<string>(leads.map((l: Lead) => l.id));
+      if (leads.every((l) => s.has(l.id))) return new Set<string>();
+      return new Set<string>(leads.map((l) => l.id));
     });
 
   const total = data?.total ?? 0;
@@ -175,7 +167,7 @@ export default function LeadsPage() {
             order={filters.order}
             onSort={toggleSort}
             onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
-            onOpen={setOpenLead}
+            onOpen={(lead) => navigate(`/leads/${lead.id}`)}
           />
 
           <div className="pager">
@@ -190,13 +182,6 @@ export default function LeadsPage() {
             </button>
           </div>
         </>
-      )}
-      {openLead && (
-        <LeadDrawer
-          lead={openLead}
-          onClose={() => setOpenLead(null)}
-          onLeadUpdated={() => qc.invalidateQueries({ queryKey: ["leads"] })}
-        />
       )}
     </div>
   );

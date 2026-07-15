@@ -322,6 +322,12 @@ button.linkish:hover { color: var(--text); background: none; }
 .reg-link:hover { text-decoration: underline; }
 .notes-label { font-size: 13px; }
 .drawer-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.client-detail .drawer-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.client-detail .drawer-actions button { width: auto; }
 button.build { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
 button.build:disabled { opacity: 0.6; cursor: default; }
 .site-links { display: flex; gap: 14px; padding: 2px 2px 6px; }
@@ -481,6 +487,8 @@ button.convert:disabled { opacity: 0.6; cursor: default; }
 .form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .form-grid input,
 .form-grid select { font-weight: 400; }
+.form-grid .span-2 { grid-column: 1 / -1; }
+.form-grid textarea { font-weight: 400; font: inherit; width: 100%; min-height: 120px; }
 .row-actions { flex-direction: row; flex-wrap: wrap; }
 .danger-title { color: #b91c1c; }
 .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; margin: 16px 0; font-size: 14px; }

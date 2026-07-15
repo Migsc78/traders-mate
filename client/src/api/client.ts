@@ -132,6 +132,8 @@ export const api = {
     return request<LeadsResponse>(`/api/leads?${p.toString()}`);
   },
 
+  getLead: (id: string) => request<Lead>(`/api/leads/${id}`),
+
   updateLead: (id: string, patch: Partial<Pick<Lead, "outreachStatus" | "notes" | "email">> & { tpsCheckedAt?: string | null }) =>
     request<Lead>(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 
