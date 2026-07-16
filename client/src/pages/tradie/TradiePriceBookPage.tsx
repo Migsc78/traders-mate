@@ -4,8 +4,10 @@ import { tradieApi } from "../../api/tradie";
 export default function TradiePriceBookPage() {
   return (
     <div>
-      <h2>Price book</h2>
-      <p className="muted-text">Rates used when drafting quotes from voice or notes</p>
+      <header className="t-page-head">
+        <h2>Rates</h2>
+        <p>Your price book — used when drafting quotes from voice or notes</p>
+      </header>
       <PriceBookEditor
         queryKey={["tradie-price-book"]}
         api={{

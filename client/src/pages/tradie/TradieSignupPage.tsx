@@ -43,51 +43,73 @@ export default function TradieSignupPage() {
   };
 
   return (
-    <div className="tradie-shell">
-      <h1>Start free trial</h1>
-      <p className="muted-text">Quote from the van. Chase by SMS. Get paid.</p>
+    <div className="tradie-shell t-gate">
+      <div className="t-gate-brand">
+        <div className="t-brand-mark">TM</div>
+        <h1>Start your free trial</h1>
+        <p>Quote from the van. Chase by SMS. Get paid.</p>
+      </div>
 
-      {step === "form" ? (
-        <form className="form" onSubmit={start}>
-          <label>
-            Business name
-            <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} required />
-          </label>
-          <label>
-            Trade
-            <input value={tradeTitle} onChange={(e) => setTradeTitle(e.target.value)} placeholder="Plumber" />
-          </label>
-          <label>
-            Town
-            <input value={town} onChange={(e) => setTown(e.target.value)} placeholder="Woking" />
-          </label>
-          <label>
-            Mobile
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07…" required />
-          </label>
-          {error && <p className="error">{error}</p>}
-          <button className="primary" type="submit" disabled={busy}>
-            {busy ? "Sending code…" : "Text me a code"}
-          </button>
-        </form>
-      ) : (
-        <form className="form" onSubmit={verify}>
-          <p className="muted-text">Enter the 6-digit code we texted to {phone}</p>
-          <label>
-            Code
-            <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" required />
-          </label>
-          {error && <p className="error">{error}</p>}
-          <button className="primary" type="submit" disabled={busy}>
-            {busy ? "Creating account…" : "Verify & start"}
-          </button>
-          <button type="button" className="linkish" onClick={() => setStep("form")}>
-            Change details
-          </button>
-        </form>
-      )}
+      <div className="t-gate-card">
+        {step === "form" ? (
+          <form className="form" onSubmit={start}>
+            <label>
+              Business name
+              <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} required />
+            </label>
+            <label>
+              Trade
+              <input value={tradeTitle} onChange={(e) => setTradeTitle(e.target.value)} placeholder="Plumber" />
+            </label>
+            <label>
+              Town
+              <input value={town} onChange={(e) => setTown(e.target.value)} placeholder="Woking" />
+            </label>
+            <label>
+              Mobile
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="07…"
+                inputMode="tel"
+                autoComplete="tel"
+                required
+              />
+            </label>
+            {error && <p className="error">{error}</p>}
+            <button className="primary t-btn--block" type="submit" disabled={busy}>
+              {busy ? "Sending code…" : "Text me a code"}
+            </button>
+          </form>
+        ) : (
+          <form className="form" onSubmit={verify}>
+            <p className="t-otp-sent">
+              Enter the 6-digit code we texted to <strong>{phone}</strong>
+            </p>
+            <label>
+              Code
+              <input
+                className="t-code-input"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                required
+              />
+            </label>
+            {error && <p className="error">{error}</p>}
+            <button className="primary t-btn--block" type="submit" disabled={busy}>
+              {busy ? "Creating account…" : "Verify & start"}
+            </button>
+            <button type="button" className="linkish" onClick={() => setStep("form")}>
+              Change details
+            </button>
+          </form>
+        )}
+      </div>
 
-      <p className="muted-text" style={{ marginTop: 20 }}>
+      <p className="t-gate-alt">
         Already have an account? <Link to="/t/auth">Sign in</Link>
       </p>
     </div>

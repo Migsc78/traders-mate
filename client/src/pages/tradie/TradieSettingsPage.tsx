@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { setTradieSession, tradieApi } from "../../api/tradie";
+import { StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
   const qc = useQueryClient();
@@ -49,92 +50,111 @@ export default function TradieSettingsPage() {
 
   return (
     <div>
-      <h2>Settings</h2>
+      <header className="t-page-head">
+        <h2>Settings</h2>
+        <p>Your account, business details, and call rescue</p>
+      </header>
 
-      <section className="client-section">
-        <h3>Account</h3>
-        <p className="muted-text">
-          Status: <strong>{me.data?.status}</strong>
-          {me.data?.routeKey ? (
-            <>
-              {" "}
-              · Route key: <code>{me.data.routeKey}</code>
-            </>
-          ) : null}
-        </p>
-        {me.data?.inboundEmail && (
-          <p className="muted-text">
-            Forward website enquiries to: <code>{me.data.inboundEmail}</code>
+      <div className="t-settings-group">
+        <p className="t-section-label" style={{ marginTop: 0 }}>Account</p>
+        <div className="t-card">
+          <dl style={{ margin: 0 }}>
+            <div className="t-kv">
+              <dt>Status</dt>
+              <dd>{me.data?.status ? <StatusPill status={me.data.status} /> : "—"}</dd>
+            </div>
+            {me.data?.routeKey && (
+              <div className="t-kv">
+                <dt>Route key</dt>
+                <dd><code>{me.data.routeKey}</code></dd>
+              </div>
+            )}
+            {me.data?.inboundEmail && (
+              <div className="t-kv">
+                <dt>Forward enquiries to</dt>
+                <dd><code>{me.data.inboundEmail}</code></dd>
+              </div>
+            )}
+          </dl>
+          <div className="tradie-actions">
+            <button className="primary t-btn--block" onClick={() => checkout.mutate()} disabled={checkout.isPending}>
+              {checkout.isPending ? "Opening…" : "Subscribe / manage billing"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="t-settings-group">
+        <p className="t-section-label">Business</p>
+        <div className="t-card">
+          <div className="form">
+            <label>
+              Business name
+              <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+            </label>
+            <label>
+              Trade
+              <input value={tradeTitle} onChange={(e) => setTradeTitle(e.target.value)} placeholder="Plumber" />
+            </label>
+            <label>
+              Town
+              <input value={town} onChange={(e) => setTown(e.target.value)} placeholder="Woking" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="t-settings-group">
+        <p className="t-section-label">Bank details — shown on invoices</p>
+        <div className="t-card">
+          <div className="form">
+            <label>
+              Bank name
+              <input value={bankName} onChange={(e) => setBankName(e.target.value)} />
+            </label>
+            <label>
+              Account name
+              <input value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} />
+            </label>
+            <label>
+              Sort code
+              <input value={bankSortCode} onChange={(e) => setBankSortCode(e.target.value)} placeholder="00-00-00" />
+            </label>
+            <label>
+              Account number
+              <input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="t-settings-group">
+        <p className="t-section-label">Missed-call rescue</p>
+        <div className="t-card">
+          <p className="muted-text" style={{ margin: "0 0 12px" }}>
+            Assign a Twilio number, then dial these codes once on your phone so unanswered calls come to us instead of
+            voicemail.
           </p>
-        )}
-        <button className="primary" onClick={() => checkout.mutate()} disabled={checkout.isPending}>
-          {checkout.isPending ? "Opening…" : "Subscribe / manage billing"}
-        </button>
-      </section>
-
-      <section className="client-section" style={{ marginTop: 24 }}>
-        <h3>Business</h3>
-        <div className="form">
           <label>
-            Business name
-            <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+            Twilio number (E.164)
+            <input value={twilioNumber} onChange={(e) => setTwilioNumber(e.target.value)} placeholder="+44…" />
           </label>
-          <label>
-            Trade
-            <input value={tradeTitle} onChange={(e) => setTradeTitle(e.target.value)} />
-          </label>
-          <label>
-            Town
-            <input value={town} onChange={(e) => setTown(e.target.value)} />
-          </label>
+          {me.data?.divertCodes && (
+            <ul className="t-divert-list">
+              <li><span>No answer</span> <code>{me.data.divertCodes.noAnswer}</code></li>
+              <li><span>Busy</span> <code>{me.data.divertCodes.busy}</code></li>
+              <li><span>Off / no signal</span> <code>{me.data.divertCodes.unreachable}</code></li>
+            </ul>
+          )}
         </div>
-      </section>
+      </div>
 
-      <section className="client-section" style={{ marginTop: 24 }}>
-        <h3>Bank details (invoices)</h3>
-        <div className="form">
-          <label>
-            Bank name
-            <input value={bankName} onChange={(e) => setBankName(e.target.value)} />
-          </label>
-          <label>
-            Account name
-            <input value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} />
-          </label>
-          <label>
-            Sort code
-            <input value={bankSortCode} onChange={(e) => setBankSortCode(e.target.value)} />
-          </label>
-          <label>
-            Account number
-            <input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
-          </label>
-        </div>
-      </section>
-
-      <section className="client-section" style={{ marginTop: 24 }}>
-        <h3>Missed-call rescue</h3>
-        <p className="muted-text">
-          Assign a Twilio number, then dial these codes once on your phone so unanswered calls come to us instead of
-          voicemail.
-        </p>
-        <label>
-          Twilio number (E.164)
-          <input value={twilioNumber} onChange={(e) => setTwilioNumber(e.target.value)} placeholder="+44…" />
-        </label>
-        {me.data?.divertCodes && (
-          <ul className="muted-text">
-            <li>No answer: <code>{me.data.divertCodes.noAnswer}</code></li>
-            <li>Busy: <code>{me.data.divertCodes.busy}</code></li>
-            <li>Off / no signal: <code>{me.data.divertCodes.unreachable}</code></li>
-          </ul>
-        )}
-      </section>
-
-      <div className="drawer-actions" style={{ marginTop: 16 }}>
-        <button className="primary" onClick={() => save.mutate()} disabled={save.isPending}>
+      <div className="t-save-bar">
+        <button className="primary t-btn--block" onClick={() => save.mutate()} disabled={save.isPending}>
           {save.isPending ? "Saving…" : "Save settings"}
         </button>
+        {save.isError && <p className="error">{(save.error as Error).message}</p>}
+        {save.isSuccess && <p className="muted-text" style={{ textAlign: "center" }}>Saved.</p>}
         <button
           className="linkish"
           onClick={() => {
@@ -145,8 +165,6 @@ export default function TradieSettingsPage() {
           Sign out
         </button>
       </div>
-      {save.isError && <p className="error">{(save.error as Error).message}</p>}
-      {save.isSuccess && <p className="muted-text">Saved.</p>}
     </div>
   );
 }

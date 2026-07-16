@@ -8,6 +8,7 @@ import {
   type QuoteDto,
   type QuoteLineDto,
 } from "../../api/tradie";
+import { IconPhone, StatusPill, initialsOf } from "./ui";
 
 export default function TradieJobPage() {
   const { enquiryId = "" } = useParams();
@@ -171,150 +172,174 @@ export default function TradieJobPage() {
 
   return (
     <div className="tradie-shell">
-      <p><Link to="/t">← Jobs</Link></p>
-      <h1>{enquiry.name}</h1>
-      <p className="muted-text">
-        {enquiry.phone}
-        {enquiry.postcode ? ` · ${enquiry.postcode}` : ""}
-      </p>
-      {enquiry.message && <p>{enquiry.message}</p>}
-      {enquiry.photoUrls?.length > 0 && (
-        <div className="tradie-photos">
-          {enquiry.photoUrls.map((u) => (
-            <a key={u} href={u} target="_blank" rel="noreferrer">
-              <img src={u} alt="" />
-            </a>
-          ))}
-        </div>
-      )}
+      <Link className="t-back" to="/t">
+        ← Jobs
+      </Link>
 
-      <h2>Create draft quote</h2>
-      <textarea
-        rows={4}
-        placeholder="Or type the job: combi swap, 2 rads upstairs, call-out…"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-      />
-      <div className="tradie-actions">
-        <button
-          className="primary"
-          disabled={fromNotes.isPending || notes.trim().length < 3}
-          onClick={() => fromNotes.mutate()}
-        >
-          {fromNotes.isPending ? "Building…" : "Draft from notes"}
-        </button>
-        {!recording ? (
-          <button onClick={() => void startRecording()} disabled={fromVoice.isPending}>
-            Record voice
-          </button>
-        ) : (
-          <button className="danger" onClick={stopRecording}>
-            Stop & transcribe
-          </button>
+      <div className="t-card t-contact-card">
+        <div className="t-contact-head">
+          <span className="t-avatar">{initialsOf(enquiry.name)}</span>
+          <div>
+            <h1>{enquiry.name}</h1>
+            <p className="t-contact-meta">
+              <a className="t-tel" href={`tel:${enquiry.phone}`}>
+                <IconPhone /> {enquiry.phone}
+              </a>
+              {enquiry.postcode && <span>· {enquiry.postcode}</span>}
+            </p>
+          </div>
+        </div>
+        {enquiry.message && <blockquote className="t-quote-msg">{enquiry.message}</blockquote>}
+        {enquiry.photoUrls?.length > 0 && (
+          <div className="tradie-photos">
+            {enquiry.photoUrls.map((u) => (
+              <a key={u} href={u} target="_blank" rel="noreferrer">
+                <img src={u} alt="" />
+              </a>
+            ))}
+          </div>
         )}
       </div>
-      {(fromNotes.isError || fromVoice.isError) && (
-        <p className="error">{((fromNotes.error || fromVoice.error) as Error).message}</p>
-      )}
-      {fromVoice.isPending && <p className="muted-text">Transcribing & pricing…</p>}
+
+      <p className="t-section-label">Draft a quote</p>
+      <div className="t-card">
+        <textarea
+          rows={4}
+          placeholder="Type the job: combi swap, 2 rads upstairs, call-out…"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+        <div className="tradie-actions">
+          <button
+            className="primary"
+            disabled={fromNotes.isPending || notes.trim().length < 3}
+            onClick={() => fromNotes.mutate()}
+          >
+            {fromNotes.isPending ? "Building…" : "Draft from notes"}
+          </button>
+          {!recording ? (
+            <button onClick={() => void startRecording()} disabled={fromVoice.isPending}>
+              Record voice
+            </button>
+          ) : (
+            <button className="danger" onClick={stopRecording}>
+              Stop & transcribe
+            </button>
+          )}
+        </div>
+        {(fromNotes.isError || fromVoice.isError) && (
+          <p className="error">{((fromNotes.error || fromVoice.error) as Error).message}</p>
+        )}
+        {fromVoice.isPending && <p className="muted-text">Transcribing &amp; pricing…</p>}
+      </div>
 
       {activeQuote && (
         <>
-          <h2>
-            Quote <span className="badge grey">{activeQuote.status}</span> · {formatGbp(activeQuote.totalPence)}
-          </h2>
-          {activeQuote.assumptions && <p className="muted-text">{activeQuote.assumptions}</p>}
-          {activeQuote.status === "DRAFT" && (
-            <div className="tradie-lines">
-              {activeQuote.lines.map((l, i) => (
-                <div key={l.id || i} className="tradie-line-block">
-                  <div className="tradie-line">
-                    <input value={l.label} onChange={(e) => updateLine(i, { label: e.target.value })} />
-                    <input
-                      type="number"
-                      step="0.25"
-                      value={l.qty}
-                      onChange={(e) => updateLine(i, { qty: Number(e.target.value) })}
-                    />
-                    <select value={l.unit} onChange={(e) => updateLine(i, { unit: e.target.value })}>
-                      {["JOB", "HOUR", "EACH", "DAY", "METRE"].map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      step="1"
-                      value={(l.unitPricePence / 100).toFixed(2)}
-                      onChange={(e) => updateLine(i, { unitPricePence: Math.round(Number(e.target.value) * 100) })}
-                      title="Unit price £"
-                    />
-                    <button
-                      className="linkish"
-                      onClick={() =>
-                        setDraft({ ...activeQuote, lines: activeQuote.lines.filter((_, j) => j !== i) })
-                      }
-                    >
-                      Remove
-                    </button>
+          <p className="t-section-label">Quote</p>
+          <div className="t-card">
+            <div className="t-quote-head">
+              <StatusPill status={activeQuote.status} />
+              <span className="t-money">{formatGbp(activeQuote.totalPence)}</span>
+            </div>
+            {activeQuote.assumptions && <p className="t-quote-assumptions">{activeQuote.assumptions}</p>}
+
+            {activeQuote.status === "DRAFT" && (
+              <div className="tradie-lines">
+                {activeQuote.lines.map((l, i) => (
+                  <div key={l.id || i} className="tradie-line-block">
+                    <div className="tradie-line">
+                      <input value={l.label} onChange={(e) => updateLine(i, { label: e.target.value })} />
+                      <input
+                        type="number"
+                        step="0.25"
+                        value={l.qty}
+                        onChange={(e) => updateLine(i, { qty: Number(e.target.value) })}
+                      />
+                      <select value={l.unit} onChange={(e) => updateLine(i, { unit: e.target.value })}>
+                        {["JOB", "HOUR", "EACH", "DAY", "METRE"].map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        step="1"
+                        value={(l.unitPricePence / 100).toFixed(2)}
+                        onChange={(e) => updateLine(i, { unitPricePence: Math.round(Number(e.target.value) * 100) })}
+                        title="Unit price £"
+                      />
+                      <button
+                        className="linkish"
+                        onClick={() =>
+                          setDraft({ ...activeQuote, lines: activeQuote.lines.filter((_, j) => j !== i) })
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <p className="tradie-line-source">{lineSourceHint(l)}</p>
                   </div>
-                  <p className="tradie-line-source muted-text">{lineSourceHint(l)}</p>
+                ))}
+                <div className="tradie-actions">
+                  <button onClick={addLine}>+ Line</button>
+                  <button onClick={() => saveLines.mutate(activeQuote.lines)} disabled={saveLines.isPending}>
+                    {saveLines.isPending ? "Saving…" : "Save edits"}
+                  </button>
                 </div>
-              ))}
-              <button onClick={addLine}>+ Line</button>
+                <div className="tradie-actions">
+                  <button
+                    className="primary t-btn--block"
+                    onClick={() => approve.mutate()}
+                    disabled={approve.isPending}
+                  >
+                    {approve.isPending ? "Sending…" : "Approve & send to customer"}
+                  </button>
+                  <button
+                    className="danger"
+                    onClick={() => {
+                      if (confirm("Delete this draft?")) remove.mutate();
+                    }}
+                  >
+                    Delete draft
+                  </button>
+                </div>
+                {(saveLines.isError || approve.isError || remove.isError) && (
+                  <p className="error">
+                    {((saveLines.error || approve.error || remove.error) as Error).message}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {activeQuote.status === "SENT" && (
+              <p className="muted-text">Sent to customer. Waiting for accept/decline — follow-ups are scheduled.</p>
+            )}
+            {(activeQuote.status === "ACCEPTED" || activeQuote.status === "SENT") && (
               <div className="tradie-actions">
                 <button
-                  onClick={() => saveLines.mutate(activeQuote.lines)}
-                  disabled={saveLines.isPending}
+                  className="convert t-btn--block"
+                  onClick={() => makeInvoice.mutate()}
+                  disabled={makeInvoice.isPending}
                 >
-                  {saveLines.isPending ? "Saving…" : "Save edits"}
+                  {makeInvoice.isPending ? "Creating…" : "Create invoice"}
                 </button>
-                <button
-                  className="primary"
-                  onClick={() => approve.mutate()}
-                  disabled={approve.isPending}
-                >
-                  {approve.isPending ? "Sending…" : "Approve & send"}
-                </button>
-                <button
-                  className="danger"
-                  onClick={() => {
-                    if (confirm("Delete this draft?")) remove.mutate();
-                  }}
-                >
-                  Delete
-                </button>
+                {makeInvoice.isError && <p className="error">{(makeInvoice.error as Error).message}</p>}
               </div>
-              {(saveLines.isError || approve.isError || remove.isError) && (
-                <p className="error">
-                  {((saveLines.error || approve.error || remove.error) as Error).message}
-                </p>
-              )}
-            </div>
-          )}
-          {activeQuote.status === "SENT" && (
-            <p className="muted-text">Sent to customer. Waiting for accept/decline. Follow-ups are scheduled.</p>
-          )}
-          {(activeQuote.status === "ACCEPTED" || activeQuote.status === "SENT") && (
-            <div className="tradie-actions" style={{ marginTop: 12 }}>
-              <button className="convert" onClick={() => makeInvoice.mutate()} disabled={makeInvoice.isPending}>
-                {makeInvoice.isPending ? "Creating…" : "Create invoice"}
-              </button>
-              {makeInvoice.isError && <p className="error">{(makeInvoice.error as Error).message}</p>}
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
 
-      <section style={{ marginTop: 28 }}>
-        <h2>Messages</h2>
+      <section>
+        <p className="t-section-label">Messages</p>
         {messages.isLoading && <p className="muted-text">Loading…</p>}
         <ul className="tradie-messages">
           {(messages.data || []).map((m: { id: string; direction: string; channel: string; body: string; createdAt: string }) => (
             <li key={m.id} className={m.direction === "INBOUND" ? "in" : "out"}>
               <span className="muted-text">
-                {m.direction} · {m.channel} · {new Date(m.createdAt).toLocaleString("en-GB")}
+                {m.direction === "INBOUND" ? "Customer" : "You"} · {m.channel} ·{" "}
+                {new Date(m.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
               </span>
               <p>{m.body}</p>
             </li>

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { formatGbp, tradieApi } from "../../api/tradie";
+import { EmptyState, IconChevron, StatusPill } from "./ui";
 
 export default function TradieJobsPage() {
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
@@ -11,35 +12,44 @@ export default function TradieJobsPage() {
 
   return (
     <div>
-      <h2>Jobs</h2>
-      <p className="muted-text">Recent enquiries — tap to quote</p>
+      <header className="t-page-head">
+        <h2>Jobs</h2>
+        <p>New enquiries — tap one to quote it</p>
+      </header>
 
       {me.data && !me.data.caps.claude && (
         <p className="error">Claude API key not set on the server — ask your admin to add it in Settings.</p>
       )}
 
-      {jobs.isLoading && <p>Loading…</p>}
+      {jobs.isLoading && <p className="muted-text">Loading…</p>}
       {jobs.isError && <p className="error">{(jobs.error as Error).message}</p>}
 
-      <ul className="tradie-jobs">
+      <ul className="t-list">
         {(jobs.data || []).map((j: { id: string; name: string; phone: string; message: string | null; postcode: string | null; latestQuote: { id: string; status: string; totalPence: number } | null }) => (
           <li key={j.id}>
-            <Link to={`/t/jobs/${j.id}`}>
-              <strong>{j.name}</strong>
-              <span className="muted-text">
-                {j.postcode || j.phone}
-                {j.latestQuote ? ` · ${j.latestQuote.status} ${formatGbp(j.latestQuote.totalPence)}` : " · no quote yet"}
-              </span>
-              {j.message && <span className="tradie-snip">{j.message}</span>}
+            <Link className="t-row" to={`/t/jobs/${j.id}`}>
+              <div className="t-row-main">
+                <div className="t-row-top">
+                  <strong>{j.name}</strong>
+                  {j.latestQuote ? <StatusPill status={j.latestQuote.status} /> : <span className="t-pill t-pill--orange">New</span>}
+                </div>
+                <span className="t-row-sub">{j.postcode || j.phone}</span>
+                {j.message && <span className="t-row-snip">{j.message}</span>}
+              </div>
+              <div className="t-row-side">
+                {j.latestQuote && <span className="t-money">{formatGbp(j.latestQuote.totalPence)}</span>}
+                <IconChevron />
+              </div>
             </Link>
           </li>
         ))}
       </ul>
+
       {jobs.data?.length === 0 && (
-        <p className="muted-text">
-          No jobs yet. Share your intake link, enable missed-call divert, or forward email to{" "}
-          {me.data?.inboundEmail || "your inbound address"}.
-        </p>
+        <EmptyState
+          title="No jobs yet"
+          hint={`Share your intake link, enable missed-call divert, or forward email to ${me.data?.inboundEmail || "your inbound address"}.`}
+        />
       )}
     </div>
   );

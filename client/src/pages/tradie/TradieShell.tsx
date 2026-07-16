@@ -1,14 +1,24 @@
 import { NavLink, Outlet, Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getTradieSession, setTradieSession, tradieApi } from "../../api/tradie";
+import {
+  IconCustomers,
+  IconInvoices,
+  IconJobs,
+  IconQuotes,
+  IconRates,
+  IconSettings,
+  StatusPill,
+  initialsOf,
+} from "./ui";
 
 const TABS = [
-  { to: "/t", label: "Jobs", end: true },
-  { to: "/t/quotes", label: "Quotes" },
-  { to: "/t/invoices", label: "Invoices" },
-  { to: "/t/customers", label: "Customers" },
-  { to: "/t/price-book", label: "Rates" },
-  { to: "/t/settings", label: "Settings" },
+  { to: "/t", label: "Jobs", end: true, Icon: IconJobs },
+  { to: "/t/quotes", label: "Quotes", Icon: IconQuotes },
+  { to: "/t/invoices", label: "Invoices", Icon: IconInvoices },
+  { to: "/t/customers", label: "Customers", Icon: IconCustomers },
+  { to: "/t/price-book", label: "Rates", Icon: IconRates },
+  { to: "/t/settings", label: "Settings", Icon: IconSettings },
 ] as const;
 
 export default function TradieShell() {
@@ -26,21 +36,32 @@ export default function TradieShell() {
     return <Navigate to="/t/auth" replace />;
   }
 
+  const businessName = me.data?.businessName || "TradersMate";
+  const subtitle = [me.data?.tradeTitle, me.data?.town].filter(Boolean).join(" · ") || "Quoting & jobs";
+
   return (
     <div className="tradie-shell tradie-shell--app">
-      <header className="tradie-top">
-        <div>
-          <h1>{me.data?.businessName || "TradersMate"}</h1>
-          <p className="muted-text">
-            {me.data?.status === "TRIAL" && me.data.trialEndsAt
-              ? `Trial ends ${new Date(me.data.trialEndsAt).toLocaleDateString("en-GB")}`
-              : me.data?.tradeTitle || "Quoting & jobs"}
+      <header className="t-appbar">
+        <div className="t-brand-mark">{initialsOf(businessName)}</div>
+        <div className="t-appbar-text">
+          <h1>{businessName.replace(/\[SEED\]\s*/i, "")}</h1>
+          <p className="t-appbar-sub">
+            {subtitle}
+            {me.data?.status === "TRIAL" && (
+              <StatusPill status="TRIAL" />
+            )}
           </p>
         </div>
       </header>
 
+      {me.data?.status === "TRIAL" && me.data.trialEndsAt && me.data.accountActive && (
+        <p className="muted-text" style={{ margin: "-14px 0 16px" }}>
+          Trial ends {new Date(me.data.trialEndsAt).toLocaleDateString("en-GB")} — subscribe anytime in Settings.
+        </p>
+      )}
+
       {me.data && !me.data.accountActive && (
-        <p className="error tradie-banner">
+        <p className="t-banner t-banner--danger">
           Account inactive — subscribe in Settings to send quotes and invoices.
         </p>
       )}
@@ -50,14 +71,15 @@ export default function TradieShell() {
       </div>
 
       <nav className="tradie-bottom-nav" aria-label="Tradie navigation">
-        {TABS.map((t) => (
+        {TABS.map(({ to, label, Icon, ...rest }) => (
           <NavLink
-            key={t.to}
-            to={t.to}
-            end={"end" in t ? t.end : false}
+            key={to}
+            to={to}
+            end={"end" in rest ? (rest as { end: boolean }).end : false}
             className={({ isActive }) => (isActive ? "active" : undefined)}
           >
-            {t.label}
+            <Icon />
+            <span>{label}</span>
           </NavLink>
         ))}
       </nav>

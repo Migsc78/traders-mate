@@ -19,6 +19,7 @@ import TradieInvoicesPage from "./pages/tradie/TradieInvoicesPage";
 import TradieCustomersPage from "./pages/tradie/TradieCustomersPage";
 import TradieSettingsPage from "./pages/tradie/TradieSettingsPage";
 import "./styles.css";
+import "./tradie.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },

@@ -39,125 +39,151 @@ export default function TradieAuthPage() {
 
   if (token && !error) {
     return (
-      <div className="tradie-shell">
-        <p>Signing you in…</p>
+      <div className="tradie-shell t-gate">
+        <div className="t-gate-brand">
+          <div className="t-brand-mark">TM</div>
+          <h1>Signing you in…</h1>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="tradie-shell">
-      <h1>Tradie login</h1>
-      <p className="muted-text">Sign in with a one-time code. No password.</p>
-      {error && <p className="error">{error}</p>}
-      {getTradieSession() && (
-        <p>
-          Already signed in. <Link to="/t">Open jobs →</Link>
-        </p>
-      )}
+    <div className="tradie-shell t-gate">
+      <div className="t-gate-brand">
+        <div className="t-brand-mark">TM</div>
+        <h1>Welcome back</h1>
+        <p>Sign in with a one-time code. No password.</p>
+      </div>
 
-      {step === "phone" ? (
-        <form
-          className="form"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setSending(true);
-            setError("");
-            try {
-              await tradieApi.loginStart(phone.trim());
-              setStep("code");
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Could not send code");
-            } finally {
-              setSending(false);
-            }
-          }}
-        >
-          <label>
-            Mobile number
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07…" required />
-          </label>
-          <button className="primary" type="submit" disabled={sending || !phone.trim()}>
-            {sending ? "Sending…" : "Text me a code"}
-          </button>
-        </form>
-      ) : (
-        <form
-          className="form"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setSending(true);
-            setError("");
-            try {
-              const r = await tradieApi.loginVerify({ phone: phone.trim(), code: code.trim() });
-              setTradieSession(r.sessionToken);
-              navigate("/t");
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Invalid code");
-            } finally {
-              setSending(false);
-            }
-          }}
-        >
-          <p className="muted-text">Code sent to {phone}</p>
-          <label>
-            Code
-            <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" required />
-          </label>
-          <button className="primary" type="submit" disabled={sending || !code.trim()}>
-            {sending ? "Checking…" : "Sign in"}
-          </button>
-          <button type="button" className="linkish" onClick={() => setStep("phone")}>
-            Use a different number
-          </button>
-        </form>
-      )}
+      <div className="t-gate-card">
+        {error && <p className="error">{error}</p>}
+        {getTradieSession() && (
+          <p>
+            Already signed in. <Link to="/t">Open jobs →</Link>
+          </p>
+        )}
 
-      <details style={{ marginTop: 24 }} open>
-        <summary className="muted-text">Or sign in with route key</summary>
-        <form
-          className="form"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const key = routeKey.trim();
-            if (!key) return;
-            setSending(true);
-            setError("");
-            try {
-              if (key.startsWith("seed_tm_")) {
-                const r = await tradieApi.seedLogin(key);
+        {step === "phone" ? (
+          <form
+            className="form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setSending(true);
+              setError("");
+              try {
+                await tradieApi.loginStart(phone.trim());
+                setStep("code");
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not send code");
+              } finally {
+                setSending(false);
+              }
+            }}
+          >
+            <label>
+              Mobile number
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="07…"
+                inputMode="tel"
+                autoComplete="tel"
+                required
+              />
+            </label>
+            <button className="primary t-btn--block" type="submit" disabled={sending || !phone.trim()}>
+              {sending ? "Sending…" : "Text me a code"}
+            </button>
+          </form>
+        ) : (
+          <form
+            className="form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setSending(true);
+              setError("");
+              try {
+                const r = await tradieApi.loginVerify({ phone: phone.trim(), code: code.trim() });
                 setTradieSession(r.sessionToken);
                 navigate("/t");
-                return;
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Invalid code");
+              } finally {
+                setSending(false);
               }
-              await tradieApi.requestMagic({ routeKey: key });
-              setError("Login link sent by SMS — open the link on this phone.");
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Could not sign in");
-            } finally {
-              setSending(false);
-            }
-          }}
-        >
-          <label>
-            Route key
-            <input
-              value={routeKey}
-              onChange={(e) => setRouteKey(e.target.value)}
-              placeholder="seed_tm_demo_plumbing"
-            />
-          </label>
-          <button className="primary" type="submit" disabled={sending || !routeKey.trim()}>
-            {sending
-              ? "Signing in…"
-              : routeKey.trim().startsWith("seed_tm_")
-                ? "Sign in (seed — no SMS)"
-                : "Text me a login link"}
-          </button>
-        </form>
-      </details>
+            }}
+          >
+            <p className="t-otp-sent">
+              Code sent to <strong>{phone}</strong>
+            </p>
+            <label>
+              Code
+              <input
+                className="t-code-input"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                required
+              />
+            </label>
+            <button className="primary t-btn--block" type="submit" disabled={sending || !code.trim()}>
+              {sending ? "Checking…" : "Sign in"}
+            </button>
+            <button type="button" className="linkish" onClick={() => setStep("phone")}>
+              Use a different number
+            </button>
+          </form>
+        )}
 
-      <p className="muted-text" style={{ marginTop: 20 }}>
+        <details open>
+          <summary>Or sign in with route key</summary>
+          <form
+            className="form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const key = routeKey.trim();
+              if (!key) return;
+              setSending(true);
+              setError("");
+              try {
+                if (key.startsWith("seed_tm_")) {
+                  const r = await tradieApi.seedLogin(key);
+                  setTradieSession(r.sessionToken);
+                  navigate("/t");
+                  return;
+                }
+                await tradieApi.requestMagic({ routeKey: key });
+                setError("Login link sent by SMS — open the link on this phone.");
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not sign in");
+              } finally {
+                setSending(false);
+              }
+            }}
+          >
+            <label>
+              Route key
+              <input
+                value={routeKey}
+                onChange={(e) => setRouteKey(e.target.value)}
+                placeholder="seed_tm_demo_plumbing"
+              />
+            </label>
+            <button className="t-btn--block" type="submit" disabled={sending || !routeKey.trim()}>
+              {sending
+                ? "Signing in…"
+                : routeKey.trim().startsWith("seed_tm_")
+                  ? "Sign in (seed — no SMS)"
+                  : "Text me a login link"}
+            </button>
+          </form>
+        </details>
+      </div>
+
+      <p className="t-gate-alt">
         New here? <Link to="/signup">Start a free trial</Link>
       </p>
     </div>
