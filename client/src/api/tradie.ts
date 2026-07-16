@@ -116,6 +116,13 @@ export const tradieApi = {
   requestMagic: (body: { routeKey?: string; phone?: string }) =>
     tRequest<{ ok: boolean }>("/auth/magic", { method: "POST", body: JSON.stringify(body) }),
 
+  /** Seed accounts only (`seed_tm_*`) — creates a session without SMS. */
+  seedLogin: (routeKey: string) =>
+    tRequest<{ sessionToken: string; clientId: string; routeKey: string; businessName: string }>("/auth/seed-login", {
+      method: "POST",
+      body: JSON.stringify({ routeKey }),
+    }),
+
   consumeMagic: (token: string) =>
     tRequest<MagicConsumeResult>("/auth/consume", {
       method: "POST",

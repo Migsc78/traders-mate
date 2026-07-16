@@ -99,6 +99,20 @@ export async function consumeMagicToken(rawToken: string): Promise<{ sessionToke
   return result;
 }
 
+/** Create a long-lived browser session token for a client. */
+export async function createClientSession(clientId: string): Promise<{ sessionToken: string; expiresAt: Date }> {
+  const sessionToken = newSessionToken();
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  await prisma.clientSession.create({
+    data: {
+      clientId,
+      tokenHash: hashToken(`session:${sessionToken}`),
+      expiresAt,
+    },
+  });
+  return { sessionToken, expiresAt };
+}
+
 export async function resolveSession(sessionToken: string | null | undefined): Promise<{ clientId: string } | null> {
   if (!sessionToken) return null;
   const row = await prisma.clientSession.findUnique({

@@ -6,7 +6,7 @@ import { prisma } from "../db.js";
 import { ApiError } from "../middleware/error.js";
 import { sendMessage } from "../services/messaging/sender.js";
 import { storeAudio } from "../services/storage/store.js";
-import { createMagicLogin, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
+import { createMagicLogin, createClientSession, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
 import {
   deactivatePriceBookItem,
   ensurePriceBook,
@@ -95,6 +95,31 @@ tradieRouter.post("/auth/magic", async (req, res, next) => {
       body: `Your TradersMate login link (expires in 30 min):\n${url}`,
     });
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Direct login for seed test accounts only (`seed_tm_*` route keys) — no SMS. */
+tradieRouter.post("/auth/seed-login", async (req, res, next) => {
+  try {
+    const body = z.object({ routeKey: z.string().min(3) }).parse(req.body ?? {});
+    const routeKey = body.routeKey.trim();
+    if (!routeKey.startsWith("seed_tm_")) {
+      throw new ApiError(403, "forbidden", "Direct login is only available for seed test accounts");
+    }
+    const client = await prisma.client.findUnique({ where: { routeKey } });
+    if (!client) throw new ApiError(404, "not_found", "Seed client not found — run npm run db:seed");
+    if (client.status === "CANCELLED") throw new ApiError(403, "cancelled", "Account cancelled");
+
+    const session = await createClientSession(client.id);
+    await ensurePriceBook(client.id, client.tradeTitle);
+    res.json({
+      sessionToken: session.sessionToken,
+      clientId: client.id,
+      routeKey: client.routeKey,
+      businessName: client.businessName,
+    });
   } catch (err) {
     next(err);
   }

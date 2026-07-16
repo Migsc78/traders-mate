@@ -113,30 +113,48 @@ export default function TradieAuthPage() {
         </form>
       )}
 
-      <details style={{ marginTop: 24 }}>
-        <summary className="muted-text">Or use magic link (route key)</summary>
-        <label>
-          Route key
-          <input value={routeKey} onChange={(e) => setRouteKey(e.target.value)} placeholder="tm_…" />
-        </label>
-        <button
-          className="primary"
-          disabled={sending || !routeKey.trim()}
-          onClick={async () => {
+      <details style={{ marginTop: 24 }} open>
+        <summary className="muted-text">Or sign in with route key</summary>
+        <form
+          className="form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const key = routeKey.trim();
+            if (!key) return;
             setSending(true);
             setError("");
             try {
-              await tradieApi.requestMagic({ routeKey: routeKey.trim() });
-              alert("Check your phone for the login SMS.");
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Could not send link");
+              if (key.startsWith("seed_tm_")) {
+                const r = await tradieApi.seedLogin(key);
+                setTradieSession(r.sessionToken);
+                navigate("/t");
+                return;
+              }
+              await tradieApi.requestMagic({ routeKey: key });
+              setError("Login link sent by SMS — open the link on this phone.");
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not sign in");
             } finally {
               setSending(false);
             }
           }}
         >
-          Text me a login link
-        </button>
+          <label>
+            Route key
+            <input
+              value={routeKey}
+              onChange={(e) => setRouteKey(e.target.value)}
+              placeholder="seed_tm_demo_plumbing"
+            />
+          </label>
+          <button className="primary" type="submit" disabled={sending || !routeKey.trim()}>
+            {sending
+              ? "Signing in…"
+              : routeKey.trim().startsWith("seed_tm_")
+                ? "Sign in (seed — no SMS)"
+                : "Text me a login link"}
+          </button>
+        </form>
       </details>
 
       <p className="muted-text" style={{ marginTop: 20 }}>
