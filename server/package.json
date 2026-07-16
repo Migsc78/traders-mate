@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npx tsc --noEmit -p tsconfig.json",
     "test": "tsx src/__tests__/pipeline.test.ts && tsx src/__tests__/site.test.ts",
     "test:site": "tsx src/__tests__/site.test.ts",
     "prisma:generate": "prisma generate",

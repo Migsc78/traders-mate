@@ -15,7 +15,7 @@
     "build:client": "npm run build --prefix client",
     "start": "npm run start --prefix server",
     "start:prod": "npm run prisma:migrate:deploy --prefix server && npm run start --prefix server",
-    "typecheck": "npm run typecheck --prefix server && npm run typecheck --prefix client",
+    "typecheck": "npm install --prefix server && npm install --prefix client && npm run typecheck --prefix server && npm run typecheck --prefix client",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "npm run prisma:migrate --prefix server"

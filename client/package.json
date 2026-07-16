@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npx tsc --noEmit -p tsconfig.json",
     "icons": "node scripts/make-icons.mjs",
     "cap:sync": "npm run build && npx cap sync",
     "cap:android": "npx cap open android",
