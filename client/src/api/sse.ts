@@ -17,9 +17,13 @@ export async function postSse<TComplete>(
   body: unknown,
   onProgress?: (progress: JobProgress) => void
 ): Promise<TComplete> {
+  const opToken = String(import.meta.env.VITE_OPERATOR_API_TOKEN || localStorage.getItem("tm_operator_token") || "").trim();
   const res = await fetch(apiUrl(url), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(opToken ? { Authorization: `Bearer ${opToken}`, "x-operator-token": opToken } : {}),
+    },
     body: JSON.stringify(body),
   });
 

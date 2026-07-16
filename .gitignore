@@ -16,4 +16,8 @@ server/generated-sites/
 .fuse_hidden*
 .tmp/
 *.dump
+client/android/.gradle/
+client/android/app/build/
+client/ios/App/Pods/
+client/ios/DerivedData/
 

@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../../env.js";
 
-export type ClientStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED";
+export type ClientStatus = "TRIAL" | "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED";
 
 export function stripeConfigured(): boolean {
   return !!env.STRIPE_SECRET_KEY;

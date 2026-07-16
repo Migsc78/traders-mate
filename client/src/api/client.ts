@@ -2,11 +2,20 @@ import type { Lead, LeadFilters, LeadsResponse, SearchSummary, JobProgress } fro
 import { searchWithProgress } from "./sse";
 import { apiUrl } from "./base";
 
+function operatorHeaders(): Record<string, string> {
+  const token = String(import.meta.env.VITE_OPERATOR_API_TOKEN || localStorage.getItem("tm_operator_token") || "").trim();
+  return token ? { Authorization: `Bearer ${token}`, "x-operator-token": token } : {};
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const fullUrl = apiUrl(url);
   const res = await fetch(fullUrl, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...operatorHeaders(),
+      ...(init?.headers || {}),
+    },
   });
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {

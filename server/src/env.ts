@@ -59,6 +59,16 @@ const schema = z.object({
   STRIPE_PRICE_ID: z.string().default(""),
   STRIPE_SUCCESS_URL: z.string().default(""),
   STRIPE_CANCEL_URL: z.string().default(""),
+
+  // Operator CRM protection (Bearer / x-operator-token). Empty = open (local/dev).
+  OPERATOR_API_TOKEN: z.string().default(""),
+
+  // Self-serve trial length (days).
+  TRIAL_DAYS: z.coerce.number().default(14),
+
+  // Inbound email domain local-part@INBOUND_EMAIL_DOMAIN
+  INBOUND_EMAIL_DOMAIN: z.string().default("in.tradersmate.co.uk"),
+  INBOUND_EMAIL_WEBHOOK_SECRET: z.string().default(""),
 });
 
 export const env = schema.parse(process.env);

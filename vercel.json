@@ -8,6 +8,10 @@
       "source": "/q/:path*",
       "destination": "https://traders-mate-production.up.railway.app/q/:path*"
     },
+    {
+      "source": "/i/:path*",
+      "destination": "https://traders-mate-production.up.railway.app/i/:path*"
+    },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ]
 }

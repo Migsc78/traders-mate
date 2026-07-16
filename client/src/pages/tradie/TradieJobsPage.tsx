@@ -1,48 +1,18 @@
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, Navigate } from "react-router-dom";
-import { formatGbp, getTradieSession, setTradieSession, tradieApi } from "../../api/tradie";
+import { Link } from "react-router-dom";
+import { formatGbp, tradieApi } from "../../api/tradie";
 
 export default function TradieJobsPage() {
-  const session = getTradieSession();
-  const me = useQuery({
-    queryKey: ["tradie-me"],
-    queryFn: () => tradieApi.me(),
-    enabled: !!session,
-    retry: false,
-  });
+  const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
   const jobs = useQuery({
     queryKey: ["tradie-jobs"],
     queryFn: () => tradieApi.jobs(),
-    enabled: !!session && me.isSuccess,
   });
 
-  useEffect(() => {
-    if (me.isError) setTradieSession(null);
-  }, [me.isError]);
-
-  if (!session || me.isError) return <Navigate to="/t/auth" replace />;
-
   return (
-    <div className="tradie-shell">
-      <header className="tradie-top">
-        <div>
-          <h1>{me.data?.businessName || "Jobs"}</h1>
-          <p className="muted-text">Recent enquiries — tap to quote</p>
-        </div>
-        <div className="tradie-actions">
-          <Link to="/t/price-book">Price book</Link>
-          <button
-            className="linkish"
-            onClick={() => {
-              setTradieSession(null);
-              window.location.href = "/t/auth";
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+    <div>
+      <h2>Jobs</h2>
+      <p className="muted-text">Recent enquiries — tap to quote</p>
 
       {me.data && !me.data.caps.claude && (
         <p className="error">Claude API key not set on the server — ask your admin to add it in Settings.</p>
@@ -65,7 +35,12 @@ export default function TradieJobsPage() {
           </li>
         ))}
       </ul>
-      {jobs.data?.length === 0 && <p className="muted-text">No jobs yet — new website enquiries will show here.</p>}
+      {jobs.data?.length === 0 && (
+        <p className="muted-text">
+          No jobs yet. Share your intake link, enable missed-call divert, or forward email to{" "}
+          {me.data?.inboundEmail || "your inbound address"}.
+        </p>
+      )}
     </div>
   );
 }

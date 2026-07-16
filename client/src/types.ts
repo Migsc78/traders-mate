@@ -99,7 +99,7 @@ export const OUTREACH_STATUSES: OutreachStatus[] = [
 
 export const WEBSITE_CLASSES: WebsiteClass[] = ["NONE", "SOCIAL_ONLY", "DIRECTORY_ONLY", "PROPER_DEAD", "PROPER"];
 
-export type ClientStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED";
+export type ClientStatus = "TRIAL" | "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED";
 export type Channel = "WHATSAPP" | "SMS" | "BOTH";
 export type EnquiryStatus = "ROUTED" | "HELD" | "FAILED";
 
@@ -158,5 +158,5 @@ export interface ClientAsset {
 
 export const CLIENT_ASSET_KINDS: ClientAssetKind[] = ["LOGO", "SHOWCASE", "JOB", "OTHER"];
 
-export const CLIENT_STATUSES: ClientStatus[] = ["ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"];
+export const CLIENT_STATUSES: ClientStatus[] = ["TRIAL", "ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"];
 export const CHANNELS: Channel[] = ["SMS", "WHATSAPP", "BOTH"];

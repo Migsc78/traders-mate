@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { LeadFilters, OutreachStatus } from "../types";
+import type { Lead, LeadFilters, OutreachStatus } from "../types";
 import FilterBar from "../components/FilterBar";
 import LeadsTable from "../components/LeadsTable";
 import ScoreLegend from "../components/ScoreLegend";
@@ -58,8 +58,8 @@ export default function LeadsPage() {
 
   const toggleAll = () =>
     setSelected((s) => {
-      if (leads.every((l) => s.has(l.id))) return new Set<string>();
-      return new Set<string>(leads.map((l) => l.id));
+      if (leads.every((l: Lead) => s.has(l.id))) return new Set<string>();
+      return new Set<string>(leads.map((l: Lead) => l.id));
     });
 
   const total = data?.total ?? 0;

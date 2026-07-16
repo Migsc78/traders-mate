@@ -47,10 +47,39 @@ enum DomainState {
 }
 
 enum ClientStatus {
+  TRIAL
   ACTIVE
   PAST_DUE
   SUSPENDED
   CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+  SYSTEM
+}
+
+enum MissedCallStatus {
+  PENDING
+  QUALIFYING
+  CONVERTED
+  SPAM
+  EXPIRED
 }
 
 enum Channel {
@@ -147,6 +176,14 @@ model Client {
   destPhone        String // tradie's own number (forwarding model), E.164 or 0-prefixed
   destChannel      Channel      @default(SMS)
   status           ClientStatus @default(ACTIVE)
+  phoneVerifiedAt  DateTime?
+  trialEndsAt      DateTime?
+  twilioNumber     String? // dedicated Twilio number for missed-call divert
+  inboundEmailLocal String? @unique // local-part for inbound email intake
+  bankName         String?
+  bankSortCode     String?
+  bankAccountName  String?
+  bankAccountNumber String?
   stripeCustomerId String?
   stripeSubId      String?
   allowedOrigins   String[]     @default([]) // domains permitted to POST via the widget
@@ -161,8 +198,14 @@ model Client {
   quotes           Quote[]
   sessions         ClientSession[]
   assets           ClientAsset[]
+  invoices         Invoice[]
+  messages         Message[]
+  missedCalls      MissedCall[]
+  otpChallenges    OtpChallenge[]
 
   @@index([status])
+  @@index([destPhone])
+  @@index([twilioNumber])
 }
 
 // A routed customer enquiry (the actual lead delivered to a client).
@@ -184,8 +227,12 @@ model Enquiry {
 
   quotes       Quote[]
   voiceNotes   VoiceNote[]
+  invoices     Invoice[]
+  messages     Message[]
+  missedCalls  MissedCall[]
 
   @@index([clientId, createdAt])
+  @@index([clientId, phone])
 }
 
 enum QuoteStatus {
@@ -208,6 +255,8 @@ enum FollowUpKind {
   QUOTE_D2
   QUOTE_D5
   QUOTE_D10
+  INVOICE_D3
+  INVOICE_D7
 }
 
 enum FollowUpStatus {
@@ -292,6 +341,7 @@ model Quote {
 
   lines           QuoteLine[]
   followUps       FollowUp[]
+  invoices        Invoice[]
 
   @@index([clientId, status, createdAt])
   @@index([enquiryId])
@@ -317,8 +367,10 @@ model QuoteLine {
 
 model FollowUp {
   id           String         @id @default(cuid())
-  quoteId      String
-  quote        Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteId      String?
+  quote        Quote?         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  invoiceId    String?
+  invoice      Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   kind         FollowUpKind
   status       FollowUpStatus @default(PENDING)
   runAt        DateTime
@@ -328,6 +380,7 @@ model FollowUp {
 
   @@index([status, runAt])
   @@index([quoteId])
+  @@index([invoiceId])
 }
 
 model ClientSession {
@@ -363,4 +416,110 @@ model ClientAsset {
   createdAt DateTime        @default(now())
 
   @@index([clientId, kind])
+}
+
+model Invoice {
+  id                String        @id @default(cuid())
+  clientId          String
+  client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enquiryId         String?
+  enquiry           Enquiry?      @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  quoteId           String?
+  quote             Quote?        @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  status            InvoiceStatus @default(DRAFT)
+  publicToken       String        @unique
+  customerName      String?
+  customerPhone     String?
+  currency          String        @default("GBP")
+  vatInclusive      Boolean       @default(true)
+  subtotalPence     Int           @default(0)
+  vatPence          Int           @default(0)
+  totalPence        Int           @default(0)
+  dueDate           DateTime?
+  reference         String?
+  bankName          String?
+  bankSortCode      String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  customerNote      String?
+  sentAt            DateTime?
+  paidAt            DateTime?
+  paidReportedAt    DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  lines             InvoiceLine[]
+  followUps         FollowUp[]
+
+  @@index([clientId, status, createdAt])
+  @@index([enquiryId])
+  @@index([quoteId])
+}
+
+model InvoiceLine {
+  id             String  @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sort           Int     @default(0)
+  label          String
+  qty            Float   @default(1)
+  unit           String  @default("JOB")
+  unitPricePence Int
+  vatRate        Float   @default(20)
+  createdAt      DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model Message {
+  id          String           @id @default(cuid())
+  clientId    String
+  client      Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enquiryId   String?
+  enquiry     Enquiry?         @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  direction   MessageDirection
+  channel     MessageChannel   @default(SMS)
+  toAddr      String
+  fromAddr    String?
+  body        String
+  twilioSid   String?
+  status      String           @default("sent")
+  createdAt   DateTime         @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([enquiryId, createdAt])
+  @@index([toAddr])
+}
+
+model MissedCall {
+  id            String          @id @default(cuid())
+  clientId      String
+  client        Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  callerPhone   String
+  status        MissedCallStatus @default(PENDING)
+  enquiryId     String?
+  enquiry       Enquiry?        @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  conversation  Json?           // [{role, text, at}]
+  callSid       String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([clientId, callerPhone, status])
+  @@index([callerPhone, status])
+}
+
+model OtpChallenge {
+  id         String   @id @default(cuid())
+  clientId   String?
+  client     Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  phone      String
+  codeHash   String
+  purpose    String   // signup | login
+  payload    Json?    // signup draft fields before client exists
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([phone, purpose])
+  @@index([expiresAt])
 }

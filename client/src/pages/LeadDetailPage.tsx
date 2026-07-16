@@ -75,7 +75,7 @@ export default function LeadDetailPage() {
 
   const generate = useMutation({
     mutationFn: () => api.generateSite(leadId),
-    onSuccess: (res) => {
+    onSuccess: (res: { previewUrl: string }) => {
       invalidate();
       window.open(res.previewUrl, "_blank");
     },
@@ -83,7 +83,7 @@ export default function LeadDetailPage() {
 
   const convert = useMutation({
     mutationFn: () => api.convertLead(leadId),
-    onSuccess: (result) => {
+    onSuccess: (result: { id: string }) => {
       invalidate();
       qc.invalidateQueries({ queryKey: ["clients"] });
       navigate(`/clients/${result.id}`);
@@ -247,7 +247,7 @@ export default function LeadDetailPage() {
               <dt>Google reviews</dt>
               <dd className="review-snips">
                 {reviews.length ? (
-                  reviews.map((r, i) => (
+                  reviews.map((r: { author: string; text: string; rating: number }, i: number) => (
                     <blockquote key={`${r.author}-${i}`}>
                       <strong>{r.author}</strong> ({r.rating}/5): {r.text.slice(0, 220)}
                       {r.text.length > 220 ? "…" : ""}

@@ -1,5 +1,6 @@
 import { prisma } from "../../db.js";
 import { sendMessage } from "../messaging/sender.js";
+import { logMessage } from "../messaging/log.js";
 import { formatGbp } from "./money.js";
 import { appPublicUrl } from "./magicAuth.js";
 
@@ -32,6 +33,12 @@ function chaseBody(kind: string, business: string, totalPence: number, url: stri
   if (kind === "QUOTE_D5") {
     return `Friendly reminder from ${business} — your quote (${money}) is still open: ${url}`;
   }
+  if (kind === "INVOICE_D3") {
+    return `Reminder from ${business}: invoice ${money} is due soon. Pay details: ${url}`;
+  }
+  if (kind === "INVOICE_D7") {
+    return `Overdue reminder from ${business}: please pay ${money}. Details: ${url}`;
+  }
   return `Final reminder from ${business} about your quote (${money}). It will expire soon: ${url}`;
 }
 
@@ -48,6 +55,11 @@ export async function tickFollowUps(limit = 20): Promise<{ sent: number; expired
           enquiry: true,
         },
       },
+      invoice: {
+        include: {
+          client: true,
+        },
+      },
     },
   });
 
@@ -55,6 +67,38 @@ export async function tickFollowUps(limit = 20): Promise<{ sent: number; expired
   let expired = 0;
 
   for (const fu of due) {
+    if (fu.kind.startsWith("INVOICE_") && fu.invoice) {
+      const inv = fu.invoice;
+      if (inv.status === "PAID" || inv.status === "VOID" || !inv.customerPhone) {
+        await prisma.followUp.update({ where: { id: fu.id }, data: { status: "SKIPPED" } });
+        continue;
+      }
+      const url = `${appPublicUrl()}/i/${inv.publicToken}`;
+      const body = chaseBody(fu.kind, inv.client.businessName, inv.totalPence, url);
+      try {
+        const results = await sendMessage({ to: inv.customerPhone, channel: "SMS", body });
+        await logMessage({
+          clientId: inv.clientId,
+          enquiryId: inv.enquiryId,
+          direction: "OUTBOUND",
+          toAddr: inv.customerPhone,
+          body,
+          twilioSid: results[0]?.id,
+        });
+        await prisma.followUp.update({
+          where: { id: fu.id },
+          data: { status: "SENT", sentAt: new Date(), bodySnapshot: body.slice(0, 500) },
+        });
+        if (fu.kind === "INVOICE_D7" && inv.status === "SENT") {
+          await prisma.invoice.update({ where: { id: inv.id }, data: { status: "OVERDUE" } });
+        }
+        sent += 1;
+      } catch {
+        continue;
+      }
+      continue;
+    }
+
     const q = fu.quote;
     if (!q || q.status !== "SENT" || !q.enquiry?.phone) {
       await prisma.followUp.update({ where: { id: fu.id }, data: { status: "SKIPPED" } });
@@ -64,14 +108,21 @@ export async function tickFollowUps(limit = 20): Promise<{ sent: number; expired
     const url = `${appPublicUrl()}/q/${q.publicToken}`;
     const body = chaseBody(fu.kind, q.client.businessName, q.totalPence, url);
     try {
-      await sendMessage({ to: q.enquiry.phone, channel: "SMS", body });
+      const results = await sendMessage({ to: q.enquiry.phone, channel: "SMS", body });
+      await logMessage({
+        clientId: q.clientId,
+        enquiryId: q.enquiryId,
+        direction: "OUTBOUND",
+        toAddr: q.enquiry.phone,
+        body,
+        twilioSid: results[0]?.id,
+      });
       await prisma.followUp.update({
         where: { id: fu.id },
         data: { status: "SENT", sentAt: new Date(), bodySnapshot: body.slice(0, 500) },
       });
       sent += 1;
     } catch {
-      // leave PENDING for retry next tick
       continue;
     }
 

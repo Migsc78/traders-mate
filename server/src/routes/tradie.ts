@@ -20,6 +20,10 @@ import { scheduleQuoteFollowUps, cancelQuoteFollowUps } from "../services/quotes
 import { formatGbp } from "../services/quotes/money.js";
 import { transcribeWithWhisper } from "../services/quotes/whisper.js";
 import { claudeConfigured, openaiConfigured } from "../settings.js";
+import { logMessage } from "../services/messaging/log.js";
+import { createCheckoutSession } from "../services/billing/stripe.js";
+import { createInvoiceFromQuote, sendInvoice, markInvoicePaid } from "../services/invoices/invoice.js";
+import { env } from "../env.js";
 
 export const tradieRouter = Router();
 
@@ -31,11 +35,34 @@ function bearer(req: Request): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+function accountActive(status: string, trialEndsAt: Date | null | undefined): boolean {
+  if (status === "ACTIVE") return true;
+  if (status === "TRIAL") {
+    if (!trialEndsAt) return true;
+    return trialEndsAt.getTime() > Date.now();
+  }
+  return false;
+}
+
 async function requireClient(req: Request, _res: Response, next: NextFunction) {
   try {
     const session = await resolveSession(bearer(req));
     if (!session) throw new ApiError(401, "unauthorized", "Sign in via magic link");
     (req as Request & { clientId: string }).clientId = session.clientId;
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Blocks mutating quote/invoice actions when trial expired / suspended. */
+async function requireActiveAccount(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    if (!accountActive(client.status, client.trialEndsAt)) {
+      throw new ApiError(402, "subscription_required", "Trial ended or account inactive — subscribe in Settings");
+    }
     next();
   } catch (err) {
     next(err);
@@ -95,14 +122,81 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
     const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
     if (!client) throw new ApiError(404, "not_found", "Client not found");
     await ensurePriceBook(client.id, client.tradeTitle);
+    const twilio = client.twilioNumber || "";
+    const digits = twilio.replace(/\D/g, "");
     res.json({
       id: client.id,
       businessName: client.businessName,
       tradeTitle: client.tradeTitle,
       town: client.town,
       routeKey: client.routeKey,
+      status: client.status,
+      trialEndsAt: client.trialEndsAt,
+      accountActive: accountActive(client.status, client.trialEndsAt),
+      twilioNumber: client.twilioNumber,
+      inboundEmail: client.inboundEmailLocal
+        ? `${client.inboundEmailLocal}@${env.INBOUND_EMAIL_DOMAIN}`
+        : null,
+      bankName: client.bankName,
+      bankSortCode: client.bankSortCode,
+      bankAccountName: client.bankAccountName,
+      bankAccountNumber: client.bankAccountNumber,
+      divertCodes: twilio
+        ? {
+            noAnswer: `**61*${digits}#`,
+            busy: `**67*${digits}#`,
+            unreachable: `**62*${digits}#`,
+          }
+        : null,
       caps: { claude: claudeConfigured(), whisper: openaiConfigured() },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.patch("/me", requireClient, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        businessName: z.string().min(2).max(120).optional(),
+        tradeTitle: z.string().max(80).nullable().optional(),
+        town: z.string().max(80).nullable().optional(),
+        destChannel: z.enum(["SMS", "WHATSAPP", "BOTH"]).optional(),
+        bankName: z.string().max(80).nullable().optional(),
+        bankSortCode: z.string().max(20).nullable().optional(),
+        bankAccountName: z.string().max(120).nullable().optional(),
+        bankAccountNumber: z.string().max(20).nullable().optional(),
+        twilioNumber: z.string().max(30).nullable().optional(),
+      })
+      .parse(req.body ?? {});
+
+    const client = await prisma.client.update({
+      where: { id: clientId(req) },
+      data: {
+        ...(body.businessName !== undefined ? { businessName: body.businessName } : {}),
+        ...(body.tradeTitle !== undefined ? { tradeTitle: body.tradeTitle } : {}),
+        ...(body.town !== undefined ? { town: body.town } : {}),
+        ...(body.destChannel !== undefined ? { destChannel: body.destChannel } : {}),
+        ...(body.bankName !== undefined ? { bankName: body.bankName } : {}),
+        ...(body.bankSortCode !== undefined ? { bankSortCode: body.bankSortCode } : {}),
+        ...(body.bankAccountName !== undefined ? { bankAccountName: body.bankAccountName } : {}),
+        ...(body.bankAccountNumber !== undefined ? { bankAccountNumber: body.bankAccountNumber } : {}),
+        ...(body.twilioNumber !== undefined
+          ? { twilioNumber: body.twilioNumber ? body.twilioNumber : null }
+          : {}),
+      },
+    });
+    res.json({ ok: true, id: client.id });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/billing/checkout", requireClient, async (req, res, next) => {
+  try {
+    const result = await createCheckoutSession({ clientId: clientId(req) });
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -164,7 +258,7 @@ tradieRouter.get("/jobs/:enquiryId", requireClient, async (req, res, next) => {
 });
 
 // ---- Voice / notes → draft ----
-tradieRouter.post("/jobs/:enquiryId/notes", requireClient, async (req, res, next) => {
+tradieRouter.post("/jobs/:enquiryId/notes", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
     const body = z.object({ transcript: z.string().min(3).max(8000) }).parse(req.body ?? {});
     const enquiry = await prisma.enquiry.findFirst({
@@ -193,7 +287,7 @@ tradieRouter.post("/jobs/:enquiryId/notes", requireClient, async (req, res, next
   }
 });
 
-tradieRouter.post("/jobs/:enquiryId/voice", requireClient, async (req, res, next) => {
+tradieRouter.post("/jobs/:enquiryId/voice", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -373,7 +467,7 @@ tradieRouter.put("/quotes/:id/lines", requireClient, async (req, res, next) => {
   }
 });
 
-tradieRouter.post("/quotes/:id/approve", requireClient, async (req, res, next) => {
+tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
     const quote = await prisma.quote.findFirst({
       where: { id: req.params.id, clientId: clientId(req) },
@@ -389,7 +483,15 @@ tradieRouter.post("/quotes/:id/approve", requireClient, async (req, res, next) =
 
     const publicUrl = `${appPublicUrl()}/q/${quote.publicToken}`;
     const body = `Hi ${quote.enquiry.name}, your quote from ${quote.client.businessName} is ready: ${formatGbp(quote.totalPence)}. View & accept: ${publicUrl}`;
-    await sendMessage({ to: quote.enquiry.phone, channel: "SMS", body });
+    const results = await sendMessage({ to: quote.enquiry.phone, channel: "SMS", body });
+    await logMessage({
+      clientId: quote.clientId,
+      enquiryId: quote.enquiryId,
+      direction: "OUTBOUND",
+      toAddr: quote.enquiry.phone,
+      body,
+      twilioSid: results[0]?.id,
+    });
 
     const sentAt = new Date();
     const updated = await prisma.quote.update({
@@ -414,6 +516,152 @@ tradieRouter.delete("/quotes/:id", requireClient, async (req, res, next) => {
     await prisma.quote.update({ where: { id: quote.id }, data: { status: "DELETED" } });
     await cancelQuoteFollowUps(quote.id);
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Quotes list ----
+tradieRouter.get("/quotes", requireClient, async (req, res, next) => {
+  try {
+    const quotes = await prisma.quote.findMany({
+      where: { clientId: clientId(req), status: { not: "DELETED" } },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+      include: {
+        enquiry: { select: { id: true, name: true, phone: true, postcode: true } },
+        lines: { select: { id: true }, take: 1 },
+      },
+    });
+    res.json(
+      quotes.map((q) => ({
+        id: q.id,
+        status: q.status,
+        totalPence: q.totalPence,
+        sentAt: q.sentAt,
+        decidedAt: q.decidedAt,
+        createdAt: q.createdAt,
+        enquiry: q.enquiry,
+        publicUrl: `${appPublicUrl()}/q/${q.publicToken}`,
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Invoices ----
+tradieRouter.get("/invoices", requireClient, async (req, res, next) => {
+  try {
+    const invoices = await prisma.invoice.findMany({
+      where: { clientId: clientId(req), status: { not: "VOID" } },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+      include: { lines: { orderBy: { sort: "asc" } } },
+    });
+    res.json(
+      invoices.map((inv) => ({
+        ...inv,
+        publicUrl: `${appPublicUrl()}/i/${inv.publicToken}`,
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/invoices/from-quote/:quoteId", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const invoice = await createInvoiceFromQuote(clientId(req), req.params.quoteId);
+    res.json({ ...invoice, publicUrl: `${appPublicUrl()}/i/${invoice.publicToken}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/invoices/:id/send", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const result = await sendInvoice(clientId(req), req.params.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/invoices/:id/mark-paid", requireClient, async (req, res, next) => {
+  try {
+    const invoice = await markInvoicePaid(clientId(req), req.params.id);
+    res.json(invoice);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Messages (conversation on a job) ----
+tradieRouter.get("/jobs/:enquiryId/messages", requireClient, async (req, res, next) => {
+  try {
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: clientId(req) },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
+    const messages = await prisma.message.findMany({
+      where: { enquiryId: enquiry.id },
+      orderBy: { createdAt: "asc" },
+      take: 200,
+    });
+    res.json(messages);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Customers (distinct contacts from enquiries) ----
+tradieRouter.get("/customers", requireClient, async (req, res, next) => {
+  try {
+    const enquiries = await prisma.enquiry.findMany({
+      where: { clientId: clientId(req) },
+      orderBy: { createdAt: "desc" },
+      take: 300,
+      include: {
+        quotes: {
+          where: { status: { not: "DELETED" } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, status: true, totalPence: true },
+        },
+      },
+    });
+
+    const byPhone = new Map<
+      string,
+      {
+        phone: string;
+        name: string;
+        jobCount: number;
+        lastJobAt: Date;
+        lastEnquiryId: string;
+        latestQuote: { id: string; status: string; totalPence: number } | null;
+      }
+    >();
+
+    for (const e of enquiries) {
+      const key = e.phone.replace(/\D/g, "").slice(-10) || e.phone;
+      const existing = byPhone.get(key);
+      if (!existing) {
+        byPhone.set(key, {
+          phone: e.phone,
+          name: e.name,
+          jobCount: 1,
+          lastJobAt: e.createdAt,
+          lastEnquiryId: e.id,
+          latestQuote: e.quotes[0] || null,
+        });
+      } else {
+        existing.jobCount += 1;
+      }
+    }
+
+    res.json(Array.from(byPhone.values()).sort((a, b) => b.lastJobAt.getTime() - a.lastJobAt.getTime()));
   } catch (err) {
     next(err);
   }

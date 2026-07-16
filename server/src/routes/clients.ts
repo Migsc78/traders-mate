@@ -103,7 +103,7 @@ const createSchema = z.object({
   postcode: z.string().optional(),
   destPhone: z.string().min(6),
   destChannel: z.enum(["WHATSAPP", "SMS", "BOTH"]).default("SMS"),
-  status: z.enum(["ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"]).default("ACTIVE"),
+  status: z.enum(["TRIAL", "ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"]).default("ACTIVE"),
 });
 
 clientsRouter.post("/", async (req, res, next) => {
@@ -177,7 +177,7 @@ clientsRouter.post("/bulk/delete", async (req, res, next) => {
 // POST /api/clients/bulk/status — set status for several clients at once (e.g. suspend/reactivate)
 const bulkStatusSchema = z.object({
   ids: z.array(z.string()).min(1),
-  status: z.enum(["ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"]),
+  status: z.enum(["TRIAL", "ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"]),
 });
 clientsRouter.post("/bulk/status", async (req, res, next) => {
   try {
@@ -303,7 +303,7 @@ const patchSchema = z.object({
   postcode: z.string().nullable().optional(),
   destPhone: z.string().optional(),
   destChannel: z.enum(["WHATSAPP", "SMS", "BOTH"]).optional(),
-  status: z.enum(["ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"]).optional(),
+  status: z.enum(["TRIAL", "ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED"]).optional(),
   allowedOrigins: z.array(z.string()).optional(),
   tradieNotifyTpl: z.string().nullable().optional(),
   customerAckTpl: z.string().nullable().optional(),

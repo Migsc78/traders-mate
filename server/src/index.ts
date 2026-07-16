@@ -18,7 +18,12 @@ import { UPLOADS_DIR } from "./services/storage/store.js";
 import { getGooglePlacesApiKey, twilioConfigured, claudeConfigured } from "./settings.js";
 import { SITES_DIR } from "./services/site/generate.js";
 import { errorHandler, notFound } from "./middleware/error.js";
+import { requireOperator } from "./middleware/operatorAuth.js";
 import { tickFollowUps } from "./services/quotes/followups.js";
+import { signupRouter } from "./routes/signup.js";
+import { invoicePublicRouter } from "./routes/invoicePublic.js";
+import { twilioHooksRouter } from "./routes/twilioHooks.js";
+import { inboundEmailRouter } from "./routes/inboundEmail.js";
 
 const app = express();
 const allowedOrigins = new Set(clientOrigins().map((o) => o.replace(/\/$/, "")));
@@ -57,8 +62,12 @@ app.use("/webhooks/stripe", express.raw({ type: "application/json" }), stripeWeb
 app.use("/api/intake", cors(), express.json({ limit: "1mb" }), intakeRouter);
 app.use("/api/upload", cors(), express.json({ limit: "12mb" }), uploadRouter);
 app.use("/api/t", cors({ origin: true, credentials: true }), express.json({ limit: "20mb" }), tradieRouter);
+app.use("/api/signup", cors({ origin: true }), express.json(), signupRouter);
 app.use("/q", cors(), express.urlencoded({ extended: true }), express.json(), quotePublicRouter);
+app.use("/i", cors(), express.urlencoded({ extended: true }), express.json(), invoicePublicRouter);
 app.use("/api/followups", express.json(), followupsRouter);
+app.use("/api/twilio", cors(), express.urlencoded({ extended: true }), express.json(), twilioHooksRouter);
+app.use("/api/inbound-email", cors(), express.json({ limit: "2mb" }), inboundEmailRouter);
 app.use("/c", redirectRouter);
 app.use(widgetRouter); // GET /widget.js
 app.use("/uploads", express.static(UPLOADS_DIR));
@@ -76,17 +85,18 @@ app.get("/api/health", (_req, res) => {
     publicBaseUrl: env.PUBLIC_BASE_URL,
     appPublicUrl: env.APP_PUBLIC_URL?.trim() || null,
     clientOrigins: [...allowedOrigins],
+    operatorAuthRequired: !!env.OPERATOR_API_TOKEN?.trim(),
     time: new Date().toISOString(),
   });
 });
 
-app.use("/api/settings", settingsRouter);
-app.use("/api/search", searchRouter);
-app.use("/api/leads", leadsRouter);
-app.use("/api/leads", sitesRouter); // /api/leads/:id/site
-app.use("/api/clients", clientsRouter);
-app.use("/api/billing", billingRouter);
-app.use("/api/search-runs", searchRunsRouter);
+app.use("/api/settings", requireOperator, settingsRouter);
+app.use("/api/search", requireOperator, searchRouter);
+app.use("/api/leads", requireOperator, leadsRouter);
+app.use("/api/leads", requireOperator, sitesRouter); // /api/leads/:id/site
+app.use("/api/clients", requireOperator, clientsRouter);
+app.use("/api/billing", requireOperator, billingRouter);
+app.use("/api/search-runs", requireOperator, searchRunsRouter);
 
 // Serve generated demo sites for preview (e.g. /sites/<slug>/)
 app.use("/sites", express.static(SITES_DIR));

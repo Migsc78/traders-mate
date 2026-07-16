@@ -70,6 +70,7 @@ export default function TradieJobPage() {
       setDraft(q);
       alert(`Quote sent.\n${q.publicUrl}`);
       qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+      qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
     },
   });
 
@@ -78,6 +79,23 @@ export default function TradieJobPage() {
     onSuccess: () => {
       setDraft(null);
       qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+    },
+  });
+
+  const messages = useQuery({
+    queryKey: ["tradie-messages", enquiryId],
+    queryFn: () => tradieApi.jobMessages(enquiryId),
+    enabled: !!session && !!enquiryId,
+  });
+
+  const makeInvoice = useMutation({
+    mutationFn: () => tradieApi.invoiceFromQuote(activeQuote!.id),
+    onSuccess: async (inv: { id: string }) => {
+      if (confirm("Invoice created. Send to customer by SMS now?")) {
+        await tradieApi.sendInvoice(inv.id);
+      }
+      qc.invalidateQueries({ queryKey: ["tradie-invoices"] });
+      alert("Invoice ready — see Invoices tab.");
     },
   });
 
@@ -278,8 +296,32 @@ export default function TradieJobPage() {
           {activeQuote.status === "SENT" && (
             <p className="muted-text">Sent to customer. Waiting for accept/decline. Follow-ups are scheduled.</p>
           )}
+          {(activeQuote.status === "ACCEPTED" || activeQuote.status === "SENT") && (
+            <div className="tradie-actions" style={{ marginTop: 12 }}>
+              <button className="convert" onClick={() => makeInvoice.mutate()} disabled={makeInvoice.isPending}>
+                {makeInvoice.isPending ? "Creating…" : "Create invoice"}
+              </button>
+              {makeInvoice.isError && <p className="error">{(makeInvoice.error as Error).message}</p>}
+            </div>
+          )}
         </>
       )}
+
+      <section style={{ marginTop: 28 }}>
+        <h2>Messages</h2>
+        {messages.isLoading && <p className="muted-text">Loading…</p>}
+        <ul className="tradie-messages">
+          {(messages.data || []).map((m: { id: string; direction: string; channel: string; body: string; createdAt: string }) => (
+            <li key={m.id} className={m.direction === "INBOUND" ? "in" : "out"}>
+              <span className="muted-text">
+                {m.direction} · {m.channel} · {new Date(m.createdAt).toLocaleString("en-GB")}
+              </span>
+              <p>{m.body}</p>
+            </li>
+          ))}
+        </ul>
+        {messages.data?.length === 0 && <p className="muted-text">No messages logged for this job yet.</p>}
+      </section>
     </div>
   );
 }

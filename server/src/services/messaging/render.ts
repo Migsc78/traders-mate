@@ -1,9 +1,9 @@
-export type ClientStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED";
+export type ClientStatus = "TRIAL" | "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED";
 export type RouteDecision = "ROUTED" | "HELD";
 
 // Whether a lead should be delivered now, or held pending payment.
 export function routeDecision(status: ClientStatus): RouteDecision {
-  return status === "ACTIVE" ? "ROUTED" : "HELD";
+  return status === "ACTIVE" || status === "TRIAL" ? "ROUTED" : "HELD";
 }
 
 export interface EnquiryVars {
