@@ -38,6 +38,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/index.html",
+        // Public quote/invoice pages are proxied to Railway — never serve the SPA shell for them.
+        navigateFallbackDenylist: [/^\/api\//, /^\/i\//, /^\/q\//, /^\/uploads\//, /^\/sites\//],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
       },
     }),
