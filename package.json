@@ -18,7 +18,9 @@
     "typecheck": "npm install --prefix server && npm install --prefix client && npm run typecheck --prefix server && npm run typecheck --prefix client",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
-    "db:migrate": "npm run prisma:migrate --prefix server"
+    "db:migrate": "npm run prisma:migrate --prefix server",
+    "db:seed": "npm run db:seed --prefix server",
+    "db:seed:wipe": "npm run db:seed:wipe --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

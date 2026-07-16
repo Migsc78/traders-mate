@@ -12,7 +12,12 @@
     "test:site": "tsx src/__tests__/site.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
-    "prisma:migrate:deploy": "prisma migrate deploy"
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed/seed.ts",
+    "db:seed:wipe": "tsx prisma/seed/wipe.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
