@@ -86,6 +86,7 @@ export const api = {
       placesConfigured: boolean;
       publicBaseUrl: string;
       operatorAuthRequired?: boolean;
+      signupsOpen?: boolean;
     }>("/api/health"),
 
   operatorSession: () => request<{ ok: boolean; authRequired: boolean }>("/api/operator/session"),

@@ -81,6 +81,13 @@ const schema = z.object({
   // Self-serve trial length (days).
   TRIAL_DAYS: z.coerce.number().default(14),
 
+  // When false, public /signup is closed (API + UI). Login still works.
+  // Set SIGNUPS_OPEN=true on Railway when you're ready for trials.
+  SIGNUPS_OPEN: z
+    .string()
+    .default("false")
+    .transform((v) => ["1", "true", "yes", "on"].includes(v.trim().toLowerCase())),
+
   // Inbound email domain local-part@INBOUND_EMAIL_DOMAIN
   INBOUND_EMAIL_DOMAIN: z.string().default("in.tradiesmate.co.uk"),
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().default(""),

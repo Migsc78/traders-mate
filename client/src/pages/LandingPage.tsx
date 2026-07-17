@@ -1,8 +1,47 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { tradieApi } from "../api/tradie";
 import "../landing.css";
 
 export default function LandingPage() {
+  const [signupsOpen, setSignupsOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    tradieApi
+      .signupStatus()
+      .then((s) => {
+        if (!cancelled) setSignupsOpen(!!s.open);
+      })
+      .catch(() => {
+        if (!cancelled) setSignupsOpen(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const primaryCta = signupsOpen ? (
+    <Link className="lp-btn lp-btn--primary" to="/signup">
+      Start free trial
+    </Link>
+  ) : (
+    <Link className="lp-btn lp-btn--primary" to="/t/auth">
+      Sign in
+    </Link>
+  );
+
+  const heroPrimary = signupsOpen ? (
+    <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/signup">
+      Start your free 14-day trial
+    </Link>
+  ) : (
+    <a className="lp-btn lp-btn--primary lp-btn--lg" href="mailto:hello@tradiesmate.co.uk?subject=TradiesMate%20private%20beta">
+      Request early access
+    </a>
+  );
+
   return (
     <div className="lp">
       <a className="lp-skip" href="#main">
@@ -28,9 +67,7 @@ export default function LandingPage() {
             <Link className="lp-link-quiet" to="/t/auth">
               Sign in
             </Link>
-            <Link className="lp-btn lp-btn--primary" to="/signup">
-              Start free trial
-            </Link>
+            {primaryCta}
           </div>
         </div>
       </header>
@@ -39,7 +76,7 @@ export default function LandingPage() {
         <section className="lp-hero">
           <div className="lp-hero-grid">
             <div className="lp-hero-copy">
-              <p className="lp-eyebrow">Built for UK trades</p>
+              <p className="lp-eyebrow">{signupsOpen ? "Built for UK trades" : "Private beta"}</p>
               <h1>
                 Turn missed calls into
                 <span className="lp-hero-accent"> quoted jobs</span>
@@ -50,14 +87,22 @@ export default function LandingPage() {
                 TradiesMate texts them back, qualifies the work, and gets the job onto your phone.
               </p>
               <div className="lp-hero-cta">
-                <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/signup">
-                  Start your free 14-day trial
-                </Link>
-                <Link className="lp-btn lp-btn--ghost lp-btn--lg" to="/t/auth">
-                  Sign in
-                </Link>
+                {heroPrimary}
+                {signupsOpen ? (
+                  <Link className="lp-btn lp-btn--ghost lp-btn--lg" to="/t/auth">
+                    Sign in
+                  </Link>
+                ) : (
+                  <Link className="lp-btn lp-btn--ghost lp-btn--lg" to="/t/auth">
+                    Already invited? Sign in
+                  </Link>
+                )}
               </div>
-              <p className="lp-fine">No password. Sign up with a text code. Cancel anytime.</p>
+              <p className="lp-fine">
+                {signupsOpen
+                  ? "No password. Sign up with a text code. Cancel anytime."
+                  : "We’re testing with a small group of UK tradies. Public trials open soon."}
+              </p>
             </div>
 
             <div className="lp-hero-visual" aria-hidden="true">
@@ -257,13 +302,23 @@ export default function LandingPage() {
           <div className="lp-wrap lp-cta-inner">
             <h2>Stop losing work while you&apos;re doing the work</h2>
             <p>
-              Start a free 14-day trial. Quote from the van. Chase by SMS. Get paid via bank
-              transfer — you confirm when the money lands.
+              {signupsOpen
+                ? "Start a free 14-day trial. Quote from the van. Chase by SMS. Get paid via bank transfer — you confirm when the money lands."
+                : "We’re in private beta while we harden the product. Request early access, or sign in if you’re already on the list."}
             </p>
             <div className="lp-hero-cta">
-              <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/signup">
-                Start free trial
-              </Link>
+              {signupsOpen ? (
+                <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/signup">
+                  Start free trial
+                </Link>
+              ) : (
+                <a
+                  className="lp-btn lp-btn--primary lp-btn--lg"
+                  href="mailto:hello@tradiesmate.co.uk?subject=TradiesMate%20private%20beta"
+                >
+                  Request early access
+                </a>
+              )}
               <Link className="lp-btn lp-btn--ghost lp-btn--lg lp-btn--on-dark" to="/t/auth">
                 Sign in
               </Link>
@@ -284,8 +339,8 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="lp-footer-links">
-            <Link to="/signup">Start free trial</Link>
-            <Link to="/t/auth">Sign in</Link>
+            {signupsOpen ? <Link to="/signup">Start free trial</Link> : <Link to="/t/auth">Sign in</Link>}
+            <a href="mailto:hello@tradiesmate.co.uk">Contact</a>
           </div>
           <p className="lp-footer-note">© {new Date().getFullYear()} TradiesMate. Made for the tools, not the desk.</p>
         </div>

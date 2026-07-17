@@ -11,6 +11,16 @@ import { newSessionToken, hashToken } from "../services/quotes/magicAuth.js";
 
 export const signupRouter = Router();
 
+function assertSignupsOpen() {
+  if (!env.SIGNUPS_OPEN) {
+    throw new ApiError(
+      403,
+      "signups_closed",
+      "TradiesMate is in private beta — new trials aren’t open yet. Sign in if you already have an account."
+    );
+  }
+}
+
 function newRouteKey(): string {
   return `tm_${randomBytes(4).toString("hex")}`;
 }
@@ -28,8 +38,13 @@ async function createSession(clientId: string) {
   return { sessionToken, expiresAt };
 }
 
+signupRouter.get("/status", (_req, res) => {
+  res.json({ open: env.SIGNUPS_OPEN });
+});
+
 signupRouter.post("/start", async (req, res, next) => {
   try {
+    assertSignupsOpen();
     const body = z
       .object({
         businessName: z.string().min(2).max(120),
@@ -66,6 +81,7 @@ signupRouter.post("/start", async (req, res, next) => {
 
 signupRouter.post("/verify", async (req, res, next) => {
   try {
+    assertSignupsOpen();
     const body = z
       .object({
         phone: z.string().min(8),

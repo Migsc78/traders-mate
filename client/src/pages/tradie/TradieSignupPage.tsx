@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { setTradieSession, tradieApi } from "../../api/tradie";
 
 export default function TradieSignupPage() {
   const navigate = useNavigate();
+  const [signupsOpen, setSignupsOpen] = useState<boolean | null>(null);
   const [step, setStep] = useState<"form" | "code">("form");
   const [businessName, setBusinessName] = useState("");
   const [tradeTitle, setTradeTitle] = useState("");
@@ -12,6 +13,21 @@ export default function TradieSignupPage() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    tradieApi
+      .signupStatus()
+      .then((s) => {
+        if (!cancelled) setSignupsOpen(!!s.open);
+      })
+      .catch(() => {
+        if (!cancelled) setSignupsOpen(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +57,37 @@ export default function TradieSignupPage() {
       setBusy(false);
     }
   };
+
+  if (signupsOpen === null) {
+    return (
+      <div className="tradie-shell t-gate">
+        <p className="muted-text">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!signupsOpen) {
+    return (
+      <div className="tradie-shell t-gate">
+        <div className="t-gate-brand">
+          <div className="t-brand-mark">TM</div>
+          <h1>Private beta</h1>
+          <p>We&apos;re testing with a small group of UK tradies before opening free trials.</p>
+        </div>
+        <div className="t-gate-card">
+          <p className="muted-text" style={{ margin: 0 }}>
+            New sign-ups are closed for now. If you already have an account, sign in below.
+          </p>
+          <Link className="primary t-btn--block" to="/t/auth" style={{ marginTop: 16, textAlign: "center" }}>
+            Sign in
+          </Link>
+        </div>
+        <p className="t-gate-alt">
+          <Link to="/">← Back to home</Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="tradie-shell t-gate">

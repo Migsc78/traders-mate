@@ -97,6 +97,12 @@ export interface TradieMe {
 }
 
 export const tradieApi = {
+  signupStatus: async () => {
+    const res = await fetch(apiUrl("/api/signup/status"));
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    return res.json() as Promise<{ open: boolean }>;
+  },
+
   signupStart: (body: { businessName: string; tradeTitle?: string; town?: string; phone: string }) =>
     signupRequest<{ ok: boolean; expiresAt: string }>("/start", body),
 

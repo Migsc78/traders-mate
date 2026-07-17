@@ -91,6 +91,7 @@ app.get("/api/health", (_req, res) => {
     appPublicUrl: env.APP_PUBLIC_URL?.trim() || null,
     clientOrigins: [...allowedOrigins],
     operatorAuthRequired: operatorAuthConfigured(),
+    signupsOpen: env.SIGNUPS_OPEN,
     time: new Date().toISOString(),
   });
 });
