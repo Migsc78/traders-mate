@@ -17,8 +17,13 @@ import { quotePublicRouter, followupsRouter } from "./routes/quotePublic.js";
 import { UPLOADS_DIR } from "./services/storage/store.js";
 import { getGooglePlacesApiKey, twilioConfigured, claudeConfigured } from "./settings.js";
 import { SITES_DIR } from "./services/site/generate.js";
-import { errorHandler, notFound } from "./middleware/error.js";
-import { requireOperator, operatorAuthConfigured } from "./middleware/operatorAuth.js";
+import { errorHandler, notFound, ApiError } from "./middleware/error.js";
+import {
+  requireOperator,
+  operatorAuthConfigured,
+  issueOperatorSession,
+  verifyLoginPassword,
+} from "./middleware/operatorAuth.js";
 import { tickFollowUps } from "./services/quotes/followups.js";
 import { signupRouter } from "./routes/signup.js";
 import { invoicePublicRouter } from "./routes/invoicePublic.js";
@@ -93,6 +98,24 @@ app.get("/api/health", (_req, res) => {
 /** Lightweight probe used by the admin login screen. */
 app.get("/api/operator/session", requireOperator, (_req, res) => {
   res.json({ ok: true, authRequired: operatorAuthConfigured() });
+});
+
+/** Password login → signed session (14 days). */
+app.post("/api/operator/login", (req, res, next) => {
+  try {
+    if (!operatorAuthConfigured()) {
+      res.json({ ok: true, open: true, sessionToken: null, expiresAt: null });
+      return;
+    }
+    const password = String(req.body?.password || "");
+    if (!verifyLoginPassword(password)) {
+      throw new ApiError(401, "unauthorized", "Incorrect password");
+    }
+    const session = issueOperatorSession();
+    res.json({ ok: true, open: false, ...session });
+  } catch (err) {
+    next(err);
+  }
 });
 
 app.use("/api/settings", requireOperator, settingsRouter);

@@ -90,6 +90,35 @@ export const api = {
 
   operatorSession: () => request<{ ok: boolean; authRequired: boolean }>("/api/operator/session"),
 
+  operatorLogin: async (password: string) => {
+    const fullUrl = apiUrl("/api/operator/login");
+    const res = await fetch(fullUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw new Error(`API returned non-JSON (${res.status}) from ${fullUrl}`);
+    }
+    const body = (await res.json()) as {
+      ok?: boolean;
+      open?: boolean;
+      sessionToken?: string | null;
+      expiresAt?: string | null;
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      throw new Error(body?.error?.message || `Login failed (${res.status})`);
+    }
+    return {
+      ok: true as const,
+      open: !!body.open,
+      sessionToken: body.sessionToken ?? null,
+      expiresAt: body.expiresAt ?? null,
+    };
+  },
+
   getSettings: () => request<SettingsView>("/api/settings"),
 
   updateSettings: (patch: SettingsUpdate) =>

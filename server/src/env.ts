@@ -73,8 +73,10 @@ const schema = z.object({
   STRIPE_SUCCESS_URL: z.string().default(""),
   STRIPE_CANCEL_URL: z.string().default(""),
 
-  // Operator CRM protection (Bearer / x-operator-token). Empty = open (local/dev).
+  // Operator CRM protection. Empty = open (local/dev).
+  // Prefer OPERATOR_ADMIN_PASSWORD for /admin/login; OPERATOR_API_TOKEN still works for API tooling.
   OPERATOR_API_TOKEN: z.string().default(""),
+  OPERATOR_ADMIN_PASSWORD: z.string().default(""),
 
   // Self-serve trial length (days).
   TRIAL_DAYS: z.coerce.number().default(14),

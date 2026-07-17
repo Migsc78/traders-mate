@@ -8,7 +8,7 @@ export default function AdminLoginPage() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from || "/admin/search";
 
-  const [token, setToken] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [authRequired, setAuthRequired] = useState<boolean | null>(null);
@@ -46,20 +46,29 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const next = token.trim();
+    const next = password.trim();
     if (!next) {
-      setError("Enter the operator access token");
+      setError("Enter your admin password");
       setBusy(false);
       return;
     }
 
-    setOperatorToken(next);
     try {
+      const result = await api.operatorLogin(next);
+      if (result.open) {
+        clearOperatorToken();
+        navigate(from, { replace: true });
+        return;
+      }
+      if (!result.sessionToken) {
+        throw new Error("Login did not return a session");
+      }
+      setOperatorToken(result.sessionToken);
       await api.operatorSession();
       navigate(from, { replace: true });
     } catch (err) {
       clearOperatorToken();
-      setError(err instanceof Error ? err.message : "Invalid token");
+      setError(err instanceof Error ? err.message : "Incorrect password");
     } finally {
       setBusy(false);
     }
@@ -81,13 +90,13 @@ export default function AdminLoginPage() {
 
         <form className="form" onSubmit={onSubmit}>
           <label>
-            Operator token
+            Password
             <input
               type="password"
               autoComplete="current-password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="OPERATOR_API_TOKEN"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Admin password"
               required
             />
           </label>
@@ -98,7 +107,8 @@ export default function AdminLoginPage() {
         </form>
 
         <p className="admin-login-note">
-          Same value as server <code>OPERATOR_API_TOKEN</code>. Stored only in this browser.
+          Set <code>OPERATOR_ADMIN_PASSWORD</code> on the API. Session lasts 14 days on this
+          browser.
         </p>
         <p className="admin-login-back">
           <Link to="/">← Back to site</Link>
