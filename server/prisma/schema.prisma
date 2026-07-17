@@ -526,3 +526,28 @@ model OtpChallenge {
   @@index([phone, purpose])
   @@index([expiresAt])
 }
+
+enum EarlyAccessStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model EarlyAccessRequest {
+  id              String            @id @default(cuid())
+  email           String
+  phone           String
+  occupation      String
+  status          EarlyAccessStatus @default(PENDING)
+  inviteTokenHash String?           @unique
+  inviteExpiresAt DateTime?
+  inviteSentAt    DateTime?
+  inviteUsedAt    DateTime?
+  reviewedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@index([phone])
+}

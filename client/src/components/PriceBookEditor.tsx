@@ -160,6 +160,99 @@ export default function PriceBookEditor({
       {error && <p className="error">{error}</p>}
       {notice && <p className="muted-text">{notice}</p>}
 
+      <div className="pricebook-mobile">
+        {rows.map((r, i) => (
+          <article key={r.id || `new-${i}`} className={`pricebook-card${r.active ? "" : " inactive"}`}>
+            <label>
+              Label
+              <input value={r.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="Label" />
+            </label>
+            <div className="pricebook-card-row">
+              <label>
+                SKU
+                <input value={r.sku ?? ""} onChange={(e) => update(i, { sku: e.target.value })} placeholder="CALL" />
+              </label>
+              <label>
+                Unit
+                <select value={r.unit} onChange={(e) => update(i, { unit: e.target.value })}>
+                  {PRICE_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="pricebook-card-row">
+              <label>
+                Price £
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={(r.unitPricePence / 100).toFixed(2)}
+                  onChange={(e) => update(i, { unitPricePence: Math.round(Number(e.target.value) * 100) })}
+                />
+              </label>
+              <label>
+                VAT %
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="100"
+                  value={r.vatRate}
+                  onChange={(e) => update(i, { vatRate: Number(e.target.value) })}
+                />
+              </label>
+            </div>
+            <div className="pricebook-card-checks">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={r.isCallout}
+                  onChange={(e) => update(i, { isCallout: e.target.checked })}
+                />
+                Call-out
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={r.active}
+                  onChange={(e) => update(i, { active: e.target.checked })}
+                />
+                Active
+              </label>
+              {r.id ? (
+                <button
+                  type="button"
+                  className="linkish"
+                  disabled={deactivate.isPending}
+                  onClick={() => {
+                    if (confirm("Deactivate this rate? Historic quotes keep the old link.")) {
+                      deactivate.mutate(r.id!);
+                    }
+                  }}
+                >
+                  Deactivate
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="linkish"
+                  onClick={() => {
+                    setDirty(true);
+                    setRows((prev) => prev.filter((_, j) => j !== i));
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+
       <div className="pricebook-table-wrap">
         <table className="pricebook-table">
           <thead>

@@ -103,10 +103,33 @@ export const tradieApi = {
     return res.json() as Promise<{ open: boolean }>;
   },
 
-  signupStart: (body: { businessName: string; tradeTitle?: string; town?: string; phone: string }) =>
-    signupRequest<{ ok: boolean; expiresAt: string }>("/start", body),
+  requestEarlyAccess: (body: { email: string; phone: string; occupation: string }) =>
+    signupRequest<{ ok: boolean; alreadyPending?: boolean }>("/early-access", body),
 
-  signupVerify: (body: { phone: string; code: string }) =>
+  getInvite: async (token: string) => {
+    const res = await fetch(apiUrl(`/api/signup/invite/${encodeURIComponent(token)}`));
+    if (!res.ok) {
+      let message = `Request failed (${res.status})`;
+      try {
+        const j = await res.json();
+        message = j?.error?.message || message;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+    return res.json() as Promise<{ email: string; phone: string; occupation: string; expiresAt: string }>;
+  },
+
+  signupStart: (body: {
+    businessName: string;
+    tradeTitle?: string;
+    town?: string;
+    phone: string;
+    inviteToken?: string;
+  }) => signupRequest<{ ok: boolean; expiresAt: string }>("/start", body),
+
+  signupVerify: (body: { phone: string; code: string; inviteToken?: string }) =>
     signupRequest<{
       sessionToken: string;
       clientId: string;

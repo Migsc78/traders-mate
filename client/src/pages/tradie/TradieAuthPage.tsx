@@ -138,7 +138,7 @@ export default function TradieAuthPage() {
           </form>
         )}
 
-        <details open>
+        <details>
           <summary>Or sign in with route key</summary>
           <form
             className="form"

@@ -254,77 +254,134 @@ export default function ClientsPage() {
       {isError && <p className="error">{(error as Error).message}</p>}
 
       {!isLoading && !isError && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th className="col-check">
-                  <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-                </th>
-                <th>Business</th>
-                <th>Town</th>
-                <th>Route key</th>
-                <th>Destination</th>
-                <th>Channel</th>
-                <th>Site</th>
-                <th>Leads (30d)</th>
-                <th>Held</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((c: Client) => (
-                <tr key={c.id} className={selected.has(c.id) ? "sel" : ""}>
-                  <td>
+        <>
+          <div className="mobile-only mobile-card-list">
+            <label className="mobile-select-all">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+              Select all
+            </label>
+            {clients.map((c: Client) => (
+              <article key={c.id} className={`mobile-card${selected.has(c.id) ? " sel" : ""}`}>
+                <div className="mobile-card-top">
+                  <label className="mobile-card-check">
                     <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} />
-                  </td>
-                  <td>
-                    <button className="link" onClick={() => navigate(`/admin/clients/${c.id}`)}>
-                      {c.businessName}
-                    </button>
-                  </td>
-                  <td>{c.town || "—"}</td>
-                  <td>
+                    <strong>{c.businessName}</strong>
+                  </label>
+                  <span className={STATUS_CLASS[c.status] || "badge grey"}>{c.status}</span>
+                </div>
+                <div className="mobile-card-meta">
+                  <span>
+                    {c.town || "—"} · {c.destChannel} · {c.destPhone}
+                  </span>
+                  <span>
                     <code>{c.routeKey}</code>
-                  </td>
-                  <td>{c.destPhone}</td>
-                  <td>{c.destChannel}</td>
-                  <td>
-                    {c.sitePreviewUrl || c.siteSlug ? (
-                      <a href={c.sitePreviewUrl || `/sites/${c.siteSlug}/`} target="_blank" rel="noreferrer">
-                        Open ↗
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>
-                    <strong>{c.leads30 ?? 0}</strong>
-                  </td>
-                  <td>{c.heldTotal ? <span className="badge amber">{c.heldTotal}</span> : "—"}</td>
-                  <td>
-                    <span className={STATUS_CLASS[c.status] || "badge grey"}>{c.status}</span>
-                  </td>
-                  <td>
-                    <button className="linkish" onClick={() => confirmDelete(c)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {clients.length === 0 && (
+                  </span>
+                  <span>
+                    Leads 30d: <strong>{c.leads30 ?? 0}</strong>
+                    {c.heldTotal ? ` · Held ${c.heldTotal}` : ""}
+                  </span>
+                </div>
+                <div className="mobile-card-actions">
+                  <button type="button" className="primary" onClick={() => navigate(`/admin/clients/${c.id}`)}>
+                    Open
+                  </button>
+                  {(c.sitePreviewUrl || c.siteSlug) && (
+                    <a
+                      className="buttonish"
+                      href={c.sitePreviewUrl || `/sites/${c.siteSlug}/`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Site
+                    </a>
+                  )}
+                  <button type="button" className="linkish" onClick={() => confirmDelete(c)}>
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+            {clients.length === 0 && (
+              <p className="hint">
+                {allClients.length === 0
+                  ? "No clients yet. Convert a lead from the Leads page to create one, or add one manually above."
+                  : "No clients match your search/filter."}
+              </p>
+            )}
+          </div>
+
+          <div className="table-wrap desktop-only">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={11} className="empty">
-                    {allClients.length === 0
-                      ? "No clients yet. Convert a lead from the Leads page to create one, or add one manually above."
-                      : "No clients match your search/filter."}
-                  </td>
+                  <th className="col-check">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                  </th>
+                  <th>Business</th>
+                  <th>Town</th>
+                  <th>Route key</th>
+                  <th>Destination</th>
+                  <th>Channel</th>
+                  <th>Site</th>
+                  <th>Leads (30d)</th>
+                  <th>Held</th>
+                  <th>Status</th>
+                  <th></th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {clients.map((c: Client) => (
+                  <tr key={c.id} className={selected.has(c.id) ? "sel" : ""}>
+                    <td>
+                      <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} />
+                    </td>
+                    <td>
+                      <button className="link" onClick={() => navigate(`/admin/clients/${c.id}`)}>
+                        {c.businessName}
+                      </button>
+                    </td>
+                    <td>{c.town || "—"}</td>
+                    <td>
+                      <code>{c.routeKey}</code>
+                    </td>
+                    <td>{c.destPhone}</td>
+                    <td>{c.destChannel}</td>
+                    <td>
+                      {c.sitePreviewUrl || c.siteSlug ? (
+                        <a href={c.sitePreviewUrl || `/sites/${c.siteSlug}/`} target="_blank" rel="noreferrer">
+                          Open ↗
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      <strong>{c.leads30 ?? 0}</strong>
+                    </td>
+                    <td>{c.heldTotal ? <span className="badge amber">{c.heldTotal}</span> : "—"}</td>
+                    <td>
+                      <span className={STATUS_CLASS[c.status] || "badge grey"}>{c.status}</span>
+                    </td>
+                    <td>
+                      <button className="linkish" onClick={() => confirmDelete(c)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {clients.length === 0 && (
+                  <tr>
+                    <td colSpan={11} className="empty">
+                      {allClients.length === 0
+                        ? "No clients yet. Convert a lead from the Leads page to create one, or add one manually above."
+                        : "No clients match your search/filter."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

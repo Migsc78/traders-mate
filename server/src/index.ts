@@ -26,6 +26,7 @@ import {
 } from "./middleware/operatorAuth.js";
 import { tickFollowUps } from "./services/quotes/followups.js";
 import { signupRouter } from "./routes/signup.js";
+import { earlyAccessRouter } from "./routes/earlyAccess.js";
 import { invoicePublicRouter } from "./routes/invoicePublic.js";
 import { twilioHooksRouter } from "./routes/twilioHooks.js";
 import { inboundEmailRouter } from "./routes/inboundEmail.js";
@@ -126,6 +127,7 @@ app.use("/api/leads", requireOperator, sitesRouter); // /api/leads/:id/site
 app.use("/api/clients", requireOperator, clientsRouter);
 app.use("/api/billing", requireOperator, billingRouter);
 app.use("/api/search-runs", requireOperator, searchRunsRouter);
+app.use("/api/early-access", requireOperator, earlyAccessRouter);
 
 // Serve generated demo sites for preview (e.g. /sites/<slug>/)
 app.use("/sites", express.static(SITES_DIR));

@@ -122,6 +122,34 @@ export const api = {
 
   getSettings: () => request<SettingsView>("/api/settings"),
 
+  listEarlyAccess: (status?: string) =>
+    request<
+      {
+        id: string;
+        email: string;
+        phone: string;
+        occupation: string;
+        status: string;
+        inviteExpiresAt: string | null;
+        inviteSentAt: string | null;
+        inviteUsedAt: string | null;
+        reviewedAt: string | null;
+        createdAt: string;
+      }[]
+    >(`/api/early-access${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+
+  approveEarlyAccess: (id: string) =>
+    request<{ ok: boolean; id: string; inviteExpiresAt: string; inviteUrl: string }>(
+      `/api/early-access/${id}/approve`,
+      { method: "POST", body: "{}" }
+    ),
+
+  denyEarlyAccess: (id: string) =>
+    request<{ ok: boolean; id: string; status: string }>(`/api/early-access/${id}/deny`, {
+      method: "POST",
+      body: "{}",
+    }),
+
   updateSettings: (patch: SettingsUpdate) =>
     request<SettingsView>("/api/settings", { method: "PUT", body: JSON.stringify(patch) }),
 

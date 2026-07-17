@@ -19,6 +19,7 @@ import TradieInvoicesPage from "./pages/tradie/TradieInvoicesPage";
 import TradieCustomersPage from "./pages/tradie/TradieCustomersPage";
 import TradieSettingsPage from "./pages/tradie/TradieSettingsPage";
 import LandingPage from "./pages/LandingPage";
+import EarlyAccessPage from "./pages/EarlyAccessPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminAuthGate from "./components/AdminAuthGate";
 import "./styles.css";
@@ -64,6 +65,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="leads/:leadId" element={<LeadDetailPage />} />
               <Route path="clients" element={<ClientsPage />} />
               <Route path="clients/:clientId" element={<ClientDetailPage />} />
+              <Route path="early-access" element={<EarlyAccessPage />} />
             </Route>
           </Route>
           {/* Legacy CRM URLs */}

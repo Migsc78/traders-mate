@@ -81,12 +81,18 @@ const schema = z.object({
   // Self-serve trial length (days).
   TRIAL_DAYS: z.coerce.number().default(14),
 
-  // When false, public /signup is closed (API + UI). Login still works.
-  // Set SIGNUPS_OPEN=true on Railway when you're ready for trials.
+  // When false, public /signup is closed unless the user has a one-time invite.
+  // Set SIGNUPS_OPEN=true on Railway when you're ready for open trials.
   SIGNUPS_OPEN: z
     .string()
     .default("false")
     .transform((v) => ["1", "true", "yes", "on"].includes(v.trim().toLowerCase())),
+
+  // Early-access waitlist notifications (optional).
+  EARLY_ACCESS_NOTIFY_EMAIL: z.string().default(""),
+  EARLY_ACCESS_NOTIFY_PHONE: z.string().default(""),
+  RESEND_API_KEY: z.string().default(""),
+  EMAIL_FROM: z.string().default("TradiesMate <onboarding@resend.dev>"),
 
   // Inbound email domain local-part@INBOUND_EMAIL_DOMAIN
   INBOUND_EMAIL_DOMAIN: z.string().default("in.tradiesmate.co.uk"),

@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { setTradieSession, tradieApi } from "../../api/tradie";
 
 export default function TradieSignupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("invite")?.trim() || "";
+
   const [signupsOpen, setSignupsOpen] = useState<boolean | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(!!inviteToken);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteOk, setInviteOk] = useState(false);
+
   const [step, setStep] = useState<"form" | "code">("form");
   const [businessName, setBusinessName] = useState("");
   const [tradeTitle, setTradeTitle] = useState("");
@@ -29,12 +36,50 @@ export default function TradieSignupPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!inviteToken) {
+      setInviteLoading(false);
+      setInviteOk(false);
+      return;
+    }
+    let cancelled = false;
+    setInviteLoading(true);
+    setInviteError("");
+    tradieApi
+      .getInvite(inviteToken)
+      .then((inv) => {
+        if (cancelled) return;
+        setInviteOk(true);
+        setPhone(inv.phone);
+        setTradeTitle(inv.occupation);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setInviteOk(false);
+        setInviteError(err instanceof Error ? err.message : "Invalid invite");
+      })
+      .finally(() => {
+        if (!cancelled) setInviteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteToken]);
+
+  const canSignup = !!signupsOpen || inviteOk;
+
   const start = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      await tradieApi.signupStart({ businessName, tradeTitle: tradeTitle || undefined, town: town || undefined, phone });
+      await tradieApi.signupStart({
+        businessName,
+        tradeTitle: tradeTitle || undefined,
+        town: town || undefined,
+        phone,
+        inviteToken: inviteToken || undefined,
+      });
       setStep("code");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
@@ -48,7 +93,11 @@ export default function TradieSignupPage() {
     setBusy(true);
     setError("");
     try {
-      const result = await tradieApi.signupVerify({ phone, code });
+      const result = await tradieApi.signupVerify({
+        phone,
+        code,
+        inviteToken: inviteToken || undefined,
+      });
       setTradieSession(result.sessionToken);
       navigate("/t");
     } catch (err) {
@@ -58,7 +107,7 @@ export default function TradieSignupPage() {
     }
   };
 
-  if (signupsOpen === null) {
+  if (signupsOpen === null || inviteLoading) {
     return (
       <div className="tradie-shell t-gate">
         <p className="muted-text">Loading…</p>
@@ -66,7 +115,7 @@ export default function TradieSignupPage() {
     );
   }
 
-  if (!signupsOpen) {
+  if (!canSignup) {
     return (
       <div className="tradie-shell t-gate">
         <div className="t-gate-brand">
@@ -75,10 +124,20 @@ export default function TradieSignupPage() {
           <p>We&apos;re testing with a small group of UK tradies before opening free trials.</p>
         </div>
         <div className="t-gate-card">
-          <p className="muted-text" style={{ margin: 0 }}>
-            New sign-ups are closed for now. If you already have an account, sign in below.
-          </p>
-          <Link className="primary t-btn--block" to="/t/auth" style={{ marginTop: 16, textAlign: "center" }}>
+          {inviteError ? (
+            <p className="error" style={{ marginTop: 0 }}>
+              {inviteError}
+            </p>
+          ) : (
+            <p className="muted-text" style={{ margin: 0 }}>
+              New sign-ups are closed for now. Request early access from the homepage, or sign in if you already have an
+              account.
+            </p>
+          )}
+          <Link className="primary t-btn--block" to="/" style={{ marginTop: 16, textAlign: "center" }}>
+            Request early access
+          </Link>
+          <Link className="t-btn--block" to="/t/auth" style={{ marginTop: 10, textAlign: "center" }}>
             Sign in
           </Link>
         </div>
@@ -93,8 +152,12 @@ export default function TradieSignupPage() {
     <div className="tradie-shell t-gate">
       <div className="t-gate-brand">
         <div className="t-brand-mark">TM</div>
-        <h1>Start your free trial</h1>
-        <p>Quote from the van. Chase by SMS. Get paid.</p>
+        <h1>{inviteOk ? "Create your account" : "Start your free trial"}</h1>
+        <p>
+          {inviteOk
+            ? "Your early access invite is ready. Use the same mobile you applied with."
+            : "Quote from the van. Chase by SMS. Get paid."}
+        </p>
       </div>
 
       <div className="t-gate-card">
@@ -121,6 +184,7 @@ export default function TradieSignupPage() {
                 inputMode="tel"
                 autoComplete="tel"
                 required
+                readOnly={inviteOk}
               />
             </label>
             {error && <p className="error">{error}</p>}

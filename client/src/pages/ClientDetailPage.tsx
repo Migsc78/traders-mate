@@ -220,7 +220,17 @@ export default function ClientDetailPage() {
         </div>
       </div>
 
-      <nav className="client-tabs" aria-label="Client sections">
+      <label className="mobile-tab-select">
+        Section
+        <select value={tab} onChange={(e) => setTab(e.target.value as TabId)} aria-label="Client section">
+          {TABS.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <nav className="client-tabs client-tabs--desktop" aria-label="Client sections">
         {TABS.map((t) => (
           <button
             key={t.id}

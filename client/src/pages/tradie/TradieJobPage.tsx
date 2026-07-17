@@ -101,8 +101,8 @@ export default function TradieJobPage() {
   });
 
   if (!session) return <Navigate to="/t/auth" replace />;
-  if (job.isLoading) return <div className="tradie-shell"><p>Loading…</p></div>;
-  if (job.isError) return <div className="tradie-shell"><p className="error">{(job.error as Error).message}</p></div>;
+  if (job.isLoading) return <p>Loading…</p>;
+  if (job.isError) return <p className="error">{(job.error as Error).message}</p>;
 
   const enquiry = job.data as {
     id: string;
@@ -172,7 +172,7 @@ export default function TradieJobPage() {
   };
 
   return (
-    <div className="tradie-shell">
+    <div className="t-job-page">
       <Link className="t-back" to="/t">
         ← Jobs
       </Link>

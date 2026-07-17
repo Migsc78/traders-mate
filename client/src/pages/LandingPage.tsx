@@ -1,11 +1,20 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { tradieApi } from "../api/tradie";
 import "../landing.css";
 
+const LANDING_LINKS = [
+  { href: "#story", label: "The problem" },
+  { href: "#how", label: "How it works" },
+  { href: "#features", label: "Features" },
+] as const;
+
 export default function LandingPage() {
   const [signupsOpen, setSignupsOpen] = useState(false);
+  const [earlyAccessOpen, setEarlyAccessOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -22,14 +31,37 @@ export default function LandingPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
+  const openEarlyAccess = () => {
+    setMenuOpen(false);
+    setEarlyAccessOpen(true);
+  };
+
+  const closeMenu = () => setMenuOpen(false);
+
   const primaryCta = signupsOpen ? (
-    <Link className="lp-btn lp-btn--primary" to="/signup">
-      Start free trial
+    <Link className="lp-btn lp-btn--primary lp-btn--nav" to="/signup">
+      <span className="lp-btn-full">Start free trial</span>
+      <span className="lp-btn-short">Free trial</span>
     </Link>
   ) : (
-    <Link className="lp-btn lp-btn--primary" to="/t/auth">
-      Sign in
-    </Link>
+    <button type="button" className="lp-btn lp-btn--primary lp-btn--nav" onClick={openEarlyAccess}>
+      <span className="lp-btn-full">Request early access</span>
+      <span className="lp-btn-short">Early access</span>
+    </button>
   );
 
   const heroPrimary = signupsOpen ? (
@@ -37,9 +69,9 @@ export default function LandingPage() {
       Start your free 14-day trial
     </Link>
   ) : (
-    <a className="lp-btn lp-btn--primary lp-btn--lg" href="mailto:hello@tradiesmate.co.uk?subject=TradiesMate%20private%20beta">
+    <button type="button" className="lp-btn lp-btn--primary lp-btn--lg" onClick={openEarlyAccess}>
       Request early access
-    </a>
+    </button>
   );
 
   return (
@@ -59,18 +91,69 @@ export default function LandingPage() {
             </span>
           </Link>
           <nav className="lp-nav-links" aria-label="Primary">
-            <a href="#story">The problem</a>
-            <a href="#how">How it works</a>
-            <a href="#features">Features</a>
+            {LANDING_LINKS.map((l) => (
+              <a key={l.href} href={l.href}>
+                {l.label}
+              </a>
+            ))}
           </nav>
           <div className="lp-nav-actions">
             <Link className="lp-link-quiet" to="/t/auth">
               Sign in
             </Link>
             {primaryCta}
+            <button
+              type="button"
+              className="lp-menu-btn"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              aria-controls={menuId}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <span className={`lp-burger${menuOpen ? " lp-burger--open" : ""}`} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </button>
           </div>
         </div>
       </header>
+
+      {menuOpen && (
+        <div className="lp-drawer-root" role="presentation" onClick={closeMenu}>
+          <div
+            id={menuId}
+            className="lp-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Site menu"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <nav className="lp-drawer-nav" aria-label="Mobile">
+              {LANDING_LINKS.map((l) => (
+                <a key={l.href} href={l.href} onClick={closeMenu}>
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+            <div className="lp-drawer-actions">
+              <Link className="lp-btn lp-btn--ghost" to="/t/auth" onClick={closeMenu}>
+                Sign in
+              </Link>
+              {signupsOpen ? (
+                <Link className="lp-btn lp-btn--primary" to="/signup" onClick={closeMenu}>
+                  Start free trial
+                </Link>
+              ) : (
+                <button type="button" className="lp-btn lp-btn--primary" onClick={openEarlyAccess}>
+                  Request early access
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <main id="main">
         <section className="lp-hero">
@@ -312,12 +395,9 @@ export default function LandingPage() {
                   Start free trial
                 </Link>
               ) : (
-                <a
-                  className="lp-btn lp-btn--primary lp-btn--lg"
-                  href="mailto:hello@tradiesmate.co.uk?subject=TradiesMate%20private%20beta"
-                >
+                <button type="button" className="lp-btn lp-btn--primary lp-btn--lg" onClick={openEarlyAccess}>
                   Request early access
-                </a>
+                </button>
               )}
               <Link className="lp-btn lp-btn--ghost lp-btn--lg lp-btn--on-dark" to="/t/auth">
                 Sign in
@@ -339,12 +419,127 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="lp-footer-links">
-            {signupsOpen ? <Link to="/signup">Start free trial</Link> : <Link to="/t/auth">Sign in</Link>}
+            {signupsOpen ? (
+              <Link to="/signup">Start free trial</Link>
+            ) : (
+              <button type="button" className="lp-footer-btn" onClick={openEarlyAccess}>
+                Request early access
+              </button>
+            )}
             <a href="mailto:hello@tradiesmate.co.uk">Contact</a>
           </div>
           <p className="lp-footer-note">© {new Date().getFullYear()} TradiesMate. Made for the tools, not the desk.</p>
         </div>
       </footer>
+
+      {earlyAccessOpen && <EarlyAccessModal onClose={() => setEarlyAccessOpen(false)} />}
+    </div>
+  );
+}
+
+function EarlyAccessModal({ onClose }: { onClose: () => void }) {
+  const titleId = useId();
+  const [email, setEmail] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState<"new" | "pending" | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const result = await tradieApi.requestEarlyAccess({ email, occupation, phone });
+      setDone(result.alreadyPending ? "pending" : "new");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not submit request");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="lp-modal-root" role="presentation" onClick={onClose}>
+      <div
+        className="lp-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="lp-modal-close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+        {done ? (
+          <div className="lp-modal-body">
+            <p className="lp-eyebrow">Thanks</p>
+            <h2 id={titleId}>{done === "pending" ? "You’re already on the list" : "Request received"}</h2>
+            <p>
+              {done === "pending"
+                ? "We’ve already got a request for this email or mobile. We’ll be in touch when a spot opens."
+                : "We’ll review your request and text you a one-time signup link if you’re approved."}
+            </p>
+            <button type="button" className="lp-btn lp-btn--primary lp-btn--lg" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        ) : (
+          <form className="lp-modal-body" onSubmit={submit}>
+            <p className="lp-eyebrow">Private beta</p>
+            <h2 id={titleId}>Request early access</h2>
+            <p>Tell us how to reach you. If approved, you’ll get a one-time link to create your account.</p>
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
+            </label>
+            <label>
+              Occupation
+              <input
+                value={occupation}
+                onChange={(e) => setOccupation(e.target.value)}
+                placeholder="Plumber"
+                required
+              />
+            </label>
+            <label>
+              Mobile
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="07…"
+                inputMode="tel"
+                autoComplete="tel"
+                required
+              />
+            </label>
+            {error && <p className="lp-modal-error">{error}</p>}
+            <button type="submit" className="lp-btn lp-btn--primary lp-btn--lg" disabled={busy}>
+              {busy ? "Sending…" : "Submit request"}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
