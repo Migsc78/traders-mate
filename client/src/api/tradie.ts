@@ -132,7 +132,32 @@ export const tradieApi = {
   me: () => tRequest<TradieMe>("/me"),
 
   updateMe: (patch: Record<string, unknown>) =>
-    tRequest<{ ok: boolean }>("/me", { method: "PATCH", body: JSON.stringify(patch) }),
+    tRequest<{
+      ok: boolean;
+      id: string;
+      twilioHooks?: { voiceUrl: string; smsUrl: string; alreadyOk: boolean } | null;
+      twilioHooksError?: string | null;
+    }>("/me", { method: "PATCH", body: JSON.stringify(patch) }),
+
+  twilioStatus: () =>
+    tRequest<{
+      configured: boolean;
+      reason?: string;
+      found?: boolean;
+      phoneNumber?: string;
+      voiceUrl?: string | null;
+      smsUrl?: string | null;
+      voiceOk?: boolean;
+      smsOk?: boolean;
+      expectedVoiceUrl?: string;
+      expectedSmsUrl?: string;
+    }>("/me/twilio"),
+
+  configureTwilio: () =>
+    tRequest<{ ok: boolean; phoneNumber: string; voiceUrl: string; smsUrl: string; alreadyOk: boolean }>(
+      "/me/twilio/configure",
+      { method: "POST", body: "{}" }
+    ),
 
   billingCheckout: () => tRequest<{ url: string; stub: boolean }>("/billing/checkout", { method: "POST", body: "{}" }),
 

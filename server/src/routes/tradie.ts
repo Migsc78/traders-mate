@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { prisma } from "../db.js";
 import { ApiError } from "../middleware/error.js";
-import { sendMessage } from "../services/messaging/sender.js";
+import { sendMessage, toE164UK, twilioConfigured } from "../services/messaging/sender.js";
 import { storeAudio } from "../services/storage/store.js";
 import { createMagicLogin, createClientSession, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
 import {
@@ -24,6 +24,7 @@ import { logMessage } from "../services/messaging/log.js";
 import { createCheckoutSession } from "../services/billing/stripe.js";
 import { createInvoiceFromQuote, sendInvoice, markInvoicePaid } from "../services/invoices/invoice.js";
 import { env } from "../env.js";
+import { configureNumberWebhooks, getNumberWebhookStatus } from "../services/twilio/numbers.js";
 
 export const tradieRouter = Router();
 
@@ -196,6 +197,13 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
       })
       .parse(req.body ?? {});
 
+    const nextTwilio =
+      body.twilioNumber !== undefined
+        ? body.twilioNumber
+          ? toE164UK(body.twilioNumber)
+          : null
+        : undefined;
+
     const client = await prisma.client.update({
       where: { id: clientId(req) },
       data: {
@@ -207,12 +215,57 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         ...(body.bankSortCode !== undefined ? { bankSortCode: body.bankSortCode } : {}),
         ...(body.bankAccountName !== undefined ? { bankAccountName: body.bankAccountName } : {}),
         ...(body.bankAccountNumber !== undefined ? { bankAccountNumber: body.bankAccountNumber } : {}),
-        ...(body.twilioNumber !== undefined
-          ? { twilioNumber: body.twilioNumber ? body.twilioNumber : null }
-          : {}),
+        ...(nextTwilio !== undefined ? { twilioNumber: nextTwilio } : {}),
       },
     });
-    res.json({ ok: true, id: client.id });
+
+    let twilioHooks: { voiceUrl: string; smsUrl: string; alreadyOk: boolean } | null = null;
+    let twilioHooksError: string | null = null;
+    if (nextTwilio && twilioConfigured()) {
+      try {
+        twilioHooks = await configureNumberWebhooks(nextTwilio);
+      } catch (e) {
+        twilioHooksError = e instanceof Error ? e.message : "Could not configure Twilio webhooks";
+      }
+    }
+
+    res.json({ ok: true, id: client.id, twilioHooks, twilioHooksError });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Status of Voice/SMS webhooks on this client's Twilio number. */
+tradieRouter.get("/me/twilio", requireClient, async (req, res, next) => {
+  try {
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    if (!client.twilioNumber) {
+      return res.json({ configured: false, reason: "No Twilio number saved on this account" });
+    }
+    if (!twilioConfigured()) {
+      return res.json({ configured: false, reason: "Twilio credentials missing on server" });
+    }
+    const status = await getNumberWebhookStatus(client.twilioNumber);
+    res.json({
+      configured: status.found && status.voiceOk && status.smsOk,
+      ...status,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Point the client's Twilio number Voice + SMS webhooks at Railway. Fixes the “set up voice” message. */
+tradieRouter.post("/me/twilio/configure", requireClient, async (req, res, next) => {
+  try {
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    if (!client.twilioNumber) throw new ApiError(400, "missing", "Save a Twilio number first");
+    if (!twilioConfigured()) throw new ApiError(503, "twilio", "Twilio credentials missing on server");
+
+    const result = await configureNumberWebhooks(client.twilioNumber);
+    res.json({ ok: true, ...result });
   } catch (err) {
     next(err);
   }

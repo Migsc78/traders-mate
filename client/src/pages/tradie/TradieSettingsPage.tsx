@@ -16,6 +16,8 @@ export default function TradieSettingsPage() {
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [twilioNumber, setTwilioNumber] = useState("");
 
+  const [twilioMsg, setTwilioMsg] = useState("");
+
   useEffect(() => {
     if (!me.data) return;
     setBusinessName(me.data.businessName || "");
@@ -27,6 +29,13 @@ export default function TradieSettingsPage() {
     setBankAccountNumber(me.data.bankAccountNumber || "");
     setTwilioNumber(me.data.twilioNumber || "");
   }, [me.data]);
+
+  const twilioStatus = useQuery({
+    queryKey: ["tradie-twilio-status"],
+    queryFn: () => tradieApi.twilioStatus(),
+    enabled: !!me.data?.twilioNumber,
+    retry: false,
+  });
 
   const save = useMutation({
     mutationFn: () =>
@@ -40,7 +49,36 @@ export default function TradieSettingsPage() {
         bankAccountNumber: bankAccountNumber || null,
         twilioNumber: twilioNumber || null,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tradie-me"] }),
+    onSuccess: (r: {
+      ok: boolean;
+      id: string;
+      twilioHooks?: { voiceUrl: string; smsUrl: string; alreadyOk: boolean } | null;
+      twilioHooksError?: string | null;
+    }) => {
+      qc.invalidateQueries({ queryKey: ["tradie-me"] });
+      qc.invalidateQueries({ queryKey: ["tradie-twilio-status"] });
+      if (r.twilioHooksError) setTwilioMsg(r.twilioHooksError);
+      else if (r.twilioHooks) {
+        setTwilioMsg(
+          r.twilioHooks.alreadyOk
+            ? "Twilio voice + SMS webhooks already pointed at TradersMate."
+            : "Twilio voice + SMS webhooks configured."
+        );
+      } else setTwilioMsg("");
+    },
+  });
+
+  const configureTwilio = useMutation({
+    mutationFn: () => tradieApi.configureTwilio(),
+    onSuccess: (r: { alreadyOk: boolean; voiceUrl: string }) => {
+      qc.invalidateQueries({ queryKey: ["tradie-twilio-status"] });
+      setTwilioMsg(
+        r.alreadyOk
+          ? "Already configured."
+          : `Webhooks set. Voice → ${r.voiceUrl}`
+      );
+    },
+    onError: (e: Error) => setTwilioMsg(e.message),
   });
 
   const checkout = useMutation({
@@ -132,13 +170,55 @@ export default function TradieSettingsPage() {
         <p className="t-section-label">Missed-call rescue</p>
         <div className="t-card">
           <p className="muted-text" style={{ margin: "0 0 12px" }}>
-            Assign a Twilio number, then dial these codes once on your phone so unanswered calls come to us instead of
-            voicemail.
+            Save your Twilio number, then tap <strong>Wire voice &amp; SMS</strong> so callers hear our TTS and get a
+            text-back (not Twilio&apos;s default “set up voice” message). After that, dial the divert codes once on your
+            phone.
           </p>
           <label>
             Twilio number (E.164)
-            <input value={twilioNumber} onChange={(e) => setTwilioNumber(e.target.value)} placeholder="+44…" />
+            <input value={twilioNumber} onChange={(e) => setTwilioNumber(e.target.value)} placeholder="+447700149777" />
           </label>
+
+          {me.data?.twilioNumber && (
+            <p className="muted-text" style={{ marginTop: 10 }}>
+              Webhooks:{" "}
+              {twilioStatus.isLoading
+                ? "checking…"
+                : twilioStatus.data?.configured
+                  ? "✅ Voice + SMS pointed at TradersMate"
+                  : twilioStatus.data?.found === false
+                    ? "⚠️ Number not found on this Twilio account"
+                    : twilioStatus.data?.voiceOk === false
+                      ? "⚠️ Voice URL not set — tap Wire voice & SMS"
+                      : "⚠️ Not fully configured"}
+            </p>
+          )}
+
+          <div className="tradie-actions">
+            <button
+              type="button"
+              className="primary"
+              disabled={!twilioNumber.trim() || configureTwilio.isPending || save.isPending}
+              onClick={() => {
+                setTwilioMsg("");
+                if (twilioNumber.trim() !== (me.data?.twilioNumber || "")) {
+                  save.mutate(undefined, {
+                    onSuccess: () => configureTwilio.mutate(),
+                  });
+                } else {
+                  configureTwilio.mutate();
+                }
+              }}
+            >
+              {configureTwilio.isPending ? "Wiring…" : "Wire voice & SMS"}
+            </button>
+          </div>
+          {twilioMsg && (
+            <p className={configureTwilio.isError || save.data?.twilioHooksError ? "error" : "muted-text"} style={{ marginTop: 8 }}>
+              {twilioMsg}
+            </p>
+          )}
+
           {me.data?.divertCodes && (
             <ul className="t-divert-list">
               <li><span>No answer</span> <code>{me.data.divertCodes.noAnswer}</code></li>
