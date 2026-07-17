@@ -8,7 +8,7 @@ const WIDGET_JS = String.raw`(function(){
   var s = document.currentScript;
   if(!s){ var all=document.getElementsByTagName('script'); s=all[all.length-1]; }
   var key = s.getAttribute('data-key');
-  if(!key){ console.error('[TradersMate] widget: missing data-key'); return; }
+  if(!key){ console.error('[TradiesMate] widget: missing data-key'); return; }
   var base = (function(){ try{ return new URL(s.src, location.href).origin; }catch(e){ return ''; } })();
   var color = s.getAttribute('data-color') || '#1f3864';
   var accent = s.getAttribute('data-accent') || '#f0a500';

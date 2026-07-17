@@ -83,7 +83,7 @@ export default function AdminLoginPage() {
       <div className="admin-login-card">
         <div className="admin-login-brand">
           <div className="brand">
-            Traders<span>Mate</span>
+            Tradies<span>Mate</span>
           </div>
           <p>Admin access</p>
         </div>

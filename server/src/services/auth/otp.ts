@@ -43,7 +43,7 @@ export async function createAndSendOtp(opts: {
   await sendMessage({
     to: phone,
     channel: "SMS",
-    body: `Your TradersMate code is ${code}. It expires in 10 minutes.`,
+    body: `Your TradiesMate code is ${code}. It expires in 10 minutes.`,
   });
 
   return { expiresAt };

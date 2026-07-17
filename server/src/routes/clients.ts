@@ -198,7 +198,7 @@ async function sendInvoiceLink(clientId: string): Promise<{ url: string; stub: b
   const session = await createCheckoutSession({ clientId: client.id });
   let delivered = false;
   try {
-    const body = `Hi ${client.businessName}, here's your TradersMate billing link — please complete payment to keep leads flowing: ${session.url}`;
+    const body = `Hi ${client.businessName}, here's your TradiesMate billing link — please complete payment to keep leads flowing: ${session.url}`;
     const results = await sendMessage({ to: client.destPhone, channel: client.destChannel, body });
     delivered = results.some((r) => r.ok);
   } catch (err) {

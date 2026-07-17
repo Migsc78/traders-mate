@@ -2,7 +2,7 @@
 import { z } from "zod";
 
 const schema = z.object({
-  DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/tradersmate?schema=public"),
+  DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/tradiesmate?schema=public"),
   PORT: z.coerce.number().default(4000),
   CLIENT_ORIGIN: z.string().default("http://localhost:5173"),
 
@@ -82,7 +82,7 @@ const schema = z.object({
   TRIAL_DAYS: z.coerce.number().default(14),
 
   // Inbound email domain local-part@INBOUND_EMAIL_DOMAIN
-  INBOUND_EMAIL_DOMAIN: z.string().default("in.tradersmate.co.uk"),
+  INBOUND_EMAIL_DOMAIN: z.string().default("in.tradiesmate.co.uk"),
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().default(""),
 });
 

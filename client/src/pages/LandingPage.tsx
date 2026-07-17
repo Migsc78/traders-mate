@@ -11,12 +11,12 @@ export default function LandingPage() {
 
       <header className="lp-nav">
         <div className="lp-nav-inner">
-          <Link to="/" className="lp-brand" aria-label="TradersMate home">
+          <Link to="/" className="lp-brand" aria-label="TradiesMate home">
             <span className="lp-brand-mark" aria-hidden="true">
               TM
             </span>
             <span className="lp-brand-name">
-              Traders<span>Mate</span>
+              Tradies<span>Mate</span>
             </span>
           </Link>
           <nav className="lp-nav-links" aria-label="Primary">
@@ -47,7 +47,7 @@ export default function LandingPage() {
               <p className="lp-lede">
                 You&apos;re under the sink. The phone rings. By the time your hands are free, that
                 landlord job — or insurance repair — has already gone to the next plumber.
-                TradersMate texts them back, qualifies the work, and gets the job onto your phone.
+                TradiesMate texts them back, qualifies the work, and gets the job onto your phone.
               </p>
               <div className="lp-hero-cta">
                 <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/signup">
@@ -77,7 +77,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="lp-comic" role="img" aria-label="Four-panel comic: a plumber misses a call while under a sink, the caller moves on, then TradersMate recovers the enquiry by SMS.">
+            <div className="lp-comic" role="img" aria-label="Four-panel comic: a plumber misses a call while under a sink, the caller moves on, then TradiesMate recovers the enquiry by SMS.">
               <ComicPanel
                 n="01"
                 title="Hands full"
@@ -101,7 +101,7 @@ export default function LandingPage() {
               </ComicPanel>
               <ComicPanel
                 n="04"
-                title="TradersMate steps in"
+                title="TradiesMate steps in"
                 caption="We text them back, ask what they need and the postcode — then put the job on your phone."
                 accent
               >
@@ -176,7 +176,7 @@ export default function LandingPage() {
                 <div>
                   <h3>Draft the quote from the van</h3>
                   <p>
-                    Type a few notes or record a voice memo. TradersMate drafts line items from your
+                    Type a few notes or record a voice memo. TradiesMate drafts line items from your
                     rates, so you can tweak prices and send a proper GBP quote with VAT.
                   </p>
                 </div>
@@ -239,7 +239,7 @@ export default function LandingPage() {
               <p>
                 Starter rates for call-outs, combi swaps, EICRs and more. Capture enquiries from
                 missed calls, your website widget, or email to your{" "}
-                <code>@in.tradersmate.co.uk</code> address.
+                <code>@in.tradiesmate.co.uk</code> address.
               </p>
             </div>
             <ul className="lp-trade-tags" aria-label="Example trades">
@@ -279,7 +279,7 @@ export default function LandingPage() {
               TM
             </span>
             <div>
-              <strong>TradersMate</strong>
+              <strong>TradiesMate</strong>
               <p>Quoting, missed-call rescue, and SMS chase for UK trades.</p>
             </div>
           </div>
@@ -287,7 +287,7 @@ export default function LandingPage() {
             <Link to="/signup">Start free trial</Link>
             <Link to="/t/auth">Sign in</Link>
           </div>
-          <p className="lp-footer-note">© {new Date().getFullYear()} TradersMate. Made for the tools, not the desk.</p>
+          <p className="lp-footer-note">© {new Date().getFullYear()} TradiesMate. Made for the tools, not the desk.</p>
         </div>
       </footer>
     </div>
@@ -346,7 +346,7 @@ function PhoneMock() {
           </div>
           <div className="lp-phone-sms">
             <p>
-              <strong>TradersMate</strong>
+              <strong>TradiesMate</strong>
             </p>
             <p>New job from missed call: Martin (GU22 7XH). Fix a leak.</p>
           </div>

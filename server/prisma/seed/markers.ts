@@ -1,5 +1,5 @@
 /**
- * TradersMate seed markers — EVERY seeded row must be identifiable by these.
+ * TradiesMate seed markers — EVERY seeded row must be identifiable by these.
  * Launch wipe (`npm run db:seed:wipe`) deletes ONLY data matching these rules.
  *
  * Do not reuse these prefixes/phones for real customers.

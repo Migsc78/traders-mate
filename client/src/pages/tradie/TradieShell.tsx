@@ -36,7 +36,7 @@ export default function TradieShell() {
     return <Navigate to="/t/auth" replace />;
   }
 
-  const businessName = me.data?.businessName || "TradersMate";
+  const businessName = me.data?.businessName || "TradiesMate";
   const subtitle = [me.data?.tradeTitle, me.data?.town].filter(Boolean).join(" · ") || "Quoting & jobs";
 
   return (

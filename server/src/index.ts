@@ -133,9 +133,9 @@ app.use(notFound);
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
-  console.log(`[traders-mate] API listening on http://localhost:${env.PORT}`);
+  console.log(`[tradiesmate] API listening on http://localhost:${env.PORT}`);
   if (!getGooglePlacesApiKey()) {
-    console.warn("[traders-mate] GOOGLE_PLACES_API_KEY is not set — searches will fail until it is.");
+    console.warn("[tradiesmate] GOOGLE_PLACES_API_KEY is not set — searches will fail until it is.");
   }
   // Quote follow-up ticker (additive — no effect until quotes are SENT).
   setInterval(() => {

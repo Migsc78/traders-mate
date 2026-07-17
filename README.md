@@ -1,4 +1,4 @@
-# Traders Mate — Lead Engine
+# Tradies Mate — Lead Engine
 
 A local web app that finds UK tradespeople who lack a **real** website, qualifies and
 scores them for outreach, and tracks them through a pipeline.

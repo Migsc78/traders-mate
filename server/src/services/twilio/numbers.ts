@@ -100,7 +100,7 @@ export async function configureNumberWebhooks(phone: string): Promise<{
     VoiceMethod: "POST",
     SmsUrl: smsUrl,
     SmsMethod: "POST",
-    FriendlyName: existing.friendlyName || `TradersMate ${existing.phoneNumber}`,
+    FriendlyName: existing.friendlyName || `TradiesMate ${existing.phoneNumber}`,
   });
 
   const res = await fetch(`${accountBase()}/IncomingPhoneNumbers/${existing.sid}.json`, {

@@ -23,7 +23,7 @@ export default function App() {
       <aside className="admin-sidebar">
         <div className="admin-sidebar-brand">
           <div className="brand">
-            Traders<span>Mate</span>
+            Tradies<span>Mate</span>
           </div>
           <span className="admin-sidebar-tag">Admin</span>
         </div>

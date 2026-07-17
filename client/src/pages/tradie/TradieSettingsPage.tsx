@@ -73,7 +73,7 @@ export default function TradieSettingsPage() {
       else if (r.twilioHooks) {
         setTwilioMsg(
           r.twilioHooks.alreadyOk
-            ? "Twilio voice + SMS webhooks already pointed at TradersMate."
+            ? "Twilio voice + SMS webhooks already pointed at TradiesMate."
             : "Twilio voice + SMS webhooks configured."
         );
       } else setTwilioMsg("");
@@ -235,7 +235,7 @@ export default function TradieSettingsPage() {
               {twilioStatus.isLoading
                 ? "checking…"
                 : twilioStatus.data?.configured
-                  ? "✅ Voice + SMS pointed at TradersMate"
+                  ? "✅ Voice + SMS pointed at TradiesMate"
                   : twilioStatus.data?.found === false
                     ? "⚠️ Number not found on this Twilio account"
                     : twilioStatus.data?.voiceOk === false

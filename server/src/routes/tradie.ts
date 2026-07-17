@@ -94,7 +94,7 @@ tradieRouter.post("/auth/magic", async (req, res, next) => {
     await sendMessage({
       to: client.destPhone,
       channel: client.destChannel,
-      body: `Your TradersMate login link (expires in 30 min):\n${url}`,
+      body: `Your TradiesMate login link (expires in 30 min):\n${url}`,
     });
     res.json({ ok: true });
   } catch (err) {

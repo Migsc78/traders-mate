@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icons/*.png"],
       manifest: {
-        name: "TradersMate",
-        short_name: "TradersMate",
+        name: "TradiesMate",
+        short_name: "TradiesMate",
         description: "Quote faster. Chase by SMS. Get paid.",
         theme_color: "#1f3864",
         background_color: "#f8fafc",

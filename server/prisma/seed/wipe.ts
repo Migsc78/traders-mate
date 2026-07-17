@@ -1,5 +1,5 @@
 /**
- * Delete ALL TradersMate seed data. Safe for launch — only rows matching seed markers.
+ * Delete ALL TradiesMate seed data. Safe for launch — only rows matching seed markers.
  *
  *   npm run db:seed:wipe --prefix server
  */
@@ -81,7 +81,7 @@ export async function wipeSeedData(): Promise<{
 }
 
 async function main() {
-  console.log("Wiping TradersMate seed data (marker-matched only)…");
+  console.log("Wiping TradiesMate seed data (marker-matched only)…");
   const result = await wipeSeedData();
   console.log("Wipe complete:", result);
   console.log("Real customer data was not touched.");

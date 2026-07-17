@@ -136,7 +136,7 @@ function downloadWorkbook(rows: Record<string, unknown>[], filename: string) {
 }
 
 export function downloadPriceBookTemplate() {
-  downloadWorkbook(toSheetRows(TEMPLATE_SAMPLE), "tradersmate-pricebook-template.xlsx");
+  downloadWorkbook(toSheetRows(TEMPLATE_SAMPLE), "TradiesMate-pricebook-template.xlsx");
 }
 
 export function exportPriceBook(items: PriceBookRow[], filename = "pricebook.xlsx") {

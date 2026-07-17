@@ -1,4 +1,4 @@
-# TradersMate seed data
+# TradiesMate seed data
 
 Marked test data for every CRM + tradie screen. Safe to wipe at launch.
 

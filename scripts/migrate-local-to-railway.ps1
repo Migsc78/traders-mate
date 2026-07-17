@@ -22,4 +22,4 @@ Write-Host "Restoring dump into Railway..."
 docker run --rm -v "${root}/.tmp:/dump" postgres:16-alpine `
   pg_restore --clean --if-exists --no-owner --no-acl -d $url /dump/tradersmate.dump
 
-Write-Host "Done. Update server/.env DATABASE_URL to the same Railway URL, then stop using local Docker for TradersMate."
+Write-Host "Done. Update server/.env DATABASE_URL to the same Railway URL, then stop using local Docker for TradiesMate."
