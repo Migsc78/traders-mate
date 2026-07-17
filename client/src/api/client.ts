@@ -1,9 +1,10 @@
 import type { Lead, LeadFilters, LeadsResponse, SearchSummary, JobProgress } from "../types";
 import { searchWithProgress } from "./sse";
 import { apiUrl } from "./base";
+import { getOperatorToken } from "../lib/operatorAuth";
 
 function operatorHeaders(): Record<string, string> {
-  const token = String(import.meta.env.VITE_OPERATOR_API_TOKEN || localStorage.getItem("tm_operator_token") || "").trim();
+  const token = getOperatorToken();
   return token ? { Authorization: `Bearer ${token}`, "x-operator-token": token } : {};
 }
 
@@ -79,7 +80,15 @@ export interface SettingsUpdate {
 }
 
 export const api = {
-  health: () => request<{ ok: boolean; placesConfigured: boolean; publicBaseUrl: string }>("/api/health"),
+  health: () =>
+    request<{
+      ok: boolean;
+      placesConfigured: boolean;
+      publicBaseUrl: string;
+      operatorAuthRequired?: boolean;
+    }>("/api/health"),
+
+  operatorSession: () => request<{ ok: boolean; authRequired: boolean }>("/api/operator/session"),
 
   getSettings: () => request<SettingsView>("/api/settings"),
 

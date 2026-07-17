@@ -101,7 +101,7 @@ export default function ClientDetailPage() {
     mutationFn: () => api.deleteClient(clientId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      navigate("/clients");
+      navigate("/admin/clients");
     },
   });
 
@@ -189,7 +189,7 @@ export default function ClientDetailPage() {
     return (
       <div className="page">
         <p className="error">{(error as Error)?.message || "Client not found"}</p>
-        <Link to="/clients">← Back to clients</Link>
+        <Link to="/admin/clients">← Back to clients</Link>
       </div>
     );
   }
@@ -198,7 +198,7 @@ export default function ClientDetailPage() {
     <div className="page client-detail">
       <div className="client-detail-top">
         <div>
-          <Link to="/clients" className="back-link">
+          <Link to="/admin/clients" className="back-link">
             ← Clients
           </Link>
           <h1>{client.businessName}</h1>

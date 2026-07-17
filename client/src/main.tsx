@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import SearchPage from "./pages/SearchPage";
@@ -18,12 +18,25 @@ import TradieQuotesPage from "./pages/tradie/TradieQuotesPage";
 import TradieInvoicesPage from "./pages/tradie/TradieInvoicesPage";
 import TradieCustomersPage from "./pages/tradie/TradieCustomersPage";
 import TradieSettingsPage from "./pages/tradie/TradieSettingsPage";
+import LandingPage from "./pages/LandingPage";
+import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminAuthGate from "./components/AdminAuthGate";
 import "./styles.css";
 import "./tradie.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
+
+function RedirectLead() {
+  const { leadId } = useParams();
+  return <Navigate to={`/admin/leads/${leadId}`} replace />;
+}
+
+function RedirectClient() {
+  const { clientId } = useParams();
+  return <Navigate to={`/admin/clients/${clientId}`} replace />;
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -41,14 +54,24 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="settings" element={<TradieSettingsPage />} />
             <Route path="jobs/:enquiryId" element={<TradieJobPage />} />
           </Route>
-          <Route path="/" element={<App />}>
-            <Route index element={<Navigate to="/search" replace />} />
-            <Route path="search" element={<SearchPage />} />
-            <Route path="leads" element={<LeadsPage />} />
-            <Route path="leads/:leadId" element={<LeadDetailPage />} />
-            <Route path="clients" element={<ClientsPage />} />
-            <Route path="clients/:clientId" element={<ClientDetailPage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin" element={<AdminAuthGate />}>
+            <Route element={<App />}>
+              <Route index element={<Navigate to="search" replace />} />
+              <Route path="search" element={<SearchPage />} />
+              <Route path="leads" element={<LeadsPage />} />
+              <Route path="leads/:leadId" element={<LeadDetailPage />} />
+              <Route path="clients" element={<ClientsPage />} />
+              <Route path="clients/:clientId" element={<ClientDetailPage />} />
+            </Route>
           </Route>
+          {/* Legacy CRM URLs */}
+          <Route path="/search" element={<Navigate to="/admin/search" replace />} />
+          <Route path="/leads" element={<Navigate to="/admin/leads" replace />} />
+          <Route path="/leads/:leadId" element={<RedirectLead />} />
+          <Route path="/clients" element={<Navigate to="/admin/clients" replace />} />
+          <Route path="/clients/:clientId" element={<RedirectClient />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

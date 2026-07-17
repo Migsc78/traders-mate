@@ -86,7 +86,7 @@ export default function LeadDetailPage() {
     onSuccess: (result: { id: string }) => {
       invalidate();
       qc.invalidateQueries({ queryKey: ["clients"] });
-      navigate(`/clients/${result.id}`);
+      navigate(`/admin/clients/${result.id}`);
     },
   });
 
@@ -120,7 +120,7 @@ export default function LeadDetailPage() {
     return (
       <div className="page">
         <p className="error">{(error as Error)?.message || "Lead not found"}</p>
-        <Link to="/leads">← Back to leads</Link>
+        <Link to="/admin/leads">← Back to leads</Link>
       </div>
     );
   }
@@ -139,7 +139,7 @@ export default function LeadDetailPage() {
 
       <div className="client-detail-top">
         <div>
-          <Link to="/leads" className="back-link">
+          <Link to="/admin/leads" className="back-link">
             ← Leads
           </Link>
           <h1>{lead.displayName}</h1>

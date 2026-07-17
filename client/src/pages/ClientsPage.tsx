@@ -63,7 +63,7 @@ export default function ClientsPage() {
       invalidate();
       setDraft(emptyDraft);
       setShowAdd(false);
-      navigate(`/clients/${c.id}`);
+      navigate(`/admin/clients/${c.id}`);
     },
   });
 
@@ -280,7 +280,7 @@ export default function ClientsPage() {
                     <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} />
                   </td>
                   <td>
-                    <button className="link" onClick={() => navigate(`/clients/${c.id}`)}>
+                    <button className="link" onClick={() => navigate(`/admin/clients/${c.id}`)}>
                       {c.businessName}
                     </button>
                   </td>

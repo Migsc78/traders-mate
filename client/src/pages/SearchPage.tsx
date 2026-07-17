@@ -39,7 +39,7 @@ export default function SearchPage() {
       );
       setProgressPercent(100);
       setProgressMessage(`Found ${summary.qualified} qualified lead${summary.qualified === 1 ? "" : "s"}`);
-      navigate(`/leads?searchRunId=${summary.searchRunId}`);
+      navigate(`/admin/leads?searchRunId=${summary.searchRunId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {

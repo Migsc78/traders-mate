@@ -167,7 +167,7 @@ export default function LeadsPage() {
             order={filters.order}
             onSort={toggleSort}
             onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
-            onOpen={(lead) => navigate(`/leads/${lead.id}`)}
+            onOpen={(lead) => navigate(`/admin/leads/${lead.id}`)}
           />
 
           <div className="pager">

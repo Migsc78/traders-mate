@@ -866,7 +866,7 @@ async function main() {
   });
 
   console.log("\n========== SEED READY ==========");
-  console.log("CRM: open /search, /leads, /clients — look for [SEED] names");
+  console.log("CRM: open /admin/search, /admin/leads, /admin/clients — look for [SEED] names");
   console.log("Tradie login:");
   console.log(`  Route key:  ${SEED_ROUTE_KEYS.demoPlumbing}`);
   console.log(`  Phone:      ${SEED_PHONES.demoPlumbing}`);

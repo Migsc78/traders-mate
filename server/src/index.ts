@@ -18,7 +18,7 @@ import { UPLOADS_DIR } from "./services/storage/store.js";
 import { getGooglePlacesApiKey, twilioConfigured, claudeConfigured } from "./settings.js";
 import { SITES_DIR } from "./services/site/generate.js";
 import { errorHandler, notFound } from "./middleware/error.js";
-import { requireOperator } from "./middleware/operatorAuth.js";
+import { requireOperator, operatorAuthConfigured } from "./middleware/operatorAuth.js";
 import { tickFollowUps } from "./services/quotes/followups.js";
 import { signupRouter } from "./routes/signup.js";
 import { invoicePublicRouter } from "./routes/invoicePublic.js";
@@ -50,7 +50,7 @@ const crmCors = cors({
     return cb(null, false);
   },
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-operator-token"],
   maxAge: 86400,
 });
 
@@ -85,9 +85,14 @@ app.get("/api/health", (_req, res) => {
     publicBaseUrl: env.PUBLIC_BASE_URL,
     appPublicUrl: env.APP_PUBLIC_URL?.trim() || null,
     clientOrigins: [...allowedOrigins],
-    operatorAuthRequired: !!env.OPERATOR_API_TOKEN?.trim(),
+    operatorAuthRequired: operatorAuthConfigured(),
     time: new Date().toISOString(),
   });
+});
+
+/** Lightweight probe used by the admin login screen. */
+app.get("/api/operator/session", requireOperator, (_req, res) => {
+  res.json({ ok: true, authRequired: operatorAuthConfigured() });
 });
 
 app.use("/api/settings", requireOperator, settingsRouter);

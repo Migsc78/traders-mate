@@ -1,5 +1,6 @@
 import type { JobProgress, SearchSummary } from "../types";
 import { apiUrl } from "./base";
+import { getOperatorToken } from "../lib/operatorAuth";
 
 function parseSseChunk(chunk: string): { event: string; data: string } | null {
   const lines = chunk.split("\n");
@@ -17,7 +18,7 @@ export async function postSse<TComplete>(
   body: unknown,
   onProgress?: (progress: JobProgress) => void
 ): Promise<TComplete> {
-  const opToken = String(import.meta.env.VITE_OPERATOR_API_TOKEN || localStorage.getItem("tm_operator_token") || "").trim();
+  const opToken = getOperatorToken();
   const res = await fetch(apiUrl(url), {
     method: "POST",
     headers: {
