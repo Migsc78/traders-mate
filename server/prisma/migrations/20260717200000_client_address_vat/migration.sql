@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "addressLine1" TEXT;
+ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "addressLine2" TEXT;
+ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "vatNumber" TEXT;

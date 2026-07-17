@@ -78,6 +78,10 @@ export interface TradieMe {
   businessName: string;
   tradeTitle: string | null;
   town: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  postcode: string | null;
+  vatNumber: string | null;
   routeKey: string;
   status: string;
   trialEndsAt: string | null;

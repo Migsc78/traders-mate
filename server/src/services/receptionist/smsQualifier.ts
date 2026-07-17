@@ -3,6 +3,7 @@ import { getClaudeApiKey, claudeConfigured } from "../../settings.js";
 import { sendMessage, toE164UK } from "../messaging/sender.js";
 import { logMessage } from "../messaging/log.js";
 import { createMagicLogin, appPublicUrl } from "../quotes/magicAuth.js";
+import { distanceMilesBetween, normalizePostcode } from "../geo/postcode.js";
 
 type ConvoTurn = { role: "assistant" | "user"; text: string; at: string };
 
@@ -47,6 +48,7 @@ export async function handleMissedCallInboundSms(opts: {
   await logMessage({
     clientId: client.id,
     direction: "INBOUND",
+    channel: "SMS",
     toAddr: to,
     fromAddr: from,
     body: opts.body,
@@ -66,6 +68,7 @@ export async function handleMissedCallInboundSms(opts: {
     await logMessage({
       clientId: client.id,
       direction: "OUTBOUND",
+      channel: "SMS",
       toAddr: from,
       body: result.assistantReply,
     });
@@ -80,13 +83,18 @@ export async function handleMissedCallInboundSms(opts: {
   }
 
   if (result.ready && result.name && result.message) {
+    const jobPostcode = result.postcode ? normalizePostcode(result.postcode) : null;
+    const distanceMiles =
+      jobPostcode && client.postcode ? await distanceMilesBetween(client.postcode, jobPostcode) : null;
+
     const enquiry = await prisma.enquiry.create({
       data: {
         clientId: client.id,
         name: result.name,
         phone: from,
         message: result.message,
-        postcode: result.postcode || null,
+        postcode: jobPostcode,
+        distanceMiles,
         source: "missed_call",
         status: client.status === "ACTIVE" || client.status === "TRIAL" ? "ROUTED" : "HELD",
         deliveredAt: new Date(),
@@ -98,16 +106,21 @@ export async function handleMissedCallInboundSms(opts: {
       data: { status: "CONVERTED", enquiryId: enquiry.id, conversation: convo },
     });
 
+    // SMS to tradie can include a deep link — do NOT attach the magic login URL to the job message thread.
     const { url } = await createMagicLogin(client.id);
     const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}`;
-    const notify = `New job from missed call: ${result.name}${result.postcode ? ` (${result.postcode})` : ""}. ${result.message.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
-    await sendMessage({ to: client.destPhone, channel: client.destChannel, body: notify });
+    const distBit = distanceMiles != null ? ` · ~${distanceMiles} mi` : "";
+    const notifySms = `New job from missed call: ${result.name}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${result.message.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
+    await sendMessage({ to: client.destPhone, channel: client.destChannel, body: notifySms });
+
+    // Clean timeline entry for the job (no login tokens / deep links)
     await logMessage({
       clientId: client.id,
       enquiryId: enquiry.id,
       direction: "OUTBOUND",
+      channel: "SYSTEM",
       toAddr: client.destPhone,
-      body: notify,
+      body: `New job from missed call: ${result.name}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${result.message.slice(0, 200)}`,
     });
 
     return { handled: true };

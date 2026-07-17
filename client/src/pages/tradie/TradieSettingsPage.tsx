@@ -10,6 +10,10 @@ export default function TradieSettingsPage() {
   const [businessName, setBusinessName] = useState("");
   const [tradeTitle, setTradeTitle] = useState("");
   const [town, setTown] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [postcode, setPostcode] = useState("");
+  const [vatNumber, setVatNumber] = useState("");
   const [bankName, setBankName] = useState("");
   const [bankSortCode, setBankSortCode] = useState("");
   const [bankAccountName, setBankAccountName] = useState("");
@@ -23,6 +27,10 @@ export default function TradieSettingsPage() {
     setBusinessName(me.data.businessName || "");
     setTradeTitle(me.data.tradeTitle || "");
     setTown(me.data.town || "");
+    setAddressLine1(me.data.addressLine1 || "");
+    setAddressLine2(me.data.addressLine2 || "");
+    setPostcode(me.data.postcode || "");
+    setVatNumber(me.data.vatNumber || "");
     setBankName(me.data.bankName || "");
     setBankSortCode(me.data.bankSortCode || "");
     setBankAccountName(me.data.bankAccountName || "");
@@ -43,6 +51,10 @@ export default function TradieSettingsPage() {
         businessName,
         tradeTitle: tradeTitle || null,
         town: town || null,
+        addressLine1: addressLine1 || null,
+        addressLine2: addressLine2 || null,
+        postcode: postcode || null,
+        vatNumber: vatNumber || null,
         bankName: bankName || null,
         bankSortCode: bankSortCode || null,
         bankAccountName: bankAccountName || null,
@@ -135,8 +147,46 @@ export default function TradieSettingsPage() {
               <input value={tradeTitle} onChange={(e) => setTradeTitle(e.target.value)} placeholder="Plumber" />
             </label>
             <label>
+              Address line 1
+              <input
+                value={addressLine1}
+                onChange={(e) => setAddressLine1(e.target.value)}
+                placeholder="12 High Street"
+              />
+            </label>
+            <label>
+              Address line 2
+              <input
+                value={addressLine2}
+                onChange={(e) => setAddressLine2(e.target.value)}
+                placeholder="Optional"
+              />
+            </label>
+            <label>
               Town
               <input value={town} onChange={(e) => setTown(e.target.value)} placeholder="Woking" />
+            </label>
+            <label>
+              Business postcode
+              <input
+                value={postcode}
+                onChange={(e) => setPostcode(e.target.value)}
+                placeholder="GU21 6AA"
+              />
+              <span className="muted-text" style={{ fontWeight: 400 }}>
+                Used to show how far each job is from you.
+              </span>
+            </label>
+            <label>
+              VAT number
+              <input
+                value={vatNumber}
+                onChange={(e) => setVatNumber(e.target.value)}
+                placeholder="GB123456789"
+              />
+              <span className="muted-text" style={{ fontWeight: 400 }}>
+                Shown on invoices when set.
+              </span>
             </label>
           </div>
         </div>

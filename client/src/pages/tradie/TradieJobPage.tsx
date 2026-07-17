@@ -110,6 +110,7 @@ export default function TradieJobPage() {
     phone: string;
     message: string | null;
     postcode: string | null;
+    distanceMiles: number | null;
     photoUrls: string[];
   };
 
@@ -186,6 +187,9 @@ export default function TradieJobPage() {
                 <IconPhone /> {enquiry.phone}
               </a>
               {enquiry.postcode && <span>· {enquiry.postcode}</span>}
+              {enquiry.distanceMiles != null && (
+                <span className="t-pill t-pill--slate">~{enquiry.distanceMiles} mi</span>
+              )}
             </p>
           </div>
         </div>

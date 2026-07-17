@@ -25,6 +25,7 @@ import { createCheckoutSession } from "../services/billing/stripe.js";
 import { createInvoiceFromQuote, sendInvoice, markInvoicePaid } from "../services/invoices/invoice.js";
 import { env } from "../env.js";
 import { configureNumberWebhooks, getNumberWebhookStatus } from "../services/twilio/numbers.js";
+import { extractPostcode, normalizePostcode } from "../services/geo/postcode.js";
 
 export const tradieRouter = Router();
 
@@ -155,6 +156,10 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       businessName: client.businessName,
       tradeTitle: client.tradeTitle,
       town: client.town,
+      addressLine1: client.addressLine1,
+      addressLine2: client.addressLine2,
+      postcode: client.postcode,
+      vatNumber: client.vatNumber,
       routeKey: client.routeKey,
       status: client.status,
       trialEndsAt: client.trialEndsAt,
@@ -188,6 +193,10 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         businessName: z.string().min(2).max(120).optional(),
         tradeTitle: z.string().max(80).nullable().optional(),
         town: z.string().max(80).nullable().optional(),
+        addressLine1: z.string().max(160).nullable().optional(),
+        addressLine2: z.string().max(160).nullable().optional(),
+        postcode: z.string().max(12).nullable().optional(),
+        vatNumber: z.string().max(30).nullable().optional(),
         destChannel: z.enum(["SMS", "WHATSAPP", "BOTH"]).optional(),
         bankName: z.string().max(80).nullable().optional(),
         bankSortCode: z.string().max(20).nullable().optional(),
@@ -204,12 +213,23 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
           : null
         : undefined;
 
+    let nextPostcode: string | null | undefined = undefined;
+    if (body.postcode !== undefined) {
+      nextPostcode = body.postcode
+        ? extractPostcode(body.postcode) ?? normalizePostcode(body.postcode) ?? body.postcode.trim().toUpperCase()
+        : null;
+    }
+
     const client = await prisma.client.update({
       where: { id: clientId(req) },
       data: {
         ...(body.businessName !== undefined ? { businessName: body.businessName } : {}),
         ...(body.tradeTitle !== undefined ? { tradeTitle: body.tradeTitle } : {}),
         ...(body.town !== undefined ? { town: body.town } : {}),
+        ...(body.addressLine1 !== undefined ? { addressLine1: body.addressLine1 } : {}),
+        ...(body.addressLine2 !== undefined ? { addressLine2: body.addressLine2 } : {}),
+        ...(nextPostcode !== undefined ? { postcode: nextPostcode } : {}),
+        ...(body.vatNumber !== undefined ? { vatNumber: body.vatNumber } : {}),
         ...(body.destChannel !== undefined ? { destChannel: body.destChannel } : {}),
         ...(body.bankName !== undefined ? { bankName: body.bankName } : {}),
         ...(body.bankSortCode !== undefined ? { bankSortCode: body.bankSortCode } : {}),

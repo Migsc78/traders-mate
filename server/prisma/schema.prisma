@@ -171,7 +171,10 @@ model Client {
   businessName     String
   tradeTitle       String?
   town             String?
+  addressLine1     String? // street address for invoices / business location
+  addressLine2     String?
   postcode         String? // tradie's business postcode — used to compute distance to a lead's job
+  vatNumber        String? // e.g. GB123456789 — shown on invoices when set
   routeKey         String       @unique // public key baked into the site/widget
   destPhone        String // tradie's own number (forwarding model), E.164 or 0-prefixed
   destChannel      Channel      @default(SMS)

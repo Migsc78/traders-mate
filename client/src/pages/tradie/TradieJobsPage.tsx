@@ -25,7 +25,7 @@ export default function TradieJobsPage() {
       {jobs.isError && <p className="error">{(jobs.error as Error).message}</p>}
 
       <ul className="t-list">
-        {(jobs.data || []).map((j: { id: string; name: string; phone: string; message: string | null; postcode: string | null; latestQuote: { id: string; status: string; totalPence: number } | null }) => (
+        {(jobs.data || []).map((j: { id: string; name: string; phone: string; message: string | null; postcode: string | null; distanceMiles: number | null; latestQuote: { id: string; status: string; totalPence: number } | null }) => (
           <li key={j.id}>
             <Link className="t-row" to={`/t/jobs/${j.id}`}>
               <div className="t-row-main">
@@ -33,7 +33,10 @@ export default function TradieJobsPage() {
                   <strong>{j.name}</strong>
                   {j.latestQuote ? <StatusPill status={j.latestQuote.status} /> : <span className="t-pill t-pill--orange">New</span>}
                 </div>
-                <span className="t-row-sub">{j.postcode || j.phone}</span>
+                <span className="t-row-sub">
+                  {j.postcode || j.phone}
+                  {j.distanceMiles != null ? ` · ~${j.distanceMiles} mi` : ""}
+                </span>
                 {j.message && <span className="t-row-snip">{j.message}</span>}
               </div>
               <div className="t-row-side">

@@ -80,6 +80,7 @@ th{background:#f1f5f9;font-size:12px;text-transform:uppercase;color:#64748b}
 .note{color:#475569;font-size:14px}
 </style></head><body>
 <h1>Invoice from ${esc(invoice.client.businessName)}</h1>
+${invoice.client.vatNumber ? `<p class="sub">VAT: ${esc(invoice.client.vatNumber)}</p>` : ""}
 <p class="sub">${invoice.customerName ? `For ${esc(invoice.customerName)}` : ""}${invoice.reference ? ` · ${esc(invoice.reference)}` : ""}</p>
 <table><thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${linesHtml}</tbody></table>
 <div class="totals">
