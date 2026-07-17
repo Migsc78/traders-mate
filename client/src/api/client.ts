@@ -60,6 +60,9 @@ export interface SettingsView {
   twilioWhatsappFrom: SettingsField;
   claudeApiKey: SettingsField;
   openaiApiKey: SettingsField;
+  missedCallSayVoice: string;
+  missedCallSayText: string;
+  missedCallSmsText: string;
 }
 
 export interface SettingsUpdate {
@@ -70,6 +73,9 @@ export interface SettingsUpdate {
   twilioWhatsappFrom?: string;
   claudeApiKey?: string;
   openaiApiKey?: string;
+  missedCallSayVoice?: string;
+  missedCallSayText?: string;
+  missedCallSmsText?: string;
 }
 
 export const api = {

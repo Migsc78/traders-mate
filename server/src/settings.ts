@@ -15,9 +15,15 @@ export interface ApiSettings {
   claudeApiKey: string;
   /** Optional OpenAI key — Whisper transcription for voice job cards */
   openaiApiKey: string;
+  /** Twilio <Say> voice id, e.g. Polly.Amy (natural) or alice (robotic) */
+  missedCallSayVoice: string;
+  /** Spoken on missed call. Use {{businessName}} */
+  missedCallSayText: string;
+  /** First SMS after missed call. Use {{businessName}} */
+  missedCallSmsText: string;
 }
 
-const SETTINGS_FIELDS = [
+const SECRET_FIELDS = [
   "googlePlacesApiKey",
   "twilioAccountSid",
   "twilioAuthToken",
@@ -26,6 +32,10 @@ const SETTINGS_FIELDS = [
   "claudeApiKey",
   "openaiApiKey",
 ] as const;
+
+const TEXT_FIELDS = ["missedCallSayVoice", "missedCallSayText", "missedCallSmsText"] as const;
+
+const SETTINGS_FIELDS = [...SECRET_FIELDS, ...TEXT_FIELDS] as const;
 
 function defaultsFromEnv(): ApiSettings {
   return {
@@ -36,6 +46,13 @@ function defaultsFromEnv(): ApiSettings {
     twilioWhatsappFrom: env.TWILIO_WHATSAPP_FROM,
     claudeApiKey: env.CLAUDE_API_KEY || env.ANTHROPIC_API_KEY || "",
     openaiApiKey: env.OPENAI_API_KEY || "",
+    missedCallSayVoice: env.MISSED_CALL_SAY_VOICE || "Polly.Amy",
+    missedCallSayText:
+      env.MISSED_CALL_SAY_TEXT ||
+      "Sorry we missed your call. We're texting you now so we can take your details.",
+    missedCallSmsText:
+      env.MISSED_CALL_SMS_TEXT ||
+      "Hi, this is {{businessName}}'s assistant — sorry we missed your call. What do you need doing and what's your postcode?",
   };
 }
 
@@ -68,6 +85,9 @@ function mergeSettings(base: ApiSettings, patch: Partial<ApiSettings>): ApiSetti
     twilioWhatsappFrom: patch.twilioWhatsappFrom ?? base.twilioWhatsappFrom,
     claudeApiKey: patch.claudeApiKey ?? base.claudeApiKey,
     openaiApiKey: patch.openaiApiKey ?? base.openaiApiKey,
+    missedCallSayVoice: patch.missedCallSayVoice ?? base.missedCallSayVoice,
+    missedCallSayText: patch.missedCallSayText ?? base.missedCallSayText,
+    missedCallSmsText: patch.missedCallSmsText ?? base.missedCallSmsText,
   };
 }
 
@@ -120,6 +140,28 @@ export function openaiConfigured(): boolean {
   return !!getOpenaiApiKey();
 }
 
+export function getMissedCallSayVoice(): string {
+  return current.missedCallSayVoice.trim() || "Polly.Amy";
+}
+
+export function getMissedCallSayText(): string {
+  return (
+    current.missedCallSayText.trim() ||
+    "Sorry we missed your call. We're texting you now so we can take your details."
+  );
+}
+
+export function getMissedCallSmsText(): string {
+  return (
+    current.missedCallSmsText.trim() ||
+    "Hi, this is {{businessName}}'s assistant — sorry we missed your call. What do you need doing and what's your postcode?"
+  );
+}
+
+export function fillTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? "");
+}
+
 export function updateApiSettings(patch: Partial<ApiSettings>): ApiSettings {
   const next = { ...current };
   for (const field of SETTINGS_FIELDS) {
@@ -154,5 +196,9 @@ export function publicSettingsView() {
     twilioWhatsappFrom: maskPhone(s.twilioWhatsappFrom),
     claudeApiKey: maskSecret(s.claudeApiKey),
     openaiApiKey: maskSecret(s.openaiApiKey),
+    // Plain text — safe to show in admin UI for editing
+    missedCallSayVoice: s.missedCallSayVoice,
+    missedCallSayText: s.missedCallSayText,
+    missedCallSmsText: s.missedCallSmsText,
   };
 }

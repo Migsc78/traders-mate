@@ -3,8 +3,23 @@ import { prisma } from "../db.js";
 import { sendMessage, toE164UK } from "../services/messaging/sender.js";
 import { logMessage } from "../services/messaging/log.js";
 import { handleMissedCallInboundSms } from "../services/receptionist/smsQualifier.js";
+import {
+  fillTemplate,
+  getMissedCallSayText,
+  getMissedCallSayVoice,
+  getMissedCallSmsText,
+} from "../settings.js";
 
 export const twilioHooksRouter = Router();
+
+function escXml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
 
 async function handleMissedVoice(opts: {
   to: string;
@@ -21,7 +36,7 @@ async function handleMissedVoice(opts: {
     (await prisma.client.findFirst({ where: { twilioNumber: to } }));
 
   if (!client || !from) {
-    return `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Sorry, this number is not configured.</Say><Hangup/></Response>`;
+    return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Sorry, this number is not configured.</Say><Hangup/></Response>`;
   }
 
   await prisma.missedCall.create({
@@ -34,7 +49,8 @@ async function handleMissedVoice(opts: {
     },
   });
 
-  const smsBody = `Hi, this is ${client.businessName}'s assistant — sorry we missed your call. What do you need doing and what's your postcode?`;
+  const vars = { businessName: client.businessName };
+  const smsBody = fillTemplate(getMissedCallSmsText(), vars);
   await sendMessage({ to: from, channel: "SMS", body: smsBody });
   await logMessage({
     clientId: client.id,
@@ -52,8 +68,10 @@ async function handleMissedVoice(opts: {
     body: tradiePing,
   });
 
-  const say = `Sorry we missed your call. We're texting you now so we can take your details.`;
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-GB">${say}</Say><Hangup/></Response>`;
+  const say = fillTemplate(getMissedCallSayText(), vars);
+  const voice = getMissedCallSayVoice();
+  // Polly/Google voices sound natural; soft break between sentences.
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${escXml(voice)}"><break strength="x-weak"/>${escXml(say)}</Say><Hangup/></Response>`;
 }
 
 twilioHooksRouter.post("/voice/missed", async (req, res) => {
@@ -68,7 +86,7 @@ twilioHooksRouter.post("/voice/missed", async (req, res) => {
     console.error("[twilio voice]", e);
     res
       .type("text/xml")
-      .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Sorry, something went wrong.</Say><Hangup/></Response>`);
+      .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Sorry, something went wrong.</Say><Hangup/></Response>`);
   }
 });
 
@@ -93,7 +111,7 @@ twilioHooksRouter.post("/voice/missed/:routeKey", async (req, res) => {
     console.error("[twilio voice]", e);
     res
       .type("text/xml")
-      .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Sorry, something went wrong.</Say><Hangup/></Response>`);
+      .send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Sorry, something went wrong.</Say><Hangup/></Response>`);
   }
 });
 

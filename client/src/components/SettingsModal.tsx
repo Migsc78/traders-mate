@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type SettingsField, type SettingsView } from "../api/client";
 
@@ -11,6 +11,15 @@ function fieldHint(field: SettingsField | undefined): string {
   return field.hint ? `Saved (${field.hint})` : "Saved";
 }
 
+const VOICE_OPTIONS = [
+  { value: "Polly.Amy", label: "Polly Amy (UK, natural — recommended)" },
+  { value: "Polly.Emma", label: "Polly Emma (UK)" },
+  { value: "Polly.Brian", label: "Polly Brian (UK, male)" },
+  { value: "Google.en-GB-Neural2-A", label: "Google Neural2-A (UK)" },
+  { value: "Google.en-GB-Neural2-B", label: "Google Neural2-B (UK, male)" },
+  { value: "alice", label: "Alice (basic — robotic)" },
+];
+
 export default function SettingsModal({ onClose }: Props) {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
@@ -22,7 +31,17 @@ export default function SettingsModal({ onClose }: Props) {
   const [twilioWhatsappFrom, setTwilioWhatsappFrom] = useState("");
   const [claudeApiKey, setClaudeApiKey] = useState("");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
+  const [missedCallSayVoice, setMissedCallSayVoice] = useState("Polly.Amy");
+  const [missedCallSayText, setMissedCallSayText] = useState("");
+  const [missedCallSmsText, setMissedCallSmsText] = useState("");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setMissedCallSayVoice(data.missedCallSayVoice || "Polly.Amy");
+    setMissedCallSayText(data.missedCallSayText || "");
+    setMissedCallSmsText(data.missedCallSmsText || "");
+  }, [data]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -34,6 +53,9 @@ export default function SettingsModal({ onClose }: Props) {
         ...(twilioWhatsappFrom.trim() ? { twilioWhatsappFrom: twilioWhatsappFrom.trim() } : {}),
         ...(claudeApiKey.trim() ? { claudeApiKey: claudeApiKey.trim() } : {}),
         ...(openaiApiKey.trim() ? { openaiApiKey: openaiApiKey.trim() } : {}),
+        missedCallSayVoice: missedCallSayVoice.trim(),
+        missedCallSayText: missedCallSayText.trim(),
+        missedCallSmsText: missedCallSmsText.trim(),
       }),
     onSuccess: (next: SettingsView) => {
       qc.setQueryData(["settings"], next);
@@ -45,18 +67,23 @@ export default function SettingsModal({ onClose }: Props) {
       setTwilioWhatsappFrom("");
       setClaudeApiKey("");
       setOpenaiApiKey("");
+      setMissedCallSayVoice(next.missedCallSayVoice || "Polly.Amy");
+      setMissedCallSayText(next.missedCallSayText || "");
+      setMissedCallSmsText(next.missedCallSmsText || "");
       setSaved(true);
     },
   });
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
         <button className="close" onClick={onClose} aria-label="Close settings">
           ×
         </button>
         <h2>Settings</h2>
-        <p className="hint">API keys are saved locally on this machine and take effect immediately.</p>
+        <p className="hint">
+          API keys and missed-call scripts. On Railway, also set the matching env vars so they survive redeploys.
+        </p>
 
         {isLoading ? (
           <p className="muted-text">Loading…</p>
@@ -83,11 +110,11 @@ export default function SettingsModal({ onClose }: Props) {
 
             <h3 className="settings-section-title">Twilio</h3>
             <p className="field-hint settings-section-hint">
-              For SMS and WhatsApp lead notifications. Get credentials from{" "}
+              For SMS and WhatsApp. Get credentials from{" "}
               <a href="https://console.twilio.com" target="_blank" rel="noreferrer">
                 console.twilio.com
               </a>
-              . Leave blank to keep saved values.
+              .
             </p>
 
             <label>
@@ -121,7 +148,6 @@ export default function SettingsModal({ onClose }: Props) {
                 value={twilioSmsFrom}
                 onChange={(e) => setTwilioSmsFrom(e.target.value)}
               />
-              <span className="field-hint">Your Twilio phone number for outbound SMS.</span>
             </label>
 
             <label>
@@ -133,13 +159,49 @@ export default function SettingsModal({ onClose }: Props) {
                 value={twilioWhatsappFrom}
                 onChange={(e) => setTwilioWhatsappFrom(e.target.value)}
               />
-              <span className="field-hint">Twilio WhatsApp-enabled sender (optional).</span>
+            </label>
+
+            <h3 className="settings-section-title">Missed-call voice &amp; SMS</h3>
+            <p className="field-hint settings-section-hint">
+              Spoken when a call is diverted to Twilio, then the first SMS to the caller. Use{" "}
+              <code>{"{{businessName}}"}</code> for the tradie&apos;s name. Test by calling the Twilio number
+              directly. Prefer Polly/Google voices — Alice is the robotic one.
+            </p>
+
+            <label>
+              TTS voice
+              <select value={missedCallSayVoice} onChange={(e) => setMissedCallSayVoice(e.target.value)}>
+                {VOICE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Spoken message (TTS)
+              <textarea
+                rows={3}
+                value={missedCallSayText}
+                onChange={(e) => setMissedCallSayText(e.target.value)}
+                placeholder="Sorry we missed your call…"
+              />
+            </label>
+
+            <label>
+              First SMS to caller
+              <textarea
+                rows={3}
+                value={missedCallSmsText}
+                onChange={(e) => setMissedCallSmsText(e.target.value)}
+                placeholder="Hi, this is {{businessName}}'s assistant…"
+              />
             </label>
 
             <h3 className="settings-section-title">Quote AI</h3>
             <p className="field-hint settings-section-hint">
-              Used for voice / notes → priced draft quotes. Claude Haiku 4.5 extracts line items; OpenAI Whisper is
-              optional for audio transcription (typed notes work with Claude alone).
+              Claude extracts line items; OpenAI Whisper is optional for audio.
             </p>
 
             <label>
@@ -151,13 +213,6 @@ export default function SettingsModal({ onClose }: Props) {
                 value={claudeApiKey}
                 onChange={(e) => setClaudeApiKey(e.target.value)}
               />
-              <span className="field-hint">
-                Anthropic key for Haiku 4.5. Get one at{" "}
-                <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer">
-                  console.anthropic.com
-                </a>
-                .
-              </span>
             </label>
 
             <label>
@@ -169,7 +224,6 @@ export default function SettingsModal({ onClose }: Props) {
                 value={openaiApiKey}
                 onChange={(e) => setOpenaiApiKey(e.target.value)}
               />
-              <span className="field-hint">Optional. Enables mic → Whisper. Without it, tradies can paste typed job notes.</span>
             </label>
 
             {save.error && <p className="error">{(save.error as Error).message}</p>}

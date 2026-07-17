@@ -12,6 +12,9 @@ const updateSchema = z.object({
   twilioWhatsappFrom: z.string().optional(),
   claudeApiKey: z.string().optional(),
   openaiApiKey: z.string().optional(),
+  missedCallSayVoice: z.string().optional(),
+  missedCallSayText: z.string().optional(),
+  missedCallSmsText: z.string().optional(),
 });
 
 settingsRouter.get("/", (_req, res) => {

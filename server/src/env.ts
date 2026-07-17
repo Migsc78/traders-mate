@@ -42,6 +42,19 @@ const schema = z.object({
   TWILIO_SMS_FROM: z.string().default(""),
   TWILIO_WHATSAPP_FROM: z.string().default(""),
 
+  // Missed-call receptionist TTS + first SMS (overridable in CRM Settings)
+  MISSED_CALL_SAY_VOICE: z.string().default("Polly.Amy"),
+  MISSED_CALL_SAY_TEXT: z
+    .string()
+    .default(
+      "Sorry we missed your call. We're texting you now so we can take your details."
+    ),
+  MISSED_CALL_SMS_TEXT: z
+    .string()
+    .default(
+      "Hi, this is {{businessName}}'s assistant — sorry we missed your call. What do you need doing and what's your postcode?"
+    ),
+
   // Quote AI (Claude Haiku 4.5 for extract; optional OpenAI Whisper for voice)
   CLAUDE_API_KEY: z.string().default(""),
   ANTHROPIC_API_KEY: z.string().default(""),
