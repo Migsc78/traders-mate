@@ -173,7 +173,9 @@ export const tradieApi = {
         phone: string;
         message: string | null;
         postcode: string | null;
+        distanceMiles: number | null;
         photoUrls: string[];
+        status: string;
         createdAt: string;
         latestQuote: { id: string; status: string; totalPence: number } | null;
       }[]

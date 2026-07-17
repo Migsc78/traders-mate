@@ -25,7 +25,7 @@ export default function TradieJobsPage() {
       {jobs.isError && <p className="error">{(jobs.error as Error).message}</p>}
 
       <ul className="t-list">
-        {(jobs.data || []).map((j: { id: string; name: string; phone: string; message: string | null; postcode: string | null; distanceMiles: number | null; latestQuote: { id: string; status: string; totalPence: number } | null }) => (
+        {(jobs.data || []).map((j) => (
           <li key={j.id}>
             <Link className="t-row" to={`/t/jobs/${j.id}`}>
               <div className="t-row-main">
