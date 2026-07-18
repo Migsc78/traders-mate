@@ -182,6 +182,7 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       accountActive: accountActive(client.status, client.trialEndsAt),
       twilioNumber: client.twilioNumber,
       greetingAudioUrl: client.greetingAudioUrl,
+      missedCallMode: client.missedCallMode,
       inboundEmail: client.inboundEmailLocal
         ? `${client.inboundEmailLocal}@${env.INBOUND_EMAIL_DOMAIN}`
         : null,
@@ -220,6 +221,7 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         bankAccountName: z.string().max(120).nullable().optional(),
         bankAccountNumber: z.string().max(20).nullable().optional(),
         twilioNumber: z.string().max(30).nullable().optional(),
+        missedCallMode: z.enum(["SMS_QUALIFY", "VOICEMAIL"]).optional(),
       })
       .parse(req.body ?? {});
 
@@ -253,6 +255,7 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         ...(body.bankAccountName !== undefined ? { bankAccountName: body.bankAccountName } : {}),
         ...(body.bankAccountNumber !== undefined ? { bankAccountNumber: body.bankAccountNumber } : {}),
         ...(nextTwilio !== undefined ? { twilioNumber: nextTwilio } : {}),
+        ...(body.missedCallMode !== undefined ? { missedCallMode: body.missedCallMode } : {}),
       },
     });
 

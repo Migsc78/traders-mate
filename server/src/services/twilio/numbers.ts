@@ -12,6 +12,19 @@ function authHeader(): string {
   return "Basic " + Buffer.from(`${sid}:${token}`).toString("base64");
 }
 
+/** Download a Twilio RecordingUrl (requires account Basic auth). Prefers .wav. */
+export async function downloadTwilioRecording(recordingUrl: string): Promise<{ buffer: Buffer; contentType: string }> {
+  if (!twilioConfigured()) throw new Error("Twilio is not configured");
+  const base = recordingUrl.replace(/\.(wav|mp3)$/i, "");
+  const url = `${base}.wav`;
+  const res = await fetch(url, { headers: { Authorization: authHeader() } });
+  if (!res.ok) {
+    throw new Error(`Twilio recording download failed (${res.status})`);
+  }
+  const ab = await res.arrayBuffer();
+  return { buffer: Buffer.from(ab), contentType: res.headers.get("content-type") || "audio/wav" };
+}
+
 function accountBase(): string {
   return `https://api.twilio.com/2010-04-01/Accounts/${getTwilioAccountSid()}`;
 }

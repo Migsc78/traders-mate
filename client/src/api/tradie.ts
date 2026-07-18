@@ -88,6 +88,7 @@ export interface TradieMe {
   accountActive: boolean;
   twilioNumber: string | null;
   greetingAudioUrl: string | null;
+  missedCallMode: "SMS_QUALIFY" | "VOICEMAIL";
   inboundEmail: string | null;
   bankName: string | null;
   bankSortCode: string | null;

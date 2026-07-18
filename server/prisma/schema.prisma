@@ -82,6 +82,12 @@ enum MissedCallStatus {
   EXPIRED
 }
 
+// How missed calls are rescued after the greeting.
+enum MissedCallMode {
+  SMS_QUALIFY
+  VOICEMAIL
+}
+
 enum Channel {
   WHATSAPP
   SMS
@@ -183,6 +189,7 @@ model Client {
   trialEndsAt      DateTime?
   twilioNumber     String? // dedicated Twilio number for missed-call divert
   greetingAudioUrl String? // custom missed-call greeting (mp3/wav); null = TTS fallback
+  missedCallMode   MissedCallMode @default(SMS_QUALIFY) // SMS Q&A vs leave a voicemail → job
   inboundEmailLocal String? @unique // local-part for inbound email intake
   bankName         String?
   bankSortCode     String?

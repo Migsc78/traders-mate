@@ -23,6 +23,7 @@ export default function TradieSettingsPage() {
   const [bankAccountName, setBankAccountName] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [twilioNumber, setTwilioNumber] = useState("");
+  const [missedCallMode, setMissedCallMode] = useState<"SMS_QUALIFY" | "VOICEMAIL">("SMS_QUALIFY");
 
   const [twilioMsg, setTwilioMsg] = useState("");
   const [greetingMsg, setGreetingMsg] = useState("");
@@ -42,6 +43,7 @@ export default function TradieSettingsPage() {
     setBankAccountName(me.data.bankAccountName || "");
     setBankAccountNumber(me.data.bankAccountNumber || "");
     setTwilioNumber(me.data.twilioNumber || "");
+    setMissedCallMode(me.data.missedCallMode || "SMS_QUALIFY");
   }, [me.data]);
 
   const twilioStatus = useQuery({
@@ -66,6 +68,7 @@ export default function TradieSettingsPage() {
         bankAccountName: bankAccountName || null,
         bankAccountNumber: bankAccountNumber || null,
         twilioNumber: twilioNumber || null,
+        missedCallMode,
       }),
     onSuccess: (r: {
       ok: boolean;
@@ -342,6 +345,37 @@ export default function TradieSettingsPage() {
               <li><span>Off / no signal</span> <code>{me.data.divertCodes.unreachable}</code></li>
             </ul>
           )}
+
+          <p className="t-section-label" style={{ marginTop: 18 }}>After the greeting</p>
+          <div className="t-mode-toggle" role="radiogroup" aria-label="Missed-call rescue mode">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={missedCallMode === "SMS_QUALIFY"}
+              className={missedCallMode === "SMS_QUALIFY" ? "on" : ""}
+              onClick={() => setMissedCallMode("SMS_QUALIFY")}
+            >
+              <strong>Text them back</strong>
+              <span>We SMS the caller for the job and postcode (default).</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={missedCallMode === "VOICEMAIL"}
+              className={missedCallMode === "VOICEMAIL" ? "on" : ""}
+              onClick={() => setMissedCallMode("VOICEMAIL")}
+              disabled={me.data?.caps?.whisper === false}
+            >
+              <strong>Caller leaves a voicemail</strong>
+              <span>
+                They say name, job and postcode after the beep — we turn it into a job card and text you.
+                {me.data?.caps?.whisper === false ? " (Needs Whisper configured on the server.)" : ""}
+              </span>
+            </button>
+          </div>
+          <p className="muted-text" style={{ margin: "8px 0 0" }}>
+            Tap Save settings below to apply this choice.
+          </p>
         </div>
       </div>
 
@@ -350,8 +384,10 @@ export default function TradieSettingsPage() {
         <div className="t-card">
           <p className="muted-text" style={{ margin: "0 0 12px" }}>
             Record a short message in your own voice (about 10–15 seconds). Callers hear this instead of the default
-            robot voice. Example: “Hi, you&apos;ve reached {businessName || "us"} — text us your name and job and
-            we&apos;ll get back ASAP.”
+            robot voice.{" "}
+            {missedCallMode === "VOICEMAIL"
+              ? `Example: “Hi, you've reached ${businessName || "us"} — leave your name, what you need and your postcode after the beep.”`
+              : `Example: “Hi, you've reached ${businessName || "us"} — text us your name and job and we'll get back ASAP.”`}
           </p>
 
           {me.data?.greetingAudioUrl ? (
