@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { setTradieSession, tradieApi } from "../../api/tradie";
+import { blobToDataUrl, blobToWav } from "../../lib/wav";
 import { StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const [businessName, setBusinessName] = useState("");
   const [tradeTitle, setTradeTitle] = useState("");
@@ -21,6 +25,8 @@ export default function TradieSettingsPage() {
   const [twilioNumber, setTwilioNumber] = useState("");
 
   const [twilioMsg, setTwilioMsg] = useState("");
+  const [greetingMsg, setGreetingMsg] = useState("");
+  const [recording, setRecording] = useState(false);
 
   useEffect(() => {
     if (!me.data) return;
@@ -92,6 +98,66 @@ export default function TradieSettingsPage() {
     },
     onError: (e: Error) => setTwilioMsg(e.message),
   });
+
+  const uploadGreeting = useMutation({
+    mutationFn: async (blob: Blob) => {
+      const wav = await blobToWav(blob);
+      if (wav.size > 2 * 1024 * 1024) {
+        throw new Error("Greeting too long — keep it under about 20 seconds");
+      }
+      const dataUrl = await blobToDataUrl(wav);
+      return tradieApi.uploadGreeting("audio/wav", dataUrl);
+    },
+    onSuccess: () => {
+      setGreetingMsg("Greeting saved — callers will hear your voice instead of the robot.");
+      qc.invalidateQueries({ queryKey: ["tradie-me"] });
+    },
+    onError: (e: Error) => setGreetingMsg(e.message),
+  });
+
+  const deleteGreeting = useMutation({
+    mutationFn: () => tradieApi.deleteGreeting(),
+    onSuccess: () => {
+      setGreetingMsg("Removed — callers will hear the default text-to-speech greeting.");
+      qc.invalidateQueries({ queryKey: ["tradie-me"] });
+    },
+    onError: (e: Error) => setGreetingMsg(e.message),
+  });
+
+  const startGreetingRec = async () => {
+    setGreetingMsg("");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "";
+    const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    chunksRef.current = [];
+    rec.ondataavailable = (e) => {
+      if (e.data.size) chunksRef.current.push(e.data);
+    };
+    rec.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+      uploadGreeting.mutate(blob);
+    };
+    mediaRef.current = rec;
+    rec.start();
+    setRecording(true);
+  };
+
+  const stopGreetingRec = () => {
+    mediaRef.current?.stop();
+    setRecording(false);
+  };
+
+  const onGreetingFile = async (file: File | null) => {
+    if (!file) return;
+    setGreetingMsg("");
+    uploadGreeting.mutate(file);
+    if (fileRef.current) fileRef.current.value = "";
+  };
 
   const checkout = useMutation({
     mutationFn: () => tradieApi.billingCheckout(),
@@ -220,9 +286,9 @@ export default function TradieSettingsPage() {
         <p className="t-section-label">Missed-call rescue</p>
         <div className="t-card">
           <p className="muted-text" style={{ margin: "0 0 12px" }}>
-            Save your Twilio number, then tap <strong>Wire voice &amp; SMS</strong> so callers hear our TTS and get a
-            text-back (not Twilio&apos;s default “set up voice” message). After that, dial the divert codes once on your
-            phone.
+            Save your Twilio number, then tap <strong>Wire voice &amp; SMS</strong> so callers hear your greeting and get
+            a text-back (not Twilio&apos;s default “set up voice” message). After that, dial the divert codes once on
+            your phone.
           </p>
           <label>
             Twilio number (E.164)
@@ -275,6 +341,80 @@ export default function TradieSettingsPage() {
               <li><span>Busy</span> <code>{me.data.divertCodes.busy}</code></li>
               <li><span>Off / no signal</span> <code>{me.data.divertCodes.unreachable}</code></li>
             </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="t-settings-group">
+        <p className="t-section-label">Missed-call greeting</p>
+        <div className="t-card">
+          <p className="muted-text" style={{ margin: "0 0 12px" }}>
+            Record a short message in your own voice (about 10–15 seconds). Callers hear this instead of the default
+            robot voice. Example: “Hi, you&apos;ve reached {businessName || "us"} — text us your name and job and
+            we&apos;ll get back ASAP.”
+          </p>
+
+          {me.data?.greetingAudioUrl ? (
+            <div className="t-greeting-preview">
+              <audio controls src={me.data.greetingAudioUrl} preload="metadata" />
+              <p className="muted-text" style={{ margin: "8px 0 0" }}>
+                Your greeting is active.
+              </p>
+            </div>
+          ) : (
+            <p className="muted-text" style={{ margin: "0 0 12px" }}>
+              No custom greeting yet — callers hear text-to-speech until you record one.
+            </p>
+          )}
+
+          <div className="tradie-actions" style={{ marginTop: 12 }}>
+            {!recording ? (
+              <button
+                type="button"
+                className="primary"
+                disabled={uploadGreeting.isPending}
+                onClick={() => void startGreetingRec().catch((e) => setGreetingMsg(e instanceof Error ? e.message : "Mic failed"))}
+              >
+                {uploadGreeting.isPending ? "Saving…" : "Record greeting"}
+              </button>
+            ) : (
+              <button type="button" className="danger" onClick={stopGreetingRec}>
+                Stop &amp; save
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={uploadGreeting.isPending || recording}
+              onClick={() => fileRef.current?.click()}
+            >
+              Upload WAV/MP3
+            </button>
+            {me.data?.greetingAudioUrl && (
+              <button
+                type="button"
+                className="linkish"
+                disabled={deleteGreeting.isPending}
+                onClick={() => {
+                  if (confirm("Remove your greeting and use the default robot voice?")) {
+                    deleteGreeting.mutate();
+                  }
+                }}
+              >
+                Remove
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="audio/wav,audio/mpeg,audio/mp3,audio/mp4,.wav,.mp3,.m4a"
+              hidden
+              onChange={(e) => void onGreetingFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+          {greetingMsg && (
+            <p className={uploadGreeting.isError || deleteGreeting.isError ? "error" : "muted-text"} style={{ marginTop: 8 }}>
+              {greetingMsg}
+            </p>
           )}
         </div>
       </div>

@@ -165,6 +165,7 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       trialEndsAt: client.trialEndsAt,
       accountActive: accountActive(client.status, client.trialEndsAt),
       twilioNumber: client.twilioNumber,
+      greetingAudioUrl: client.greetingAudioUrl,
       inboundEmail: client.inboundEmailLocal
         ? `${client.inboundEmailLocal}@${env.INBOUND_EMAIL_DOMAIN}`
         : null,
@@ -286,6 +287,68 @@ tradieRouter.post("/me/twilio/configure", requireClient, async (req, res, next) 
 
     const result = await configureNumberWebhooks(client.twilioNumber);
     res.json({ ok: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const GREETING_TYPES = new Set([
+  "audio/wav",
+  "audio/x-wav",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+]);
+const MAX_GREETING_BYTES = 2 * 1024 * 1024; // ~30s WAV / short mp3
+
+/** Upload a custom missed-call greeting (wav/mp3). Used instead of TTS when set. */
+tradieRouter.post("/me/greeting", requireClient, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        contentType: z.string().min(3).max(80),
+        dataBase64: z.string().min(20),
+      })
+      .parse(req.body ?? {});
+
+    const contentType = body.contentType.split(";")[0]!.trim().toLowerCase();
+    if (!GREETING_TYPES.has(contentType) && !contentType.endsWith("wav") && !contentType.endsWith("mpeg")) {
+      throw new ApiError(400, "bad_type", "Upload a WAV or MP3 greeting (Twilio cannot play WebM)");
+    }
+
+    const raw = body.dataBase64.includes(",") ? body.dataBase64.split(",")[1]! : body.dataBase64;
+    const buf = Buffer.from(raw, "base64");
+    if (!buf.length) throw new ApiError(400, "empty", "Empty audio");
+    if (buf.length > MAX_GREETING_BYTES) {
+      throw new ApiError(400, "too_large", "Greeting too large — keep it under ~20 seconds");
+    }
+
+    const stored = await storeAudio(
+      contentType === "audio/mp3" ? "audio/mpeg" : contentType.startsWith("audio/") ? contentType : "audio/wav",
+      buf
+    );
+
+    const updated = await prisma.client.update({
+      where: { id: clientId(req) },
+      data: { greetingAudioUrl: stored.url },
+      select: { id: true, greetingAudioUrl: true },
+    });
+
+    res.json({ ok: true, greetingAudioUrl: updated.greetingAudioUrl });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.delete("/me/greeting", requireClient, async (req, res, next) => {
+  try {
+    await prisma.client.update({
+      where: { id: clientId(req) },
+      data: { greetingAudioUrl: null },
+    });
+    res.json({ ok: true, greetingAudioUrl: null });
   } catch (err) {
     next(err);
   }

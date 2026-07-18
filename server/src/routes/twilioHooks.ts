@@ -39,6 +39,12 @@ async function handleMissedVoice(opts: {
     return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Sorry, this number is not configured.</Say><Hangup/></Response>`;
   }
 
+  const greetingRow = await prisma.client.findUnique({
+    where: { id: client.id },
+    select: { greetingAudioUrl: true },
+  });
+  const greetingUrl = greetingRow?.greetingAudioUrl?.trim() || null;
+
   await prisma.missedCall.create({
     data: {
       clientId: client.id,
@@ -68,9 +74,13 @@ async function handleMissedVoice(opts: {
     body: tradiePing,
   });
 
+  // Prefer the tradie's recorded greeting (Twilio <Play>); fall back to Polly TTS.
+  if (greetingUrl) {
+    return `<?xml version="1.0" encoding="UTF-8"?><Response><Play>${escXml(greetingUrl)}</Play><Hangup/></Response>`;
+  }
+
   const say = fillTemplate(getMissedCallSayText(), vars);
   const voice = getMissedCallSayVoice();
-  // Polly/Google voices sound natural; soft break between sentences.
   return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${escXml(voice)}"><break strength="x-weak"/>${escXml(say)}</Say><Hangup/></Response>`;
 }
 

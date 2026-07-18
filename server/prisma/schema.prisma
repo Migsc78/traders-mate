@@ -182,6 +182,7 @@ model Client {
   phoneVerifiedAt  DateTime?
   trialEndsAt      DateTime?
   twilioNumber     String? // dedicated Twilio number for missed-call divert
+  greetingAudioUrl String? // custom missed-call greeting (mp3/wav); null = TTS fallback
   inboundEmailLocal String? @unique // local-part for inbound email intake
   bankName         String?
   bankSortCode     String?

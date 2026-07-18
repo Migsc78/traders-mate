@@ -87,6 +87,7 @@ export interface TradieMe {
   trialEndsAt: string | null;
   accountActive: boolean;
   twilioNumber: string | null;
+  greetingAudioUrl: string | null;
   inboundEmail: string | null;
   bankName: string | null;
   bankSortCode: string | null;
@@ -191,6 +192,15 @@ export const tradieApi = {
       "/me/twilio/configure",
       { method: "POST", body: "{}" }
     ),
+
+  uploadGreeting: (contentType: string, dataBase64: string) =>
+    tRequest<{ ok: boolean; greetingAudioUrl: string | null }>("/me/greeting", {
+      method: "POST",
+      body: JSON.stringify({ contentType, dataBase64 }),
+    }),
+
+  deleteGreeting: () =>
+    tRequest<{ ok: boolean; greetingAudioUrl: null }>("/me/greeting", { method: "DELETE" }),
 
   billingCheckout: () => tRequest<{ url: string; stub: boolean }>("/billing/checkout", { method: "POST", body: "{}" }),
 
