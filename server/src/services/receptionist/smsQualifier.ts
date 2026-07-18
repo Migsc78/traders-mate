@@ -4,6 +4,7 @@ import { sendMessage, toE164UK } from "../messaging/sender.js";
 import { logMessage } from "../messaging/log.js";
 import { createMagicLogin, appPublicUrl } from "../quotes/magicAuth.js";
 import { distanceMilesBetween, normalizePostcode } from "../geo/postcode.js";
+import { findClientByTwilioNumber } from "../twilio/findClientByNumber.js";
 
 type ConvoTurn = { role: "assistant" | "user"; text: string; at: string };
 
@@ -16,9 +17,7 @@ export async function handleMissedCallInboundSms(opts: {
   const from = toE164UK(opts.from);
   const to = toE164UK(opts.to);
 
-  const client =
-    (await prisma.client.findFirst({ where: { twilioNumber: { contains: to.replace(/\D/g, "").slice(-10) } } })) ||
-    (await prisma.client.findFirst({ where: { twilioNumber: to } }));
+  const client = await findClientByTwilioNumber(opts.to);
 
   if (!client) return { handled: false };
 

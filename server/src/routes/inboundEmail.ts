@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { env } from "../env.js";
+import { isProduction } from "../lib/production.js";
 import { ApiError } from "../middleware/error.js";
 import { sendMessage } from "../services/messaging/sender.js";
 import { logMessage } from "../services/messaging/log.js";
@@ -27,9 +28,13 @@ inboundEmailRouter.post("/", async (req, res, next) => {
       })
       .parse(req.body ?? {});
 
-    if (env.INBOUND_EMAIL_WEBHOOK_SECRET) {
+    const expectedSecret = env.INBOUND_EMAIL_WEBHOOK_SECRET?.trim() || "";
+    if (isProduction() && !expectedSecret) {
+      throw new ApiError(503, "misconfigured", "Inbound email webhook secret not configured");
+    }
+    if (expectedSecret) {
       const hdr = String(req.headers["x-inbound-secret"] || body.secret || "");
-      if (hdr !== env.INBOUND_EMAIL_WEBHOOK_SECRET) {
+      if (hdr !== expectedSecret) {
         throw new ApiError(401, "unauthorized", "Bad inbound email secret");
       }
     }

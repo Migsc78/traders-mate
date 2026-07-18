@@ -3,6 +3,8 @@ import { prisma } from "../db.js";
 import { sendMessage, toE164UK } from "../services/messaging/sender.js";
 import { logMessage } from "../services/messaging/log.js";
 import { handleMissedCallInboundSms } from "../services/receptionist/smsQualifier.js";
+import { findClientByTwilioNumber } from "../services/twilio/findClientByNumber.js";
+import { requireTwilioSignature } from "../middleware/twilioSignature.js";
 import {
   fillTemplate,
   getMissedCallSayText,
@@ -11,6 +13,7 @@ import {
 } from "../settings.js";
 
 export const twilioHooksRouter = Router();
+twilioHooksRouter.use(requireTwilioSignature);
 
 function escXml(s: string): string {
   return s
@@ -30,10 +33,7 @@ async function handleMissedVoice(opts: {
   const to = toE164UK(opts.to);
   const from = toE164UK(opts.from);
 
-  const client =
-    opts.clientHint ||
-    (await prisma.client.findFirst({ where: { twilioNumber: { contains: to.replace(/\D/g, "").slice(-10) } } })) ||
-    (await prisma.client.findFirst({ where: { twilioNumber: to } }));
+  const client = opts.clientHint || (await findClientByTwilioNumber(opts.to));
 
   if (!client || !from) {
     return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Sorry, this number is not configured.</Say><Hangup/></Response>`;

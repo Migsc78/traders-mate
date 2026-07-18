@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -28,6 +29,21 @@ import { configureNumberWebhooks, getNumberWebhookStatus } from "../services/twi
 import { extractPostcode, normalizePostcode } from "../services/geo/postcode.js";
 
 export const tradieRouter = Router();
+
+const magicLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const phone = String(req.body?.phone || "")
+      .replace(/\D/g, "")
+      .slice(-10);
+    const key = String(req.body?.routeKey || phone || req.ip || "unknown");
+    return `magic:${key}`;
+  },
+  message: { error: { code: "rate_limited", message: "Too many login link requests — try again later." } },
+});
 
 function bearer(req: Request): string | null {
   const h = req.headers.authorization;
@@ -76,7 +92,7 @@ function clientId(req: Request): string {
 }
 
 // ---- Auth (public) ----
-tradieRouter.post("/auth/magic", async (req, res, next) => {
+tradieRouter.post("/auth/magic", magicLoginLimiter, async (req, res, next) => {
   try {
     const body = z.object({ routeKey: z.string().min(3).optional(), phone: z.string().min(6).optional() }).parse(req.body ?? {});
     if (!body.routeKey && !body.phone) throw new ApiError(400, "missing", "Provide routeKey or phone");

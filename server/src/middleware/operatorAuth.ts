@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 import { env } from "../env.js";
+import { isProduction } from "../lib/production.js";
 import { ApiError } from "./error.js";
 
 /**
@@ -8,6 +9,9 @@ import { ApiError } from "./error.js";
  * OPERATOR_API_TOKEN is set. Accepts:
  * - Bearer / x-operator-token == OPERATOR_API_TOKEN (scripts / legacy)
  * - Signed operator session from password login
+ *
+ * Production: fail closed if neither secret is set.
+ * Local/dev: open when unset (convenience).
  */
 let warnedOpen = false;
 
@@ -85,9 +89,14 @@ export function isValidOperatorCredential(provided: string): boolean {
 
 export function requireOperator(req: Request, _res: Response, next: NextFunction) {
   if (!operatorAuthConfigured()) {
-    if (!warnedOpen && process.env.NODE_ENV === "production") {
+    if (isProduction()) {
+      return next(
+        new ApiError(503, "misconfigured", "Operator authentication is not configured on this server")
+      );
+    }
+    if (!warnedOpen) {
       console.warn(
-        "[auth] OPERATOR_ADMIN_PASSWORD / OPERATOR_API_TOKEN not set — CRM API is open. Set OPERATOR_ADMIN_PASSWORD in production."
+        "[auth] OPERATOR_ADMIN_PASSWORD / OPERATOR_API_TOKEN not set — CRM API is open (dev only)."
       );
       warnedOpen = true;
     }

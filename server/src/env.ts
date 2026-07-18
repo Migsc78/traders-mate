@@ -1,5 +1,8 @@
 // Centralised, validated environment access.
 import { z } from "zod";
+import { isProduction } from "./lib/production.js";
+
+const DEV_MAGIC_LINK_SECRET = "dev-magic-link-secret-change-me";
 
 const schema = z.object({
   DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/tradiesmate?schema=public"),
@@ -59,7 +62,7 @@ const schema = z.object({
   CLAUDE_API_KEY: z.string().default(""),
   ANTHROPIC_API_KEY: z.string().default(""),
   OPENAI_API_KEY: z.string().default(""),
-  MAGIC_LINK_SECRET: z.string().default("dev-magic-link-secret-change-me"),
+  MAGIC_LINK_SECRET: z.string().default(DEV_MAGIC_LINK_SECRET),
   // Public URL for tradie PWA + customer quote pages (defaults to CLIENT_ORIGIN).
   APP_PUBLIC_URL: z.string().default(""),
 
@@ -99,7 +102,32 @@ const schema = z.object({
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().default(""),
 });
 
-export const env = schema.parse(process.env);
+const WEAK_MAGIC_SECRETS = new Set([
+  DEV_MAGIC_LINK_SECRET,
+  "change-me-in-production",
+  "change-me",
+  "secret",
+  "password",
+]);
+
+function assertProductionSecrets(parsed: z.infer<typeof schema>) {
+  if (!isProduction()) return;
+  const magic = parsed.MAGIC_LINK_SECRET?.trim() || "";
+  if (!magic || WEAK_MAGIC_SECRETS.has(magic) || magic.length < 32) {
+    throw new Error(
+      "[env] MAGIC_LINK_SECRET must be a strong random secret (≥32 chars) in production — set it on Railway"
+    );
+  }
+  if (!parsed.OPERATOR_ADMIN_PASSWORD?.trim() && !parsed.OPERATOR_API_TOKEN?.trim()) {
+    throw new Error(
+      "[env] OPERATOR_ADMIN_PASSWORD (or OPERATOR_API_TOKEN) is required in production — CRM must not be open"
+    );
+  }
+}
+
+const parsed = schema.parse(process.env);
+assertProductionSecrets(parsed);
+export const env = parsed;
 export type Env = typeof env;
 
 /** Comma-separated CLIENT_ORIGIN support (local + Vercel). */

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
@@ -13,6 +14,40 @@ import { notifyEarlyAccessRequest, sendEmail } from "../services/email/send.js";
 export const signupRouter = Router();
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function phoneKey(req: { body?: { phone?: unknown }; ip?: string }, prefix: string): string {
+  const digits = String(req.body?.phone || "")
+    .replace(/\D/g, "")
+    .slice(-10);
+  return `${prefix}:${digits || req.ip || "unknown"}`;
+}
+
+/** Limit OTP / signup SMS abuse without blocking normal retries. */
+const otpStartLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => phoneKey(req, "otp-start"),
+  message: { error: { code: "rate_limited", message: "Too many code requests — try again in a few minutes." } },
+});
+
+const otpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => phoneKey(req, "otp-verify"),
+  message: { error: { code: "rate_limited", message: "Too many code attempts — try again later." } },
+});
+
+const earlyAccessLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: "rate_limited", message: "Too many early-access requests — try again later." } },
+});
 
 function newRouteKey(): string {
   return `tm_${randomBytes(4).toString("hex")}`;
@@ -51,7 +86,7 @@ signupRouter.get("/status", (_req, res) => {
   res.json({ open: env.SIGNUPS_OPEN });
 });
 
-signupRouter.post("/early-access", async (req, res, next) => {
+signupRouter.post("/early-access", earlyAccessLimiter, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -109,7 +144,7 @@ signupRouter.get("/invite/:token", async (req, res, next) => {
   }
 });
 
-signupRouter.post("/start", async (req, res, next) => {
+signupRouter.post("/start", otpStartLimiter, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -161,7 +196,7 @@ signupRouter.post("/start", async (req, res, next) => {
   }
 });
 
-signupRouter.post("/verify", async (req, res, next) => {
+signupRouter.post("/verify", otpVerifyLimiter, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -249,7 +284,7 @@ signupRouter.post("/verify", async (req, res, next) => {
   }
 });
 
-signupRouter.post("/login/start", async (req, res, next) => {
+signupRouter.post("/login/start", otpStartLimiter, async (req, res, next) => {
   try {
     const body = z.object({ phone: z.string().min(8) }).parse(req.body ?? {});
     const phone = toE164UK(body.phone);
@@ -271,7 +306,7 @@ signupRouter.post("/login/start", async (req, res, next) => {
   }
 });
 
-signupRouter.post("/login/verify", async (req, res, next) => {
+signupRouter.post("/login/verify", otpVerifyLimiter, async (req, res, next) => {
   try {
     const body = z
       .object({ phone: z.string().min(8), code: z.string().min(4).max(8) })

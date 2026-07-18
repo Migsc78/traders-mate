@@ -32,6 +32,8 @@ import { twilioHooksRouter } from "./routes/twilioHooks.js";
 import { inboundEmailRouter } from "./routes/inboundEmail.js";
 
 const app = express();
+// Railway / reverse proxies — needed for correct client IP on rate limits.
+app.set("trust proxy", 1);
 const allowedOrigins = new Set(clientOrigins().map((o) => o.replace(/\/$/, "")));
 
 function isAllowedOrigin(origin: string | undefined): boolean {
