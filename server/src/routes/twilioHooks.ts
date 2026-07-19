@@ -57,19 +57,27 @@ async function handleMissedVoice(opts: {
     return `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Sorry, this number is not configured.</Say><Hangup/></Response>`;
   }
 
-  const row = await prisma.client.findUnique({
-    where: { id: client.id },
-    select: { greetingAudioUrl: true, missedCallMode: true },
-  });
+  // Always re-read mode from DB (raw) so a stale Prisma client can't force SMS.
+  const [row] = await prisma.$queryRaw<
+    Array<{ greetingAudioUrl: string | null; missedCallMode: string }>
+  >`SELECT "greetingAudioUrl", "missedCallMode"::text AS "missedCallMode" FROM "Client" WHERE id = ${client.id} LIMIT 1`;
   const greetingUrl = row?.greetingAudioUrl?.trim() || null;
-  const mode = row?.missedCallMode || "SMS_QUALIFY";
-  // Honour Settings choice for the call flow. Whisper is only required when processing the recording
-  // (missing key → SMS fallback after Record, not an instant text at call start).
+  const mode = (row?.missedCallMode || "SMS_QUALIFY").trim().toUpperCase();
   const useVoicemail = mode === "VOICEMAIL";
+
+  console.log("[twilio voice] rescue decision", {
+    clientId: client.id,
+    mode,
+    useVoicemail,
+    openai: openaiConfigured(),
+    callSid: opts.callSid || null,
+  });
+
   if (useVoicemail && !openaiConfigured()) {
-    console.warn("[twilio voice] VOICEMAIL mode but OpenAI/Whisper not configured — will Record then SMS-fallback if transcribe fails", {
-      clientId: client.id,
-    });
+    console.warn(
+      "[twilio voice] VOICEMAIL mode but OpenAI/Whisper not configured — will Record then SMS-fallback if transcribe fails",
+      { clientId: client.id }
+    );
   }
 
   const missed = await prisma.missedCall.create({
@@ -78,7 +86,13 @@ async function handleMissedVoice(opts: {
       callerPhone: from,
       status: "PENDING",
       callSid: opts.callSid || null,
-      conversation: [],
+      conversation: [
+        {
+          role: "assistant",
+          text: `[system] rescueMode=${mode} useVoicemail=${useVoicemail}`,
+          at: new Date().toISOString(),
+        },
+      ],
     },
   });
 
@@ -87,7 +101,9 @@ async function handleMissedVoice(opts: {
 
   if (useVoicemail) {
     const action = escXml(recordingActionUrl(missed.id));
-    const parts: string[] = ['<?xml version="1.0" encoding="UTF-8"?><Response>'];
+    const parts: string[] = [
+      '<?xml version="1.0" encoding="UTF-8"?><Response><!-- tm-voicemail-v2 -->',
+    ];
     if (greetingUrl) {
       parts.push(`<Play>${escXml(greetingUrl)}</Play>`);
     } else {
@@ -97,7 +113,7 @@ async function handleMissedVoice(opts: {
     }
     parts.push(`<Say voice="${escXml(voice)}">${escXml(VOICEMAIL_PROMPT)}</Say>`);
     parts.push(
-      `<Record maxLength="60" playBeep="true" timeout="4" action="${action}" method="POST" />`
+      `<Record maxLength="90" playBeep="true" timeout="5" trim="trim-silence" action="${action}" method="POST" />`
     );
     parts.push(
       `<Say voice="${escXml(voice)}">Sorry we didn't catch that. We'll text you instead.</Say>`
@@ -106,7 +122,7 @@ async function handleMissedVoice(opts: {
     return parts.join("");
   }
 
-  // SMS qualify path (default)
+  // SMS qualify path (default) — only when mode is not VOICEMAIL
   const smsBody = fillTemplate(getMissedCallSmsText(), vars);
   await sendMessage({ to: from, channel: "SMS", body: smsBody });
   await logMessage({

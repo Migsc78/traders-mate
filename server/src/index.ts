@@ -15,7 +15,7 @@ import { widgetRouter } from "./routes/widget.js";
 import { tradieRouter } from "./routes/tradie.js";
 import { quotePublicRouter, followupsRouter } from "./routes/quotePublic.js";
 import { UPLOADS_DIR } from "./services/storage/store.js";
-import { getGooglePlacesApiKey, twilioConfigured, claudeConfigured } from "./settings.js";
+import { getGooglePlacesApiKey, twilioConfigured, claudeConfigured, openaiConfigured } from "./settings.js";
 import { SITES_DIR } from "./services/site/generate.js";
 import { errorHandler, notFound, ApiError } from "./middleware/error.js";
 import {
@@ -90,11 +90,18 @@ app.get("/api/health", (_req, res) => {
     placesConfigured: !!getGooglePlacesApiKey(),
     twilioConfigured: twilioConfigured(),
     claudeConfigured: claudeConfigured(),
+    openaiConfigured: openaiConfigured(),
     publicBaseUrl: env.PUBLIC_BASE_URL,
     appPublicUrl: env.APP_PUBLIC_URL?.trim() || null,
     clientOrigins: [...allowedOrigins],
     operatorAuthRequired: operatorAuthConfigured(),
     signupsOpen: env.SIGNUPS_OPEN,
+    commit:
+      process.env.RAILWAY_GIT_COMMIT_SHA ||
+      process.env.RAILWAY_GIT_COMMIT ||
+      process.env.GIT_COMMIT ||
+      null,
+    voiceRescue: "vm-mode-v2",
     time: new Date().toISOString(),
   });
 });
