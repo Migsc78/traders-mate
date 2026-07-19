@@ -12,17 +12,51 @@ function authHeader(): string {
   return "Basic " + Buffer.from(`${sid}:${token}`).toString("base64");
 }
 
-/** Download a Twilio RecordingUrl (requires account Basic auth). Prefers .wav. */
-export async function downloadTwilioRecording(recordingUrl: string): Promise<{ buffer: Buffer; contentType: string }> {
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Download a Twilio RecordingUrl (requires account Basic auth). Retries; tries wav then mp3. */
+export async function downloadTwilioRecording(
+  recordingUrl: string
+): Promise<{ buffer: Buffer; contentType: string }> {
   if (!twilioConfigured()) throw new Error("Twilio is not configured");
   const base = recordingUrl.replace(/\.(wav|mp3)$/i, "");
-  const url = `${base}.wav`;
-  const res = await fetch(url, { headers: { Authorization: authHeader() } });
-  if (!res.ok) {
-    throw new Error(`Twilio recording download failed (${res.status})`);
+  const attempts: Array<{ url: string; contentType: string }> = [
+    { url: `${base}.wav`, contentType: "audio/wav" },
+    { url: `${base}.mp3`, contentType: "audio/mpeg" },
+    { url: base, contentType: "audio/wav" },
+  ];
+
+  let lastErr: Error | null = null;
+  for (let round = 0; round < 3; round++) {
+    if (round > 0) await sleep(800 * round);
+    for (const attempt of attempts) {
+      try {
+        const res = await fetch(attempt.url, {
+          headers: { Authorization: authHeader() },
+          redirect: "follow",
+        });
+        if (!res.ok) {
+          lastErr = new Error(`Twilio recording download failed (${res.status}) ${attempt.url}`);
+          continue;
+        }
+        const ab = await res.arrayBuffer();
+        const buffer = Buffer.from(ab);
+        if (buffer.length < 100) {
+          lastErr = new Error("Twilio recording empty/too small");
+          continue;
+        }
+        return {
+          buffer,
+          contentType: res.headers.get("content-type") || attempt.contentType,
+        };
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e));
+      }
+    }
   }
-  const ab = await res.arrayBuffer();
-  return { buffer: Buffer.from(ab), contentType: res.headers.get("content-type") || "audio/wav" };
+  throw lastErr || new Error("Twilio recording download failed");
 }
 
 function accountBase(): string {

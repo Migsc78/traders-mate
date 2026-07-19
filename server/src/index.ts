@@ -101,7 +101,7 @@ app.get("/api/health", (_req, res) => {
       process.env.RAILWAY_GIT_COMMIT ||
       process.env.GIT_COMMIT ||
       null,
-    voiceRescue: "vm-mode-v2",
+    voiceRescue: "vm-mode-v3",
     time: new Date().toISOString(),
   });
 });

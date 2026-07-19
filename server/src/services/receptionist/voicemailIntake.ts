@@ -20,6 +20,26 @@ type Extracted = {
   spam: boolean;
 };
 
+type ConvoTurn = { role: string; text: string; at: string; source?: string };
+
+async function fail(
+  missedCallId: string,
+  prevConversation: unknown,
+  reason: string
+): Promise<{ ok: false; reason: string }> {
+  const convo = (Array.isArray(prevConversation) ? prevConversation : []) as ConvoTurn[];
+  convo.push({
+    role: "assistant",
+    text: `[system] voicemail_failed=${reason}`,
+    at: new Date().toISOString(),
+  });
+  await prisma.missedCall.update({
+    where: { id: missedCallId },
+    data: { conversation: convo },
+  });
+  return { ok: false, reason };
+}
+
 /**
  * Process a Twilio voicemail recording into an enquiry + tradie notify.
  * Returns whether a job was created; on failure caller should fall back to SMS qualify.
@@ -51,21 +71,27 @@ export async function processVoicemailRecording(opts: {
   }
 
   const duration = opts.recordingDurationSec ?? 0;
-  if (!opts.recordingUrl || duration < 2) {
-    return { ok: false, reason: "recording_too_short" };
+  if (!opts.recordingUrl) {
+    return await fail(missed.id, missed.conversation, "recording_missing");
+  }
+  // Allow very short clips — prospects often hang up quickly after the beep.
+  if (Number.isFinite(duration) && duration > 0 && duration < 1) {
+    return await fail(missed.id, missed.conversation, "recording_too_short");
   }
 
   if (!openaiConfigured()) {
-    return { ok: false, reason: "whisper_not_configured" };
+    return await fail(missed.id, missed.conversation, "whisper_not_configured");
   }
 
   let transcript: string;
   try {
     const { buffer, contentType } = await downloadTwilioRecording(opts.recordingUrl);
-    transcript = await transcribeWithWhisper(buffer, "voicemail.wav", contentType);
+    const filename = contentType.includes("mpeg") || contentType.includes("mp3") ? "voicemail.mp3" : "voicemail.wav";
+    transcript = await transcribeWithWhisper(buffer, filename, contentType);
   } catch (e) {
     console.error("[voicemail] transcribe failed", e);
-    return { ok: false, reason: "transcribe_failed" };
+    const detail = e instanceof Error ? e.message : "transcribe_failed";
+    return await fail(missed.id, missed.conversation, `transcribe_failed:${detail.slice(0, 120)}`);
   }
 
   const extracted = await extractJobFromTranscript({

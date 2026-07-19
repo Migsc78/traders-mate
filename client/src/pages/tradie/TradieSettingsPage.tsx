@@ -399,7 +399,7 @@ export default function TradieSettingsPage() {
             Record a short message in your own voice (about 10–15 seconds). Callers hear this instead of the default
             robot voice.{" "}
             {missedCallMode === "VOICEMAIL"
-              ? `Example: “Hi, you've reached ${businessName || "us"} — leave your name, what you need and your postcode after the beep.”`
+              ? `Example: “Hi, you've reached ${businessName || "us"} — leave your name, what you need and your postcode after the beep.” (We'll beep straight after your recording — no robot voice.)`
               : `Example: “Hi, you've reached ${businessName || "us"} — text us your name and job and we'll get back ASAP.”`}
           </p>
 

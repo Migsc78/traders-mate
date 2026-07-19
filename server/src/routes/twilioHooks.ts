@@ -102,21 +102,19 @@ async function handleMissedVoice(opts: {
   if (useVoicemail) {
     const action = escXml(recordingActionUrl(missed.id));
     const parts: string[] = [
-      '<?xml version="1.0" encoding="UTF-8"?><Response><!-- tm-voicemail-v2 -->',
+      '<?xml version="1.0" encoding="UTF-8"?><Response><!-- tm-voicemail-v3 -->',
     ];
+    // Custom greeting already tells them what to leave — go straight to beep.
+    // Only use TTS when there is no recorded greeting.
     if (greetingUrl) {
       parts.push(`<Play>${escXml(greetingUrl)}</Play>`);
     } else {
       parts.push(
-        `<Say voice="${escXml(voice)}"><break strength="x-weak"/>Sorry we missed your call at ${escXml(client.businessName)}.</Say>`
+        `<Say voice="${escXml(voice)}"><break strength="x-weak"/>Sorry we missed your call at ${escXml(client.businessName)}. ${escXml(VOICEMAIL_PROMPT)}</Say>`
       );
     }
-    parts.push(`<Say voice="${escXml(voice)}">${escXml(VOICEMAIL_PROMPT)}</Say>`);
     parts.push(
-      `<Record maxLength="90" playBeep="true" timeout="5" trim="trim-silence" action="${action}" method="POST" />`
-    );
-    parts.push(
-      `<Say voice="${escXml(voice)}">Sorry we didn't catch that. We'll text you instead.</Say>`
+      `<Record maxLength="90" playBeep="true" timeout="6" action="${action}" method="POST" />`
     );
     parts.push("<Hangup/></Response>");
     return parts.join("");
@@ -194,69 +192,57 @@ twilioHooksRouter.post("/voice/missed/:routeKey", async (req, res) => {
   }
 });
 
-/** Twilio <Record> action — Whisper → job card, or SMS fallback. */
+/**
+ * Twilio <Record> action (+ optional status callback).
+ * Reply immediately so Twilio doesn't time out while Whisper runs, then process async.
+ */
 twilioHooksRouter.post("/voice/recording", async (req, res) => {
   const missedCallId = String(req.query.missedCallId || req.body.missedCallId || "").trim();
   const recordingUrl = String(req.body.RecordingUrl || "").trim();
+  const recordingStatus = String(req.body.RecordingStatus || "").trim().toLowerCase();
   const duration = Number(req.body.RecordingDuration || 0);
   const voice = getMissedCallSayVoice();
 
-  try {
-    if (!missedCallId) {
-      res
-        .type("text/xml")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Thanks. Goodbye.</Say><Hangup/></Response>`
-        );
-      return;
-    }
+  // Status callbacks fire with RecordingStatus=completed|absent — ignore non-completed.
+  if (recordingStatus && recordingStatus !== "completed") {
+    res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+    return;
+  }
 
-    const result = await processVoicemailRecording({
-      missedCallId,
-      recordingUrl,
-      recordingDurationSec: Number.isFinite(duration) ? duration : 0,
-    });
+  // Always ACK Twilio first (Whisper + Haiku can exceed Twilio's action timeout).
+  res
+    .type("text/xml")
+    .send(
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${escXml(voice)}">Thanks, we've got your message. Someone will be in touch shortly.</Say><Hangup/></Response>`
+    );
 
-    if (!result.ok) {
-      console.warn("[twilio recording] fallback to SMS", { missedCallId, reason: result.reason });
-      await fallbackMissedCallToSms({ missedCallId });
-      res
-        .type("text/xml")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${escXml(voice)}">Thanks. We'll text you now to take your details.</Say><Hangup/></Response>`
-        );
-      return;
-    }
+  if (!missedCallId || !recordingUrl) {
+    console.warn("[twilio recording] missing id or url", { missedCallId, hasUrl: !!recordingUrl });
+    return;
+  }
 
-    if (result.reason === "spam") {
-      res
-        .type("text/xml")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${escXml(voice)}">Goodbye.</Say><Hangup/></Response>`
-        );
-      return;
-    }
-
-    res
-      .type("text/xml")
-      .send(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${escXml(voice)}">Thanks, we've got your message. Someone will be in touch shortly.</Say><Hangup/></Response>`
-      );
-  } catch (e) {
-    console.error("[twilio recording]", e);
-    if (missedCallId) {
+  void (async () => {
+    try {
+      // Brief pause so Twilio media is fully available after hangup.
+      await new Promise((r) => setTimeout(r, 1200));
+      const result = await processVoicemailRecording({
+        missedCallId,
+        recordingUrl,
+        recordingDurationSec: Number.isFinite(duration) ? duration : 0,
+      });
+      if (!result.ok) {
+        console.warn("[twilio recording] fallback to SMS", { missedCallId, reason: result.reason });
+        await fallbackMissedCallToSms({ missedCallId });
+      }
+    } catch (e) {
+      console.error("[twilio recording] async process failed", e);
       try {
         await fallbackMissedCallToSms({ missedCallId });
       } catch (fb) {
         console.error("[twilio recording] fallback failed", fb);
       }
     }
-    res
-      .type("text/xml")
-      .send(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Amy">Thanks. We'll text you shortly.</Say><Hangup/></Response>`
-      );
-  }
+  })();
 });
 
 twilioHooksRouter.post("/sms/inbound", async (req, res) => {
