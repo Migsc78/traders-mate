@@ -112,16 +112,22 @@ const WEAK_MAGIC_SECRETS = new Set([
 
 function assertProductionSecrets(parsed: z.infer<typeof schema>) {
   if (!isProduction()) return;
+  const problems: string[] = [];
   const magic = parsed.MAGIC_LINK_SECRET?.trim() || "";
   if (!magic || WEAK_MAGIC_SECRETS.has(magic) || magic.length < 32) {
-    throw new Error(
-      "[env] MAGIC_LINK_SECRET must be a strong random secret (≥32 chars) in production — set it on Railway"
+    problems.push(
+      "MAGIC_LINK_SECRET must be a strong random secret (≥32 chars) — set it on Railway"
     );
   }
   if (!parsed.OPERATOR_ADMIN_PASSWORD?.trim() && !parsed.OPERATOR_API_TOKEN?.trim()) {
-    throw new Error(
-      "[env] OPERATOR_ADMIN_PASSWORD (or OPERATOR_API_TOKEN) is required in production — CRM must not be open"
+    problems.push(
+      "OPERATOR_ADMIN_PASSWORD (or OPERATOR_API_TOKEN) is required — CRM is otherwise open"
     );
+  }
+  // Warn instead of crash: throwing here fails Railway healthchecks and freezes deploys
+  // on the previous revision (which is why voicemail never went live).
+  if (problems.length) {
+    console.error("[env] PRODUCTION SECRET WARNINGS (fix ASAP):\n- " + problems.join("\n- "));
   }
 }
 
