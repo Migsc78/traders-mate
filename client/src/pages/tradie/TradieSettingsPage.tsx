@@ -483,7 +483,11 @@ export default function TradieSettingsPage() {
       </div>
 
       <div className="t-save-bar">
-        <button className="primary t-btn--block" onClick={() => save.mutate()} disabled={save.isPending}>
+        <button
+          className="primary t-btn--block"
+          onClick={() => save.mutate(undefined)}
+          disabled={save.isPending}
+        >
           {save.isPending ? "Saving…" : "Save settings"}
         </button>
         {save.isError && <p className="error">{(save.error as Error).message}</p>}
