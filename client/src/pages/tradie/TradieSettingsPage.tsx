@@ -54,7 +54,7 @@ export default function TradieSettingsPage() {
   });
 
   const save = useMutation({
-    mutationFn: () =>
+    mutationFn: (modeOverride?: "SMS_QUALIFY" | "VOICEMAIL") =>
       tradieApi.updateMe({
         businessName,
         tradeTitle: tradeTitle || null,
@@ -68,14 +68,16 @@ export default function TradieSettingsPage() {
         bankAccountName: bankAccountName || null,
         bankAccountNumber: bankAccountNumber || null,
         twilioNumber: twilioNumber || null,
-        missedCallMode,
+        missedCallMode: modeOverride ?? missedCallMode,
       }),
     onSuccess: (r: {
       ok: boolean;
       id: string;
+      missedCallMode?: "SMS_QUALIFY" | "VOICEMAIL";
       twilioHooks?: { voiceUrl: string; smsUrl: string; alreadyOk: boolean } | null;
       twilioHooksError?: string | null;
     }) => {
+      if (r.missedCallMode) setMissedCallMode(r.missedCallMode);
       qc.invalidateQueries({ queryKey: ["tradie-me"] });
       qc.invalidateQueries({ queryKey: ["tradie-twilio-status"] });
       if (r.twilioHooksError) setTwilioMsg(r.twilioHooksError);
@@ -353,7 +355,11 @@ export default function TradieSettingsPage() {
               role="radio"
               aria-checked={missedCallMode === "SMS_QUALIFY"}
               className={missedCallMode === "SMS_QUALIFY" ? "on" : ""}
-              onClick={() => setMissedCallMode("SMS_QUALIFY")}
+              disabled={save.isPending}
+              onClick={() => {
+                setMissedCallMode("SMS_QUALIFY");
+                save.mutate("SMS_QUALIFY");
+              }}
             >
               <strong>Text them back</strong>
               <span>We SMS the caller for the job and postcode (default).</span>
@@ -363,8 +369,11 @@ export default function TradieSettingsPage() {
               role="radio"
               aria-checked={missedCallMode === "VOICEMAIL"}
               className={missedCallMode === "VOICEMAIL" ? "on" : ""}
-              onClick={() => setMissedCallMode("VOICEMAIL")}
-              disabled={me.data?.caps?.whisper === false}
+              disabled={me.data?.caps?.whisper === false || save.isPending}
+              onClick={() => {
+                setMissedCallMode("VOICEMAIL");
+                save.mutate("VOICEMAIL");
+              }}
             >
               <strong>Caller leaves a voicemail</strong>
               <span>
@@ -374,7 +383,11 @@ export default function TradieSettingsPage() {
             </button>
           </div>
           <p className="muted-text" style={{ margin: "8px 0 0" }}>
-            Tap Save settings below to apply this choice.
+            {save.isPending
+              ? "Saving rescue mode…"
+              : missedCallMode === "VOICEMAIL"
+                ? "Voicemail mode is on — callers will hear a beep after your greeting."
+                : "Text-back mode is on — callers get an SMS after your greeting."}
           </p>
         </div>
       </div>

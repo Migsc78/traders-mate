@@ -63,7 +63,14 @@ async function handleMissedVoice(opts: {
   });
   const greetingUrl = row?.greetingAudioUrl?.trim() || null;
   const mode = row?.missedCallMode || "SMS_QUALIFY";
-  const useVoicemail = mode === "VOICEMAIL" && openaiConfigured();
+  // Honour Settings choice for the call flow. Whisper is only required when processing the recording
+  // (missing key → SMS fallback after Record, not an instant text at call start).
+  const useVoicemail = mode === "VOICEMAIL";
+  if (useVoicemail && !openaiConfigured()) {
+    console.warn("[twilio voice] VOICEMAIL mode but OpenAI/Whisper not configured — will Record then SMS-fallback if transcribe fails", {
+      clientId: client.id,
+    });
+  }
 
   const missed = await prisma.missedCall.create({
     data: {
@@ -99,7 +106,7 @@ async function handleMissedVoice(opts: {
     return parts.join("");
   }
 
-  // SMS qualify path (default) — also used if Whisper isn't configured
+  // SMS qualify path (default)
   const smsBody = fillTemplate(getMissedCallSmsText(), vars);
   await sendMessage({ to: from, channel: "SMS", body: smsBody });
   await logMessage({

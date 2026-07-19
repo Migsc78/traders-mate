@@ -269,7 +269,13 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
       }
     }
 
-    res.json({ ok: true, id: client.id, twilioHooks, twilioHooksError });
+    res.json({
+      ok: true,
+      id: client.id,
+      missedCallMode: client.missedCallMode,
+      twilioHooks,
+      twilioHooksError,
+    });
   } catch (err) {
     next(err);
   }

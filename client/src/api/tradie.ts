@@ -170,6 +170,7 @@ export const tradieApi = {
     tRequest<{
       ok: boolean;
       id: string;
+      missedCallMode?: "SMS_QUALIFY" | "VOICEMAIL";
       twilioHooks?: { voiceUrl: string; smsUrl: string; alreadyOk: boolean } | null;
       twilioHooksError?: string | null;
     }>("/me", { method: "PATCH", body: JSON.stringify(patch) }),
