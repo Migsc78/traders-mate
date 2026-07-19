@@ -22,6 +22,7 @@ export default function TradieSettingsPage() {
   const [bankSortCode, setBankSortCode] = useState("");
   const [bankAccountName, setBankAccountName] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [destPhone, setDestPhone] = useState("");
   const [twilioNumber, setTwilioNumber] = useState("");
   const [missedCallMode, setMissedCallMode] = useState<"SMS_QUALIFY" | "VOICEMAIL">("SMS_QUALIFY");
 
@@ -42,6 +43,7 @@ export default function TradieSettingsPage() {
     setBankSortCode(me.data.bankSortCode || "");
     setBankAccountName(me.data.bankAccountName || "");
     setBankAccountNumber(me.data.bankAccountNumber || "");
+    setDestPhone(me.data.destPhone || "");
     setTwilioNumber(me.data.twilioNumber || "");
     setMissedCallMode(me.data.missedCallMode || "SMS_QUALIFY");
   }, [me.data]);
@@ -67,6 +69,7 @@ export default function TradieSettingsPage() {
         bankSortCode: bankSortCode || null,
         bankAccountName: bankAccountName || null,
         bankAccountNumber: bankAccountNumber || null,
+        destPhone: destPhone || undefined,
         twilioNumber: twilioNumber || null,
         missedCallMode: modeOverride ?? missedCallMode,
       }),
@@ -295,6 +298,17 @@ export default function TradieSettingsPage() {
             a text-back (not Twilio&apos;s default “set up voice” message). After that, dial the divert codes once on
             your phone.
           </p>
+          <label>
+            Your mobile — job alerts
+            <input
+              value={destPhone}
+              onChange={(e) => setDestPhone(e.target.value)}
+              placeholder="+447700900123"
+            />
+            <span className="muted-text" style={{ fontWeight: 400 }}>
+              New jobs from missed calls / voicemail are texted here.
+            </span>
+          </label>
           <label>
             Twilio number (E.164)
             <input value={twilioNumber} onChange={(e) => setTwilioNumber(e.target.value)} placeholder="+447700149777" />

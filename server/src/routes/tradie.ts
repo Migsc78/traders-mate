@@ -181,6 +181,7 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       status: client.status,
       trialEndsAt: client.trialEndsAt,
       accountActive: accountActive(client.status, client.trialEndsAt),
+      destPhone: client.destPhone,
       twilioNumber: client.twilioNumber,
       greetingAudioUrl: client.greetingAudioUrl,
       missedCallMode: client.missedCallMode,
@@ -221,10 +222,14 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         bankSortCode: z.string().max(20).nullable().optional(),
         bankAccountName: z.string().max(120).nullable().optional(),
         bankAccountNumber: z.string().max(20).nullable().optional(),
+        destPhone: z.string().min(10).max(30).optional(),
         twilioNumber: z.string().max(30).nullable().optional(),
         missedCallMode: z.enum(["SMS_QUALIFY", "VOICEMAIL"]).optional(),
       })
       .parse(req.body ?? {});
+
+    const nextDestPhone =
+      body.destPhone !== undefined ? toE164UK(body.destPhone) : undefined;
 
     const nextTwilio =
       body.twilioNumber !== undefined
@@ -255,6 +260,7 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         ...(body.bankSortCode !== undefined ? { bankSortCode: body.bankSortCode } : {}),
         ...(body.bankAccountName !== undefined ? { bankAccountName: body.bankAccountName } : {}),
         ...(body.bankAccountNumber !== undefined ? { bankAccountNumber: body.bankAccountNumber } : {}),
+        ...(nextDestPhone !== undefined ? { destPhone: nextDestPhone } : {}),
         ...(nextTwilio !== undefined ? { twilioNumber: nextTwilio } : {}),
         ...(body.missedCallMode !== undefined ? { missedCallMode: body.missedCallMode } : {}),
       },

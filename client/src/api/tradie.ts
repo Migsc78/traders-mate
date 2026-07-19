@@ -86,6 +86,7 @@ export interface TradieMe {
   status: string;
   trialEndsAt: string | null;
   accountActive: boolean;
+  destPhone: string;
   twilioNumber: string | null;
   greetingAudioUrl: string | null;
   missedCallMode: "SMS_QUALIFY" | "VOICEMAIL";

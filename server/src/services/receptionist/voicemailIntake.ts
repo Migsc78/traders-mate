@@ -147,21 +147,33 @@ export async function processVoicemailRecording(opts: {
   const distBit = distanceMiles != null ? ` · ~${distanceMiles} mi` : "";
   const msg = extracted.message || transcript;
   const notifySms = `New job from voicemail: ${extracted.name || "Caller"}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${msg.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
-  await sendMessage({ to: missed.client.destPhone, channel: missed.client.destChannel, body: notifySms });
+  const notifyTo = toE164UK(missed.client.destPhone) || missed.client.destPhone;
+  const notifyResults = await sendMessage({
+    to: notifyTo,
+    channel: missed.client.destChannel,
+    body: notifySms,
+  });
+  const notifyOk = notifyResults.some((r) => r.ok && r.via !== "stub");
+  const notifyErr = notifyResults.map((r) => r.error).filter(Boolean).join("; ");
+  if (!notifyOk) {
+    console.error("[voicemail] tradie notify SMS failed", { to: notifyTo, notifyResults });
+  }
   await logMessage({
     clientId: missed.client.id,
     enquiryId: enquiry.id,
     direction: "OUTBOUND",
-    channel: "SYSTEM",
-    toAddr: missed.client.destPhone,
+    channel: "SMS",
+    toAddr: notifyTo,
     body: `New job from voicemail: ${extracted.name || "Caller"}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${msg.slice(0, 200)}`,
+    status: notifyOk ? "sent" : notifyErr || "failed",
+    twilioSid: notifyResults.find((r) => r.id)?.id,
   });
 
   // Short ack to caller (no Q&A loop)
   const caller = toE164UK(missed.callerPhone);
   if (caller) {
     const ack = `Thanks — we've got your message for ${missed.client.businessName} and they'll be in touch shortly.`;
-    await sendMessage({ to: caller, channel: "SMS", body: ack });
+    const ackResults = await sendMessage({ to: caller, channel: "SMS", body: ack });
     await logMessage({
       clientId: missed.client.id,
       enquiryId: enquiry.id,
@@ -169,6 +181,8 @@ export async function processVoicemailRecording(opts: {
       channel: "SMS",
       toAddr: caller,
       body: ack,
+      status: ackResults.some((r) => r.ok) ? "sent" : "failed",
+      twilioSid: ackResults.find((r) => r.id)?.id,
     });
   }
 
