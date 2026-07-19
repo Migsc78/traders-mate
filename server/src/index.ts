@@ -29,6 +29,7 @@ import { signupRouter } from "./routes/signup.js";
 import { earlyAccessRouter } from "./routes/earlyAccess.js";
 import { invoicePublicRouter } from "./routes/invoicePublic.js";
 import { twilioHooksRouter } from "./routes/twilioHooks.js";
+import { publicGreetingRouter } from "./routes/publicGreeting.js";
 import { inboundEmailRouter } from "./routes/inboundEmail.js";
 
 const app = express();
@@ -75,6 +76,7 @@ app.use("/q", cors(), express.urlencoded({ extended: true }), express.json(), qu
 app.use("/i", cors(), express.urlencoded({ extended: true }), express.json(), invoicePublicRouter);
 app.use("/api/followups", express.json(), followupsRouter);
 app.use("/api/twilio", cors(), express.urlencoded({ extended: true }), express.json(), twilioHooksRouter);
+app.use("/api/public/greeting", cors(), publicGreetingRouter);
 app.use("/api/inbound-email", cors(), express.json({ limit: "2mb" }), inboundEmailRouter);
 app.use("/c", redirectRouter);
 app.use(widgetRouter); // GET /widget.js
@@ -101,7 +103,7 @@ app.get("/api/health", (_req, res) => {
       process.env.RAILWAY_GIT_COMMIT ||
       process.env.GIT_COMMIT ||
       null,
-    voiceRescue: "vm-mode-v3",
+    voiceRescue: "vm-mode-v4",
     time: new Date().toISOString(),
   });
 });

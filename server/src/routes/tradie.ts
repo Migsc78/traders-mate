@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
 import { ApiError } from "../middleware/error.js";
 import { sendMessage, toE164UK, twilioConfigured } from "../services/messaging/sender.js";
@@ -350,14 +351,26 @@ tradieRouter.post("/me/greeting", requireClient, async (req, res, next) => {
       throw new ApiError(400, "too_large", "Greeting too large — keep it under ~20 seconds");
     }
 
-    const stored = await storeAudio(
-      contentType === "audio/mp3" ? "audio/mpeg" : contentType.startsWith("audio/") ? contentType : "audio/wav",
-      buf
-    );
+    const mime =
+      contentType === "audio/mp3"
+        ? "audio/mpeg"
+        : contentType.startsWith("audio/")
+          ? contentType
+          : "audio/wav";
+    // Also write to disk for local/dev convenience; production playback uses DB bytes.
+    await storeAudio(mime, buf).catch(() => null);
+
+    const token = randomBytes(16).toString("hex");
+    const playUrl = `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/api/public/greeting/${token}`;
 
     const updated = await prisma.client.update({
       where: { id: clientId(req) },
-      data: { greetingAudioUrl: stored.url },
+      data: {
+        greetingAudioData: buf,
+        greetingAudioMime: mime,
+        greetingPlayToken: token,
+        greetingAudioUrl: playUrl,
+      },
       select: { id: true, greetingAudioUrl: true },
     });
 
@@ -371,7 +384,12 @@ tradieRouter.delete("/me/greeting", requireClient, async (req, res, next) => {
   try {
     await prisma.client.update({
       where: { id: clientId(req) },
-      data: { greetingAudioUrl: null },
+      data: {
+        greetingAudioUrl: null,
+        greetingPlayToken: null,
+        greetingAudioData: null,
+        greetingAudioMime: null,
+      },
     });
     res.json({ ok: true, greetingAudioUrl: null });
   } catch (err) {

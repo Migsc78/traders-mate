@@ -32,7 +32,37 @@ function escXml(s: string): string {
 
 function recordingActionUrl(missedCallId: string): string {
   const base = env.PUBLIC_BASE_URL.replace(/\/$/, "");
-  return `${base}/api/twilio/voice/recording?missedCallId=${encodeURIComponent(missedCallId)}`;
+  // Path param (not query) — cleaner Twilio signature validation.
+  return `${base}/api/twilio/voice/recording/${encodeURIComponent(missedCallId)}`;
+}
+
+function greetingPlayUrl(token: string): string {
+  return `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/api/public/greeting/${encodeURIComponent(token)}`;
+}
+
+/** Prefer durable DB greeting; never <Play> a dead /uploads URL (causes Twilio "application error"). */
+async function resolveGreetingPlayUrl(clientId: string): Promise<string | null> {
+  const row = await prisma.client.findUnique({
+    where: { id: clientId },
+    select: {
+      greetingPlayToken: true,
+      greetingAudioData: true,
+      greetingAudioUrl: true,
+    },
+  });
+  if (row?.greetingPlayToken && row.greetingAudioData && row.greetingAudioData.length > 100) {
+    return greetingPlayUrl(row.greetingPlayToken);
+  }
+  // Legacy disk URL — only use if still reachable after redeploys.
+  const legacy = row?.greetingAudioUrl?.trim() || null;
+  if (!legacy || legacy.includes("/api/public/greeting/")) return null;
+  try {
+    const head = await fetch(legacy, { method: "HEAD" });
+    if (head.ok) return legacy;
+  } catch {
+    /* fall through */
+  }
+  return null;
 }
 
 const VOICEMAIL_PROMPT =
@@ -58,10 +88,10 @@ async function handleMissedVoice(opts: {
   }
 
   // Always re-read mode from DB (raw) so a stale Prisma client can't force SMS.
-  const [row] = await prisma.$queryRaw<
-    Array<{ greetingAudioUrl: string | null; missedCallMode: string }>
-  >`SELECT "greetingAudioUrl", "missedCallMode"::text AS "missedCallMode" FROM "Client" WHERE id = ${client.id} LIMIT 1`;
-  const greetingUrl = row?.greetingAudioUrl?.trim() || null;
+  const [row] = await prisma.$queryRaw<Array<{ missedCallMode: string }>>`
+    SELECT "missedCallMode"::text AS "missedCallMode" FROM "Client" WHERE id = ${client.id} LIMIT 1
+  `;
+  const greetingUrl = await resolveGreetingPlayUrl(client.id);
   const mode = (row?.missedCallMode || "SMS_QUALIFY").trim().toUpperCase();
   const useVoicemail = mode === "VOICEMAIL";
 
@@ -102,7 +132,7 @@ async function handleMissedVoice(opts: {
   if (useVoicemail) {
     const action = escXml(recordingActionUrl(missed.id));
     const parts: string[] = [
-      '<?xml version="1.0" encoding="UTF-8"?><Response><!-- tm-voicemail-v3 -->',
+      '<?xml version="1.0" encoding="UTF-8"?><Response><!-- tm-voicemail-v4 -->',
     ];
     // Custom greeting already tells them what to leave — go straight to beep.
     // Only use TTS when there is no recorded greeting.
@@ -193,11 +223,11 @@ twilioHooksRouter.post("/voice/missed/:routeKey", async (req, res) => {
 });
 
 /**
- * Twilio <Record> action (+ optional status callback).
+ * Twilio <Record> action.
  * Reply immediately so Twilio doesn't time out while Whisper runs, then process async.
  */
-twilioHooksRouter.post("/voice/recording", async (req, res) => {
-  const missedCallId = String(req.query.missedCallId || req.body.missedCallId || "").trim();
+async function handleRecordingCallback(req: import("express").Request, res: import("express").Response) {
+  const missedCallId = String(req.params.missedCallId || req.query.missedCallId || req.body.missedCallId || "").trim();
   const recordingUrl = String(req.body.RecordingUrl || "").trim();
   const recordingStatus = String(req.body.RecordingStatus || "").trim().toLowerCase();
   const duration = Number(req.body.RecordingDuration || 0);
@@ -243,7 +273,10 @@ twilioHooksRouter.post("/voice/recording", async (req, res) => {
       }
     }
   })();
-});
+}
+
+twilioHooksRouter.post("/voice/recording/:missedCallId", handleRecordingCallback);
+twilioHooksRouter.post("/voice/recording", handleRecordingCallback);
 
 twilioHooksRouter.post("/sms/inbound", async (req, res) => {
   try {
