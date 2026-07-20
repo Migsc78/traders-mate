@@ -201,3 +201,145 @@ export async function getNumberWebhookStatus(phone: string): Promise<{
     expectedSmsUrl,
   };
 }
+
+export type IncomingNumberDetail = IncomingNumber & {
+  capabilities: { voice: boolean; sms: boolean; mms: boolean };
+  dateCreated: string | null;
+};
+
+/** List all Incoming Phone Numbers on the Twilio account (up to 200). */
+export async function listIncomingNumbers(): Promise<IncomingNumberDetail[]> {
+  if (!twilioConfigured()) throw new Error("Twilio is not configured");
+  const out: IncomingNumberDetail[] = [];
+  let url: string | null = `${accountBase()}/IncomingPhoneNumbers.json?PageSize=100`;
+  while (url && out.length < 200) {
+    const res = await fetch(url, { headers: { Authorization: authHeader() } });
+    const json = (await res.json().catch(() => ({}))) as {
+      incoming_phone_numbers?: Array<{
+        sid: string;
+        phone_number: string;
+        friendly_name?: string;
+        voice_url?: string;
+        sms_url?: string;
+        status_callback?: string;
+        capabilities?: { voice?: boolean; sms?: boolean; mms?: boolean };
+        date_created?: string;
+      }>;
+      next_page_uri?: string | null;
+      message?: string;
+    };
+    if (!res.ok) throw new Error(json.message || `Twilio list numbers failed (${res.status})`);
+    for (const n of json.incoming_phone_numbers || []) {
+      out.push({
+        sid: n.sid,
+        phoneNumber: n.phone_number,
+        friendlyName: n.friendly_name ?? null,
+        voiceUrl: n.voice_url || null,
+        smsUrl: n.sms_url || null,
+        statusCallback: n.status_callback || null,
+        capabilities: {
+          voice: !!n.capabilities?.voice,
+          sms: !!n.capabilities?.sms,
+          mms: !!n.capabilities?.mms,
+        },
+        dateCreated: n.date_created ?? null,
+      });
+    }
+    url = json.next_page_uri ? `https://api.twilio.com${json.next_page_uri}` : null;
+  }
+  return out;
+}
+
+export type TwilioUsageRecord = {
+  category: string;
+  description: string;
+  count: string;
+  countUnit: string;
+  usage: string;
+  usageUnit: string;
+  price: string;
+  priceUnit: string;
+  startDate: string;
+  endDate: string;
+};
+
+type UsagePeriod = "Today" | "Yesterday" | "ThisMonth" | "LastMonth" | "AllTime";
+
+/** Fetch Twilio Usage Records for a built-in period (all categories). */
+export async function fetchUsageRecords(period: UsagePeriod): Promise<TwilioUsageRecord[]> {
+  if (!twilioConfigured()) throw new Error("Twilio is not configured");
+  const url = `${accountBase()}/Usage/Records/${period}.json?PageSize=1000`;
+  const res = await fetch(url, { headers: { Authorization: authHeader() } });
+  const json = (await res.json().catch(() => ({}))) as {
+    usage_records?: Array<{
+      category?: string;
+      description?: string;
+      count?: string;
+      count_unit?: string;
+      usage?: string;
+      usage_unit?: string;
+      price?: string;
+      price_unit?: string;
+      start_date?: string;
+      end_date?: string;
+    }>;
+    message?: string;
+  };
+  if (!res.ok) throw new Error(json.message || `Twilio usage failed (${res.status})`);
+  return (json.usage_records || []).map((r) => ({
+    category: r.category || "",
+    description: r.description || "",
+    count: r.count || "0",
+    countUnit: r.count_unit || "",
+    usage: r.usage || "0",
+    usageUnit: r.usage_unit || "",
+    price: r.price || "0",
+    priceUnit: r.price_unit || "USD",
+    startDate: r.start_date || "",
+    endDate: r.end_date || "",
+  }));
+}
+
+export async function fetchAccountBalance(): Promise<{
+  currency: string;
+  balance: string;
+} | null> {
+  if (!twilioConfigured()) return null;
+  const res = await fetch(`${accountBase()}/Balance.json`, {
+    headers: { Authorization: authHeader() },
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    currency?: string;
+    balance?: string;
+    message?: string;
+  };
+  if (!res.ok) return null;
+  return {
+    currency: json.currency || "USD",
+    balance: json.balance || "0",
+  };
+}
+
+export async function fetchAccountInfo(): Promise<{
+  friendlyName: string | null;
+  status: string | null;
+  type: string | null;
+} | null> {
+  if (!twilioConfigured()) return null;
+  const res = await fetch(`${accountBase()}.json`, {
+    headers: { Authorization: authHeader() },
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    friendly_name?: string;
+    status?: string;
+    type?: string;
+  };
+  if (!res.ok) return null;
+  return {
+    friendlyName: json.friendly_name ?? null,
+    status: json.status ?? null,
+    type: json.type ?? null,
+  };
+}
+
+export { voiceWebhookUrl, smsWebhookUrl, digitsOnly };

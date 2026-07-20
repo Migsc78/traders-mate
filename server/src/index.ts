@@ -27,6 +27,8 @@ import {
 import { tickFollowUps } from "./services/quotes/followups.js";
 import { signupRouter } from "./routes/signup.js";
 import { earlyAccessRouter } from "./routes/earlyAccess.js";
+import { dashboardRouter } from "./routes/dashboard.js";
+import { twilioAdminRouter } from "./routes/twilioAdmin.js";
 import { invoicePublicRouter } from "./routes/invoicePublic.js";
 import { twilioHooksRouter } from "./routes/twilioHooks.js";
 import { publicGreetingRouter } from "./routes/publicGreeting.js";
@@ -139,6 +141,8 @@ app.use("/api/clients", requireOperator, clientsRouter);
 app.use("/api/billing", requireOperator, billingRouter);
 app.use("/api/search-runs", requireOperator, searchRunsRouter);
 app.use("/api/early-access", requireOperator, earlyAccessRouter);
+app.use("/api/dashboard", requireOperator, dashboardRouter);
+app.use("/api/twilio-admin", requireOperator, twilioAdminRouter);
 
 // Serve generated demo sites for preview (e.g. /sites/<slug>/)
 app.use("/sites", express.static(SITES_DIR));

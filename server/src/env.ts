@@ -75,6 +75,8 @@ const schema = z.object({
   STRIPE_PRICE_ID: z.string().default(""),
   STRIPE_SUCCESS_URL: z.string().default(""),
   STRIPE_CANCEL_URL: z.string().default(""),
+  // Monthly SaaS plan amount in pence (for dashboard MRR). Default £49.
+  SAAS_PLAN_PRICE_PENCE: z.coerce.number().default(4900),
 
   // Operator CRM protection. Empty = open (local/dev).
   // Prefer OPERATOR_ADMIN_PASSWORD for /admin/login; OPERATOR_API_TOKEN still works for API tooling.

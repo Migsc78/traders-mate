@@ -1,16 +1,21 @@
 import { useEffect, useId, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import SettingsButton from "./components/SettingsButton";
 import { clearOperatorToken } from "./lib/operatorAuth";
 
 const NAV: { to: string; label: string; end?: boolean }[] = [
-  { to: "/admin/search", label: "Search", end: true },
+  { to: "/admin/dashboard", label: "Dashboard", end: true },
+  { to: "/admin/search", label: "Search" },
   { to: "/admin/leads", label: "Leads" },
   { to: "/admin/clients", label: "Clients" },
   { to: "/admin/early-access", label: "Early access" },
+  { to: "/admin/twilio", label: "Twilio" },
+  { to: "/admin/settings", label: "Settings" },
 ];
 
 function sectionTitle(pathname: string): string {
+  if (pathname.startsWith("/admin/dashboard")) return "Dashboard";
+  if (pathname.startsWith("/admin/twilio")) return "Twilio";
+  if (pathname.startsWith("/admin/settings")) return "Settings";
   if (pathname.startsWith("/admin/early-access")) return "Early access";
   if (pathname.startsWith("/admin/clients")) return "Clients";
   if (pathname.startsWith("/admin/leads")) return "Leads";
@@ -23,7 +28,12 @@ export default function App() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
-  const wide = pathname.startsWith("/admin/leads") || pathname.startsWith("/admin/clients");
+  const wide =
+    pathname.startsWith("/admin/dashboard") ||
+    pathname.startsWith("/admin/twilio") ||
+    pathname.startsWith("/admin/leads") ||
+    pathname.startsWith("/admin/clients") ||
+    pathname.startsWith("/admin/settings");
 
   useEffect(() => {
     setMenuOpen(false);
@@ -87,9 +97,6 @@ export default function App() {
           </div>
           <span className="admin-topbar-section">{sectionTitle(pathname)}</span>
         </div>
-        <div className="admin-topbar-actions">
-          <SettingsButton />
-        </div>
       </header>
 
       <aside className="admin-sidebar" aria-label="Admin sidebar">
@@ -101,7 +108,6 @@ export default function App() {
         </div>
         {navLinks}
         <div className="admin-sidebar-foot">
-          <SettingsButton />
           <button type="button" className="admin-signout" onClick={signOut}>
             Sign out
           </button>
@@ -128,7 +134,6 @@ export default function App() {
             </div>
             {navLinks}
             <div className="admin-drawer-foot">
-              <SettingsButton />
               <button type="button" className="admin-signout" onClick={signOut}>
                 Sign out
               </button>

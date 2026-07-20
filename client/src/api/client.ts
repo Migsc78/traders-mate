@@ -79,6 +79,198 @@ export interface SettingsUpdate {
   missedCallSmsText?: string;
 }
 
+export interface DashboardStats {
+  generatedAt: string;
+  period: {
+    last7DaysFrom: string;
+    last30DaysFrom: string;
+    monthStart: string;
+  };
+  kpis: {
+    clients: {
+      active: number;
+      trial: number;
+      pastDue: number;
+      suspended: number;
+      cancelled: number;
+      total: number;
+      trialsEndingSoon7d: number;
+    };
+    earlyAccess: {
+      pending: number;
+      approved: number;
+      denied: number;
+      signedUp: number;
+    };
+    enquiries: {
+      total: number;
+      last7Days: number;
+      last30Days: number;
+      routed30: number;
+      held30: number;
+      failed30: number;
+    };
+    missedCalls: {
+      total: number;
+      pending: number;
+      qualifying: number;
+      converted: number;
+      spam: number;
+      expired: number;
+      last30Days: number;
+      converted30: number;
+      conversionRate30: number | null;
+    };
+    quotes: {
+      draft: number;
+      sent: number;
+      accepted: number;
+      declined: number;
+      expired: number;
+      sent30: number;
+      accepted30: number;
+    };
+    invoices: {
+      draft: number;
+      sent: number;
+      paid: number;
+      overdue: number;
+    };
+    pipeline: {
+      leadsTotal: number;
+      leadsInPlay: number;
+      searchRuns30: number;
+    };
+  };
+  billableRevenue: {
+    currency: string;
+    planPricePence: number;
+    saasMrrPence: number;
+    saasAtRiskMrrPence: number;
+    saasTrialPipelinePence: number;
+    payingClients: number;
+    activeClients: number;
+    trialClients: number;
+    jobInvoicesPaidTotalPence: number;
+    jobInvoicesPaidTotalCount: number;
+    jobInvoicesPaidMonthPence: number;
+    jobInvoicesPaidMonthCount: number;
+    jobInvoicesOutstandingPence: number;
+    jobInvoicesOutstandingCount: number;
+    note: string;
+  };
+  costings: {
+    currency: string;
+    periodDays: number;
+    estimated: boolean;
+    ratesPence: Record<string, number>;
+    usage30: {
+      smsOutbound: number;
+      whatsappOutbound: number;
+      emailOutbound: number;
+      systemOutbound: number;
+      messagesOutboundTotal: number;
+      missedCalls: number;
+      voiceNotes: number;
+    };
+    messagingPence: number;
+    voiceAndAiPence: number;
+    totalPence: number;
+    note: string;
+  };
+}
+
+export interface TwilioUsageBlock {
+  totalPrice: string | null;
+  priceUnit: string;
+  startDate: string | null;
+  endDate: string | null;
+  records: {
+    category: string;
+    description: string;
+    count: string;
+    countUnit: string;
+    usage: string;
+    usageUnit: string;
+    price: string;
+    priceUnit: string;
+    startDate: string;
+    endDate: string;
+  }[];
+}
+
+export interface TwilioAdminStats {
+  generatedAt: string;
+  configured: boolean;
+  twilioError: string | null;
+  account: {
+    sidHint: string | null;
+    friendlyName: string | null;
+    status: string | null;
+    type: string | null;
+    smsFrom: string | null;
+    whatsappFrom: string | null;
+    expectedVoiceUrl: string;
+    expectedSmsUrl: string;
+  };
+  balance: { currency: string; balance: string } | null;
+  numbers: {
+    totalOnTwilio: number;
+    assignedToClients: number;
+    unassignedCount: number;
+    clientsWithNumberMissingOnTwilio: number;
+    rows: {
+      sid: string;
+      phoneNumber: string;
+      friendlyName: string | null;
+      capabilities: { voice: boolean; sms: boolean; mms: boolean };
+      dateCreated: string | null;
+      voiceUrl: string | null;
+      smsUrl: string | null;
+      voiceOk: boolean;
+      smsOk: boolean;
+      webhooksOk: boolean;
+      assignedClient: {
+        id: string;
+        businessName: string;
+        status: string;
+        missedCallMode: string;
+        destChannel: string;
+      } | null;
+    }[];
+    clientsMissing: {
+      id: string;
+      businessName: string;
+      status: string;
+      twilioNumber: string | null;
+      missedCallMode: string;
+    }[];
+  };
+  usage: {
+    today: TwilioUsageBlock;
+    thisMonth: TwilioUsageBlock;
+    lastMonth: TwilioUsageBlock;
+  };
+  local: {
+    messages7d: { byKey: Record<string, number>; total: number };
+    messages30d: { byKey: Record<string, number>; total: number };
+    outboundWithTwilioSid30: number;
+    failedOrUndelivered30: number;
+    missedCalls30: number;
+    missedByStatus30: Record<string, number>;
+    estimatedCost30: {
+      currency: string;
+      totalPence: number;
+      note: string;
+      breakdown: {
+        smsOutbound: number;
+        whatsappOutbound: number;
+        missedCallSessions: number;
+      };
+    };
+  };
+}
+
 export const api = {
   health: () =>
     request<{
@@ -121,6 +313,10 @@ export const api = {
   },
 
   getSettings: () => request<SettingsView>("/api/settings"),
+
+  getDashboard: () => request<DashboardStats>("/api/dashboard"),
+
+  getTwilioAdmin: () => request<TwilioAdminStats>("/api/twilio-admin"),
 
   listEarlyAccess: (status?: string) =>
     request<

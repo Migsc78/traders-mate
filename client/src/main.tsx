@@ -20,6 +20,9 @@ import TradieCustomersPage from "./pages/tradie/TradieCustomersPage";
 import TradieSettingsPage from "./pages/tradie/TradieSettingsPage";
 import LandingPage from "./pages/LandingPage";
 import EarlyAccessPage from "./pages/EarlyAccessPage";
+import SettingsPage from "./pages/SettingsPage";
+import DashboardPage from "./pages/DashboardPage";
+import TwilioPage from "./pages/TwilioPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminAuthGate from "./components/AdminAuthGate";
 import "./styles.css";
@@ -59,13 +62,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin" element={<AdminAuthGate />}>
             <Route element={<App />}>
-              <Route index element={<Navigate to="search" replace />} />
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
               <Route path="search" element={<SearchPage />} />
               <Route path="leads" element={<LeadsPage />} />
               <Route path="leads/:leadId" element={<LeadDetailPage />} />
               <Route path="clients" element={<ClientsPage />} />
               <Route path="clients/:clientId" element={<ClientDetailPage />} />
               <Route path="early-access" element={<EarlyAccessPage />} />
+              <Route path="twilio" element={<TwilioPage />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Route>
           {/* Legacy CRM URLs */}
