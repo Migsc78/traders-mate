@@ -12,6 +12,10 @@
       "source": "/i/:path*",
       "destination": "https://traders-mate-production.up.railway.app/i/:path*"
     },
+    {
+      "source": "/cert/:path*",
+      "destination": "https://traders-mate-production.up.railway.app/cert/:path*"
+    },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ]
 }
