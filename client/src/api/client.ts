@@ -180,6 +180,183 @@ export interface DashboardStats {
   };
 }
 
+export type DashboardKpiKey =
+  | "active-clients"
+  | "early-access"
+  | "enquiries"
+  | "missed-calls"
+  | "quotes"
+  | "invoices-overdue"
+  | "trials-ending"
+  | "leads-in-play"
+  | "saas-mrr"
+  | "at-risk-mrr"
+  | "trial-pipeline"
+  | "invoices-paid-month"
+  | "invoices-paid-all"
+  | "invoices-outstanding"
+  | "costings"
+  | "costings-messaging"
+  | "costings-voice";
+
+export type DashboardClientRow = {
+  id: string;
+  businessName: string;
+  status: string;
+  destPhone: string;
+  destChannel: string;
+  trialEndsAt: string | null;
+  town: string | null;
+  tradeTitle: string | null;
+  createdAt: string;
+};
+
+export type DashboardEarlyAccessRow = {
+  id: string;
+  email: string;
+  phone: string;
+  occupation: string;
+  status: string;
+  createdAt: string;
+};
+
+export type DashboardEnquiryRow = {
+  id: string;
+  name: string;
+  phone: string;
+  message: string | null;
+  postcode: string | null;
+  source: string;
+  status: string;
+  createdAt: string;
+  client: { id: string; businessName: string; status: string };
+};
+
+export type DashboardMissedCallRow = {
+  id: string;
+  callerPhone: string;
+  status: string;
+  enquiryId: string | null;
+  callSid: string | null;
+  createdAt: string;
+  updatedAt: string;
+  client: { id: string; businessName: string; status: string };
+};
+
+export type DashboardQuoteRow = {
+  id: string;
+  status: string;
+  totalPence: number;
+  sentAt: string | null;
+  decidedAt: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  publicUrl: string;
+  client: { id: string; businessName: string; status: string };
+};
+
+export type DashboardInvoiceRow = {
+  id: string;
+  status: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  totalPence: number;
+  dueDate: string | null;
+  sentAt: string | null;
+  paidAt: string | null;
+  publicUrl: string;
+  client: { id: string; businessName: string; status: string };
+};
+
+export type DashboardLeadRow = {
+  id: string;
+  businessName: string;
+  occupation: string;
+  town: string;
+  phone: string | null;
+  outreachStatus: string;
+  qualified: boolean;
+  createdAt: string;
+};
+
+export type DashboardMessageRow = {
+  id: string;
+  channel: string;
+  toAddr: string;
+  status: string;
+  twilioSid: string | null;
+  bodyPreview: string;
+  createdAt: string;
+  client: { id: string; businessName: string };
+};
+
+export type DashboardDetails =
+  | {
+      kpi: DashboardKpiKey;
+      kind: "clients";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardClientRow[];
+    }
+  | {
+      kpi: DashboardKpiKey;
+      kind: "early-access";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardEarlyAccessRow[];
+    }
+  | {
+      kpi: DashboardKpiKey;
+      kind: "enquiries";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardEnquiryRow[];
+    }
+  | {
+      kpi: DashboardKpiKey;
+      kind: "missed-calls";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardMissedCallRow[];
+    }
+  | {
+      kpi: DashboardKpiKey;
+      kind: "quotes";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardQuoteRow[];
+    }
+  | {
+      kpi: DashboardKpiKey;
+      kind: "invoices";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardInvoiceRow[];
+    }
+  | {
+      kpi: DashboardKpiKey;
+      kind: "leads";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardLeadRow[];
+    }
+  | {
+      kpi: DashboardKpiKey;
+      kind: "messages";
+      title: string;
+      description: string;
+      total: number;
+      rows: DashboardMessageRow[];
+      links?: { label: string; href: string }[];
+    };
+
 export interface TwilioUsageBlock {
   totalPrice: string | null;
   priceUnit: string;
@@ -315,6 +492,21 @@ export const api = {
   getSettings: () => request<SettingsView>("/api/settings"),
 
   getDashboard: () => request<DashboardStats>("/api/dashboard"),
+
+  getDashboardDetails: (kpi: DashboardKpiKey) =>
+    request<DashboardDetails>(`/api/dashboard/details?kpi=${encodeURIComponent(kpi)}`),
+
+  patchDashboardMissedCall: (id: string, status: string) =>
+    request<{ ok: boolean; row: DashboardMissedCallRow }>(`/api/dashboard/missed-calls/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+
+  patchDashboardInvoice: (id: string, status: "SENT" | "PAID" | "OVERDUE" | "VOID") =>
+    request<{ ok: boolean; row: DashboardInvoiceRow }>(`/api/dashboard/invoices/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
 
   getTwilioAdmin: () => request<TwilioAdminStats>("/api/twilio-admin"),
 
