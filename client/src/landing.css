@@ -345,105 +345,15 @@ body:has(.lp) {
 }
 
 .lp-phone {
-  width: min(100%, 320px);
+  width: min(100%, 340px);
   filter: drop-shadow(0 28px 50px rgba(19, 28, 38, 0.22));
 }
 
-.lp-phone-bezel {
-  background: #1a222c;
-  border-radius: 36px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.lp-phone-notch {
-  width: 96px;
-  height: 8px;
-  border-radius: 999px;
-  background: #0d1218;
-  margin: 4px auto 10px;
-}
-
-.lp-phone-screen {
-  background: var(--lp-paper);
-  border-radius: 26px;
-  padding: 18px 14px 20px;
-  min-height: 420px;
-}
-
-.lp-phone-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
-  font-family: var(--lp-font-display);
-  font-weight: 800;
-  font-size: 18px;
-}
-
-.lp-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--lp-accent-soft);
-  color: var(--lp-accent-down);
-  font-family: var(--lp-font-display);
-  font-size: 11px;
-  font-weight: 700;
-}
-.lp-pill--sent {
-  background: #e7eefb;
-  color: #2360d8;
-}
-
-.lp-phone-card {
-  background: var(--lp-surface);
-  border: 1px solid var(--lp-line);
-  border-radius: 16px;
-  padding: 14px;
-  margin-bottom: 10px;
-  box-shadow: var(--lp-shadow);
-}
-.lp-phone-card--muted {
-  opacity: 0.88;
-  box-shadow: none;
-}
-.lp-phone-card p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--lp-ink-soft);
-}
-.lp-snip {
-  color: var(--lp-ink) !important;
-}
-.lp-phone-card-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.lp-money {
-  font-family: var(--lp-font-display);
-  font-weight: 800;
-  color: var(--lp-green);
-}
-
-.lp-phone-sms {
-  margin-top: 16px;
-  background: #131c26;
-  color: #f5f3ee;
-  border-radius: 16px;
-  padding: 14px;
-  font-size: 13px;
-}
-.lp-phone-sms p {
-  margin: 0;
-}
-.lp-phone-sms p + p {
-  margin-top: 6px;
-  color: rgba(245, 243, 238, 0.78);
+.lp-phone-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 28px;
 }
 
 /* ---------- sections ---------- */
@@ -936,9 +846,6 @@ body:has(.lp) {
   }
   .lp-phone {
     width: min(100%, 280px);
-  }
-  .lp-phone-screen {
-    min-height: 360px;
   }
   .lp-comic {
     grid-template-columns: repeat(2, minmax(0, 1fr));

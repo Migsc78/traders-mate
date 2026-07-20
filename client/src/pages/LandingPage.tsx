@@ -572,36 +572,14 @@ function ComicPanel({
 function PhoneMock() {
   return (
     <div className="lp-phone">
-      <div className="lp-phone-bezel">
-        <div className="lp-phone-notch" />
-        <div className="lp-phone-screen">
-          <div className="lp-phone-top">
-            <span>Jobs</span>
-            <span className="lp-pill">New</span>
-          </div>
-          <div className="lp-phone-card">
-            <div className="lp-phone-card-row">
-              <strong>Martin</strong>
-              <span className="lp-money">£186</span>
-            </div>
-            <p>GU22 7XH · ~2.4 mi</p>
-            <p className="lp-snip">Fix a leak under the kitchen sink</p>
-          </div>
-          <div className="lp-phone-card lp-phone-card--muted">
-            <div className="lp-phone-card-row">
-              <strong>Priya</strong>
-              <span className="lp-pill lp-pill--sent">Sent</span>
-            </div>
-            <p>KT14 · Combi swap quote</p>
-          </div>
-          <div className="lp-phone-sms">
-            <p>
-              <strong>TradiesMate</strong>
-            </p>
-            <p>New job from missed call: Martin (GU22 7XH). Fix a leak.</p>
-          </div>
-        </div>
-      </div>
+      <img
+        className="lp-phone-art"
+        src="/images/story/hero-phone.webp"
+        alt="TradiesMate Jobs screen: Martin £186 leak job and a missed-call alert"
+        width={900}
+        height={1200}
+        decoding="async"
+      />
     </div>
   );
 }
