@@ -606,128 +606,48 @@ function PhoneMock() {
   );
 }
 
-/* ---------- Comic panels (editorial SVG) ---------- */
+/* ---------- Story panels (editorial artwork) ---------- */
 
 function PanelUnderSink() {
   return (
-    <svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg" role="presentation">
-      <rect width="320" height="220" fill="#f7f4ee" />
-      <rect x="18" y="28" width="160" height="14" rx="3" fill="#d9d3c6" />
-      <rect x="40" y="42" width="116" height="78" rx="6" fill="#ebe6db" stroke="#131c26" strokeWidth="2.5" />
-      <ellipse cx="98" cy="78" rx="28" ry="12" fill="#c8e8f5" opacity="0.7" />
-      <path d="M86 90c4 18 8 34 10 48" stroke="#3aa0c8" strokeWidth="3" fill="none" strokeLinecap="round" />
-      <path d="M108 88c-2 16 2 32 6 46" stroke="#5bb8d8" strokeWidth="2.5" fill="none" strokeLinecap="round" opacity="0.8" />
-      <circle cx="96" cy="148" r="7" fill="#7ec8e0" opacity="0.85" />
-      <circle cx="114" cy="156" r="5" fill="#7ec8e0" opacity="0.7" />
-      <circle cx="88" cy="162" r="4" fill="#7ec8e0" opacity="0.55" />
-      {/* plumber */}
-      <ellipse cx="210" cy="168" rx="42" ry="14" fill="#e4dfd4" />
-      <path d="M178 120c8-28 28-40 48-36 14 3 28 18 30 42l-6 48h-66l-6-54z" fill="#ff5a1f" stroke="#131c26" strokeWidth="2.2" />
-      <circle cx="228" cy="86" r="18" fill="#f0c9a0" stroke="#131c26" strokeWidth="2.2" />
-      <path d="M214 82h8M234 82h8" stroke="#131c26" strokeWidth="2" strokeLinecap="round" />
-      <path d="M220 94c4 4 10 4 14 0" stroke="#131c26" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <path d="M168 138c-18 6-28 18-30 28" stroke="#131c26" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-      <path d="M252 136c16 10 28 8 36 2" stroke="#131c26" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-      {/* phone ringing */}
-      <rect x="248" y="48" width="42" height="68" rx="8" fill="#131c26" />
-      <rect x="252" y="56" width="34" height="48" rx="3" fill="#f5f3ee" />
-      <path d="M268 36c8-6 18-6 26 0M272 28c10-8 22-8 32 0" stroke="#ff5a1f" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      <text x="24" y="204" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        Van seat · 11:42
-      </text>
-    </svg>
+    <img
+      src="/images/story/hands-full.webp"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
   );
 }
 
 function PanelCallerGivesUp() {
   return (
-    <svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg" role="presentation">
-      <rect width="320" height="220" fill="#fbfaf7" />
-      <rect x="36" y="36" width="140" height="150" rx="16" fill="#131c26" />
-      <rect x="44" y="48" width="124" height="116" rx="6" fill="#f5f3ee" />
-      <circle cx="106" cy="92" r="22" fill="#e8e4da" stroke="#131c26" strokeWidth="2" />
-      <text x="62" y="136" fill="#131c26" fontFamily="Archivo, sans-serif" fontSize="13" fontWeight="700">
-        Dave Plumbing
-      </text>
-      <text x="72" y="154" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        No answer…
-      </text>
-      <path d="M200 70h84" stroke="#e8e4da" strokeWidth="8" strokeLinecap="round" />
-      <path d="M200 98h64" stroke="#e8e4da" strokeWidth="8" strokeLinecap="round" />
-      <path d="M200 126h76" stroke="#e8e4da" strokeWidth="8" strokeLinecap="round" />
-      <g transform="translate(210 150)">
-        <rect width="88" height="36" rx="8" fill="#ff5a1f" />
-        <text x="14" y="23" fill="#fff" fontFamily="Archivo, sans-serif" fontSize="12" fontWeight="700">
-          Next result
-        </text>
-      </g>
-      <text x="24" y="204" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        Customer scrolls on
-      </text>
-    </svg>
+    <img
+      src="/images/story/they-move-on.webp"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
   );
 }
 
 function PanelBigClient() {
   return (
-    <svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg" role="presentation">
-      <rect width="320" height="220" fill="#f7f4ee" />
-      {/* building */}
-      <rect x="40" y="56" width="100" height="120" fill="#ebe6db" stroke="#131c26" strokeWidth="2.5" />
-      <rect x="52" y="72" width="22" height="22" fill="#c5d8f0" stroke="#131c26" strokeWidth="1.5" />
-      <rect x="82" y="72" width="22" height="22" fill="#c5d8f0" stroke="#131c26" strokeWidth="1.5" />
-      <rect x="112" y="72" width="16" height="22" fill="#c5d8f0" stroke="#131c26" strokeWidth="1.5" />
-      <rect x="52" y="106" width="22" height="22" fill="#c5d8f0" stroke="#131c26" strokeWidth="1.5" />
-      <rect x="82" y="106" width="22" height="22" fill="#c5d8f0" stroke="#131c26" strokeWidth="1.5" />
-      <rect x="78" y="148" width="28" height="28" fill="#131c26" />
-      {/* clipboard */}
-      <rect x="168" y="48" width="120" height="140" rx="8" fill="#fff" stroke="#131c26" strokeWidth="2.5" />
-      <rect x="196" y="40" width="64" height="16" rx="4" fill="#ff5a1f" />
-      <text x="184" y="84" fill="#131c26" fontFamily="Archivo, sans-serif" fontSize="13" fontWeight="800">
-        Insurance claim
-      </text>
-      <text x="184" y="106" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        Escape of water
-      </text>
-      <text x="184" y="128" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        Landlord portfolio
-      </text>
-      <path d="M184 148h88" stroke="#e8e4da" strokeWidth="6" strokeLinecap="round" />
-      <path d="M184 166h64" stroke="#e8e4da" strokeWidth="6" strokeLinecap="round" />
-      <text x="24" y="204" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        Not just a tap washer
-      </text>
-    </svg>
+    <img
+      src="/images/story/not-a-small-job.webp"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
   );
 }
 
 function PanelRescued() {
   return (
-    <svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg" role="presentation">
-      <rect width="320" height="220" fill="#fff4ee" />
-      <rect x="36" y="40" width="248" height="128" rx="16" fill="#fff" stroke="#131c26" strokeWidth="2.5" />
-      <circle cx="68" cy="72" r="16" fill="#ff5a1f" />
-      <text x="60" y="77" fill="#fff" fontFamily="Archivo, sans-serif" fontSize="11" fontWeight="800">
-        TM
-      </text>
-      <text x="96" y="68" fill="#131c26" fontFamily="Archivo, sans-serif" fontSize="14" fontWeight="800">
-        Missed-call rescue
-      </text>
-      <text x="96" y="88" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        SMS to customer
-      </text>
-      <rect x="52" y="108" width="216" height="40" rx="8" fill="#f5f3ee" />
-      <text x="64" y="126" fill="#131c26" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        Hi — sorry we missed your call.
-      </text>
-      <text x="64" y="142" fill="#131c26" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        What do you need and your postcode?
-      </text>
-      <path d="M250 178c12 0 22 8 22 18" stroke="#0d8a4e" strokeWidth="3" fill="none" strokeLinecap="round" />
-      <path d="M262 188l6 6 12-14" stroke="#0d8a4e" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <text x="24" y="204" fill="#5c6672" fontFamily="Instrument Sans, sans-serif" fontSize="11">
-        Job saved · on your phone
-      </text>
-    </svg>
+    <img
+      src="/images/story/tradiesmate-steps-in.webp"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
   );
 }
