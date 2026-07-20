@@ -30,6 +30,7 @@ import { earlyAccessRouter } from "./routes/earlyAccess.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { twilioAdminRouter } from "./routes/twilioAdmin.js";
 import { invoicePublicRouter } from "./routes/invoicePublic.js";
+import { certPublicRouter } from "./routes/certPublic.js";
 import { twilioHooksRouter } from "./routes/twilioHooks.js";
 import { publicGreetingRouter } from "./routes/publicGreeting.js";
 import { inboundEmailRouter } from "./routes/inboundEmail.js";
@@ -76,6 +77,7 @@ app.use("/api/t", cors({ origin: true, credentials: true }), express.json({ limi
 app.use("/api/signup", cors({ origin: true }), express.json(), signupRouter);
 app.use("/q", cors(), express.urlencoded({ extended: true }), express.json(), quotePublicRouter);
 app.use("/i", cors(), express.urlencoded({ extended: true }), express.json(), invoicePublicRouter);
+app.use("/cert", cors(), certPublicRouter);
 app.use("/api/followups", express.json(), followupsRouter);
 app.use("/api/twilio", cors(), express.urlencoded({ extended: true }), express.json(), twilioHooksRouter);
 app.use("/api/public/greeting", cors(), publicGreetingRouter);

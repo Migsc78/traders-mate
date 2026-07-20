@@ -1,9 +1,14 @@
 import { Router } from "express";
 import { env } from "../env.js";
 import { prisma } from "../db.js";
-import { verifyStripeSignature, mapEventToStatus, mapSubscriptionStatus } from "../services/billing/stripe.js";
+import {
+  verifyStripeSignature,
+  mapEventToStatus,
+  mapSubscriptionStatus,
+} from "../services/billing/stripe.js";
+import { markInvoicePaid } from "../services/invoices/invoice.js";
+import { sendMessage } from "../services/messaging/sender.js";
 
-// Public Stripe webhook. Mounted with express.raw so we can verify the signature.
 export const stripeWebhookRouter = Router();
 
 stripeWebhookRouter.post("/", async (req, res) => {
@@ -26,6 +31,72 @@ stripeWebhookRouter.post("/", async (req, res) => {
   const obj = event.data?.object ?? {};
   const customerId = (obj.customer as string) || undefined;
   const clientRef = (obj.client_reference_id as string) || undefined;
+  const metadata = (obj.metadata as Record<string, string>) || {};
+
+  // Connect / job payments (invoice Pay Now + quote deposits)
+  if (event.type === "checkout.session.completed" && obj.mode === "payment") {
+    try {
+      const paymentStatus = String(obj.payment_status || "");
+      if (paymentStatus === "paid" || paymentStatus === "no_payment_required") {
+        if (metadata.type === "invoice" && metadata.invoiceId) {
+          const inv = await prisma.invoice.findUnique({ where: { id: metadata.invoiceId } });
+          if (inv && inv.status !== "PAID") {
+            await markInvoicePaid(inv.clientId, inv.id, {
+              paidVia: "stripe",
+              stripePaymentIntentId: (obj.payment_intent as string) || null,
+            });
+            const client = await prisma.client.findUnique({ where: { id: inv.clientId } });
+            if (client?.destPhone) {
+              void sendMessage({
+                to: client.destPhone,
+                channel: client.destChannel,
+                body: `Payment received for invoice ${inv.reference || ""} via card/Pay Now.`,
+              }).catch(() => undefined);
+            }
+          }
+        }
+        if (metadata.type === "deposit" && metadata.quoteId) {
+          const quote = await prisma.quote.findUnique({
+            where: { id: metadata.quoteId },
+            include: { client: true },
+          });
+          if (quote && !quote.depositPaidAt) {
+            await prisma.quote.update({
+              where: { id: quote.id },
+              data: { depositPaidAt: new Date() },
+            });
+            if (quote.client.destPhone) {
+              void sendMessage({
+                to: quote.client.destPhone,
+                channel: quote.client.destChannel,
+                body: `Deposit paid on quote (${quote.depositPence / 100} GBP).`,
+              }).catch(() => undefined);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[stripe] payment handling failed", e);
+    }
+    return res.json({ received: true });
+  }
+
+  // Account updated — mark Connect onboarded when charges enabled
+  if (event.type === "account.updated") {
+    try {
+      const accountId = String(obj.id || "");
+      const chargesEnabled = !!obj.charges_enabled;
+      if (accountId) {
+        await prisma.client.updateMany({
+          where: { stripeConnectAccountId: accountId },
+          data: { stripeConnectOnboarded: chargesEnabled },
+        });
+      }
+    } catch (e) {
+      console.error("[stripe] account.updated failed", e);
+    }
+    return res.json({ received: true });
+  }
 
   let status = mapEventToStatus(event.type || "");
   if (event.type === "customer.subscription.updated" && typeof obj.status === "string") {

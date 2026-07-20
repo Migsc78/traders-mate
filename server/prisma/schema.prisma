@@ -200,6 +200,13 @@ model Client {
   bankAccountNumber String?
   stripeCustomerId String?
   stripeSubId      String?
+  /// Stripe Connect Express account for customer invoice Pay Now
+  stripeConnectAccountId String?
+  stripeConnectOnboarded Boolean @default(false)
+  /// Google review URL for post-job review SMS
+  googleReviewUrl  String?
+  /// Default deposit % on quotes (0 = off)
+  defaultDepositPercent Int @default(0)
   allowedOrigins   String[]     @default([]) // domains permitted to POST via the widget
   tradieNotifyTpl  String? // custom message the tradie receives
   customerAckTpl   String? // custom auto-reply the customer sees
@@ -216,6 +223,8 @@ model Client {
   messages         Message[]
   missedCalls      MissedCall[]
   otpChallenges    OtpChallenge[]
+  appointments     Appointment[]
+  certificates     Certificate[]
 
   @@index([status])
   @@index([destPhone])
@@ -244,6 +253,8 @@ model Enquiry {
   invoices     Invoice[]
   messages     Message[]
   missedCalls  MissedCall[]
+  appointments Appointment[]
+  certificates Certificate[]
 
   @@index([clientId, createdAt])
   @@index([clientId, phone])
@@ -271,6 +282,11 @@ enum FollowUpKind {
   QUOTE_D10
   INVOICE_D3
   INVOICE_D7
+  REVIEW_ASK
+  REVIEW_NUDGE
+  APPT_CONFIRM
+  APPT_REMINDER
+  SERVICE_REMINDER
 }
 
 enum FollowUpStatus {
@@ -343,6 +359,11 @@ model Quote {
   subtotalPence   Int         @default(0)
   vatPence        Int         @default(0)
   totalPence      Int         @default(0)
+  /// 0-100; deposit required on accept when > 0 and Connect ready
+  depositPercent  Int         @default(0)
+  depositPence    Int         @default(0)
+  depositPaidAt   DateTime?
+  depositStripeSessionId String?
   publicToken     String      @unique
   customerNote    String?
   assumptions     String?
@@ -380,21 +401,29 @@ model QuoteLine {
 }
 
 model FollowUp {
-  id           String         @id @default(cuid())
-  quoteId      String?
-  quote        Quote?         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  invoiceId    String?
-  invoice      Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  kind         FollowUpKind
-  status       FollowUpStatus @default(PENDING)
-  runAt        DateTime
-  sentAt       DateTime?
-  bodySnapshot String?
-  createdAt    DateTime       @default(now())
+  id             String         @id @default(cuid())
+  quoteId        String?
+  quote          Quote?         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  invoiceId      String?
+  invoice        Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  appointmentId  String?
+  appointment    Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  certificateId  String?
+  certificate    Certificate?   @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  clientId       String?
+  enquiryId      String?
+  kind           FollowUpKind
+  status         FollowUpStatus @default(PENDING)
+  runAt          DateTime
+  sentAt         DateTime?
+  bodySnapshot   String?
+  createdAt      DateTime       @default(now())
 
   @@index([status, runAt])
   @@index([quoteId])
   @@index([invoiceId])
+  @@index([appointmentId])
+  @@index([certificateId])
 }
 
 model ClientSession {
@@ -449,6 +478,9 @@ model Invoice {
   subtotalPence     Int           @default(0)
   vatPence          Int           @default(0)
   totalPence        Int           @default(0)
+  /// Amount still due after deposits already collected
+  amountDuePence    Int           @default(0)
+  depositAppliedPence Int         @default(0)
   dueDate           DateTime?
   reference         String?
   bankName          String?
@@ -456,9 +488,14 @@ model Invoice {
   bankAccountName   String?
   bankAccountNumber String?
   customerNote      String?
+  pdfUrl            String?
+  stripeCheckoutSessionId String?
+  stripePaymentIntentId   String?
+  paidVia           String? // bank | stripe | manual
   sentAt            DateTime?
   paidAt            DateTime?
   paidReportedAt    DateTime?
+  reviewAskedAt     DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -561,4 +598,77 @@ model EarlyAccessRequest {
   @@index([status, createdAt])
   @@index([email])
   @@index([phone])
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  ON_THE_WAY
+  DONE
+  CANCELLED
+  NO_SHOW
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  clientId    String
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enquiryId   String?
+  enquiry     Enquiry?          @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  title       String
+  notes       String?
+  startsAt    DateTime
+  endsAt      DateTime
+  status      AppointmentStatus @default(SCHEDULED)
+  address     String?
+  customerName String?
+  customerPhone String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  followUps   FollowUp[]
+
+  @@index([clientId, startsAt])
+  @@index([enquiryId])
+}
+
+enum CertificateKind {
+  GAS_SAFETY
+  MINOR_WORKS
+  EICR
+}
+
+enum CertificateStatus {
+  DRAFT
+  SIGNED
+  SENT
+}
+
+model Certificate {
+  id              String            @id @default(cuid())
+  clientId        String
+  client          Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enquiryId       String?
+  enquiry         Enquiry?          @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  kind            CertificateKind
+  status          CertificateStatus @default(DRAFT)
+  siteAddress     String?
+  customerName    String?
+  customerPhone   String?
+  customerEmail   String?
+  /// Form field values as JSON
+  formData        Json              @default("{}")
+  signatureDataUrl String?
+  signedAt        DateTime?
+  pdfUrl          String?
+  publicToken     String            @unique
+  serviceDueAt    DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  followUps       FollowUp[]
+
+  @@index([clientId, kind, createdAt])
+  @@index([enquiryId])
+  @@index([serviceDueAt])
 }

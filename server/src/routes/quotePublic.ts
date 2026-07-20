@@ -86,6 +86,7 @@ ${quote.enquiry?.photoUrls?.length ? `<div class="photos">${quote.enquiry.photoU
   <div><span>Subtotal</span><span>${esc(formatGbp(quote.subtotalPence))}</span></div>
   <div><span>VAT</span><span>${esc(formatGbp(quote.vatPence))}</span></div>
   <div class="total"><span>Total ${quote.vatInclusive ? "(inc VAT)" : "(ex VAT)"}</span><span>${esc(formatGbp(quote.totalPence))}</span></div>
+  ${quote.depositPercent > 0 ? `<div><span>Deposit (${quote.depositPercent}%)</span><span>${esc(formatGbp(quote.depositPence))}${quote.depositPaidAt ? " · paid" : " on accept"}</span></div>` : ""}
   ${quote.validUntil ? `<div><span>Valid until</span><span>${esc(new Date(quote.validUntil).toLocaleDateString("en-GB"))}</span></div>` : ""}
 </div>
 ${quote.assumptions ? `<p class="note"><strong>Notes:</strong> ${esc(quote.assumptions)}</p>` : ""}
@@ -127,7 +128,44 @@ async function decide(token: string, status: "ACCEPTED" | "DECLINED") {
 
 quotePublicRouter.post("/:token/accept", async (req, res, next) => {
   try {
-    await decide(req.params.token, "ACCEPTED");
+    const quote = await decide(req.params.token, "ACCEPTED");
+    const needsDeposit =
+      quote.depositPercent > 0 &&
+      quote.depositPence > 0 &&
+      !quote.depositPaidAt &&
+      !!quote.client.stripeConnectAccountId &&
+      quote.client.stripeConnectOnboarded;
+
+    if (needsDeposit) {
+      const { createConnectPaymentCheckout } = await import("../services/billing/connect.js");
+      const { appPublicUrl } = await import("../services/quotes/magicAuth.js");
+      const base = appPublicUrl();
+      const session = await createConnectPaymentCheckout({
+        connectedAccountId: quote.client.stripeConnectAccountId!,
+        amountPence: quote.depositPence,
+        currency: quote.currency,
+        description: `Deposit for quote — ${quote.client.businessName}`,
+        successUrl: `${base}/q/${quote.publicToken}?deposit=1`,
+        cancelUrl: `${base}/q/${quote.publicToken}?deposit_cancelled=1`,
+        clientId: quote.clientId,
+        metadata: {
+          type: "deposit",
+          quoteId: quote.id,
+          publicToken: quote.publicToken,
+        },
+      });
+      if (session.sessionId) {
+        await prisma.quote.update({
+          where: { id: quote.id },
+          data: { depositStripeSessionId: session.sessionId },
+        });
+      }
+      if ((req.headers.accept || "").includes("application/json")) {
+        return res.json({ ok: true, status: "ACCEPTED", depositUrl: session.url });
+      }
+      return res.redirect(303, session.url);
+    }
+
     if ((req.headers.accept || "").includes("application/json")) return res.json({ ok: true, status: "ACCEPTED" });
     res.type("html").send(`<!doctype html><meta charset=utf-8><title>Accepted</title><p style="font-family:sans-serif;max-width:420px;margin:60px auto;text-align:center">Thanks — we've told the tradie you accepted.</p>`);
   } catch (err) {

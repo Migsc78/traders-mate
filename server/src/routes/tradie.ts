@@ -192,6 +192,12 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       bankSortCode: client.bankSortCode,
       bankAccountName: client.bankAccountName,
       bankAccountNumber: client.bankAccountNumber,
+      googleReviewUrl: client.googleReviewUrl,
+      defaultDepositPercent: client.defaultDepositPercent,
+      stripeConnectOnboarded: client.stripeConnectOnboarded,
+      stripeConnectAccountId: client.stripeConnectAccountId
+        ? `${client.stripeConnectAccountId.slice(0, 8)}…`
+        : null,
       divertCodes: twilio
         ? {
             noAnswer: `**61*${digits}#`,
@@ -225,6 +231,8 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         destPhone: z.string().min(10).max(30).optional(),
         twilioNumber: z.string().max(30).nullable().optional(),
         missedCallMode: z.enum(["SMS_QUALIFY", "VOICEMAIL"]).optional(),
+        googleReviewUrl: z.string().url().max(500).nullable().optional().or(z.literal("")),
+        defaultDepositPercent: z.number().int().min(0).max(100).optional(),
       })
       .parse(req.body ?? {});
 
@@ -263,6 +271,12 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         ...(nextDestPhone !== undefined ? { destPhone: nextDestPhone } : {}),
         ...(nextTwilio !== undefined ? { twilioNumber: nextTwilio } : {}),
         ...(body.missedCallMode !== undefined ? { missedCallMode: body.missedCallMode } : {}),
+        ...(body.googleReviewUrl !== undefined
+          ? { googleReviewUrl: body.googleReviewUrl || null }
+          : {}),
+        ...(body.defaultDepositPercent !== undefined
+          ? { defaultDepositPercent: body.defaultDepositPercent }
+          : {}),
       },
     });
 
@@ -679,6 +693,9 @@ tradieRouter.put("/quotes/:id/lines", requireClient, async (req, res, next) => {
 
 tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
+    const body = z
+      .object({ depositPercent: z.number().int().min(0).max(100).optional() })
+      .parse(req.body ?? {});
     const quote = await prisma.quote.findFirst({
       where: { id: req.params.id, clientId: clientId(req) },
       include: { lines: true, enquiry: true, client: true },
@@ -691,22 +708,63 @@ tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, as
     }
     if (!quote.enquiry?.phone) throw new ApiError(400, "no_customer", "No customer phone on this job");
 
+    const depositPercent =
+      body.depositPercent !== undefined ? body.depositPercent : quote.client.defaultDepositPercent || 0;
+    const depositPence = depositPercent > 0 ? Math.round((quote.totalPence * depositPercent) / 100) : 0;
+
+    // Best-effort PDF
+    let pdfUrl = quote.pdfUrl;
+    try {
+      const { renderMoneyPdf } = await import("../services/docs/pdf.js");
+      const logo = await prisma.clientAsset.findFirst({
+        where: { clientId: quote.clientId, kind: "LOGO" },
+        orderBy: { createdAt: "desc" },
+      });
+      const pdf = await renderMoneyPdf({
+        kind: "quote",
+        businessName: quote.client.businessName,
+        vatNumber: quote.client.vatNumber,
+        customerName: quote.enquiry.name,
+        lines: quote.lines.map((l) => ({
+          label: l.label,
+          qty: l.qty,
+          unitPricePence: l.unitPricePence,
+        })),
+        subtotalPence: quote.subtotalPence,
+        vatPence: quote.vatPence,
+        totalPence: quote.totalPence,
+        note: quote.customerNote,
+        logoUrl: logo?.url,
+      });
+      pdfUrl = pdf.url;
+    } catch (e) {
+      console.warn("[quote] pdf failed", e instanceof Error ? e.message : e);
+    }
+
     const publicUrl = `${appPublicUrl()}/q/${quote.publicToken}`;
-    const body = `Hi ${quote.enquiry.name}, your quote from ${quote.client.businessName} is ready: ${formatGbp(quote.totalPence)}. View & accept: ${publicUrl}`;
-    const results = await sendMessage({ to: quote.enquiry.phone, channel: "SMS", body });
+    const depositNote =
+      depositPence > 0 ? ` Deposit ${formatGbp(depositPence)} (${depositPercent}%) due on accept.` : "";
+    const smsBody = `Hi ${quote.enquiry.name}, your quote from ${quote.client.businessName} is ready: ${formatGbp(quote.totalPence)}.${depositNote} View & accept: ${publicUrl}`;
+    const results = await sendMessage({ to: quote.enquiry.phone, channel: "SMS", body: smsBody });
     await logMessage({
       clientId: quote.clientId,
       enquiryId: quote.enquiryId,
       direction: "OUTBOUND",
       toAddr: quote.enquiry.phone,
-      body,
+      body: smsBody,
       twilioSid: results[0]?.id,
     });
 
     const sentAt = new Date();
     const updated = await prisma.quote.update({
       where: { id: quote.id },
-      data: { status: "SENT", sentAt },
+      data: {
+        status: "SENT",
+        sentAt,
+        depositPercent,
+        depositPence,
+        ...(pdfUrl ? { pdfUrl } : {}),
+      },
       include: { lines: quoteLineInclude },
     });
     await scheduleQuoteFollowUps(quote.id, sentAt);
@@ -872,6 +930,296 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
     }
 
     res.json(Array.from(byPhone.values()).sort((a, b) => b.lastJobAt.getTime() - a.lastJobAt.getTime()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Two-way SMS composer ----
+tradieRouter.post("/jobs/:enquiryId/messages", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const body = z.object({ text: z.string().min(1).max(1200) }).parse(req.body ?? {});
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: clientId(req) },
+      include: { client: true },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
+    const results = await sendMessage({ to: enquiry.phone, channel: "SMS", body: body.text });
+    const logged = await logMessage({
+      clientId: enquiry.clientId,
+      enquiryId: enquiry.id,
+      direction: "OUTBOUND",
+      toAddr: enquiry.phone,
+      body: body.text,
+      twilioSid: results[0]?.id,
+    });
+    res.json({ ok: true, message: logged, deliverOk: results.some((r) => r.ok) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Stripe Connect (Pay Now) ----
+tradieRouter.post("/connect/onboard", requireClient, async (req, res, next) => {
+  try {
+    const {
+      ensureConnectAccount,
+      createConnectOnboardingLink,
+      getConnectAccountStatus,
+      stripeConfigured,
+    } = await import("../services/billing/connect.js");
+    if (!stripeConfigured()) throw new ApiError(400, "stripe_off", "Stripe is not configured on the server");
+
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+
+    const { accountId } = await ensureConnectAccount({
+      clientId: client.id,
+      existingAccountId: client.stripeConnectAccountId,
+    });
+    if (!client.stripeConnectAccountId) {
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { stripeConnectAccountId: accountId },
+      });
+    }
+
+    const status = await getConnectAccountStatus(accountId);
+    if (status.chargesEnabled) {
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { stripeConnectOnboarded: true },
+      });
+      return res.json({ ok: true, onboarded: true, url: null });
+    }
+
+    const base = appPublicUrl();
+    const link = await createConnectOnboardingLink({
+      accountId,
+      refreshUrl: `${base}/t/settings?connect=refresh`,
+      returnUrl: `${base}/t/settings?connect=return`,
+    });
+    res.json({ ok: true, onboarded: false, url: link.url });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.get("/connect/status", requireClient, async (req, res, next) => {
+  try {
+    const { getConnectAccountStatus, stripeConfigured } = await import("../services/billing/connect.js");
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    if (!stripeConfigured() || !client.stripeConnectAccountId) {
+      return res.json({ configured: stripeConfigured(), onboarded: false, chargesEnabled: false });
+    }
+    const status = await getConnectAccountStatus(client.stripeConnectAccountId);
+    if (status.chargesEnabled && !client.stripeConnectOnboarded) {
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { stripeConnectOnboarded: true },
+      });
+    }
+    res.json({
+      configured: true,
+      onboarded: status.chargesEnabled || client.stripeConnectOnboarded,
+      chargesEnabled: status.chargesEnabled,
+      detailsSubmitted: status.detailsSubmitted,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Diary / appointments ----
+tradieRouter.get("/appointments", requireClient, async (req, res, next) => {
+  try {
+    const { listAppointments } = await import("../services/diary/appointments.js");
+    const from = req.query.from ? new Date(String(req.query.from)) : new Date();
+    const to = req.query.to
+      ? new Date(String(req.query.to))
+      : new Date(from.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const rows = await listAppointments(clientId(req), from, to);
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/appointments", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const { createAppointment } = await import("../services/diary/appointments.js");
+    const body = z
+      .object({
+        enquiryId: z.string().nullable().optional(),
+        title: z.string().min(1).max(160),
+        notes: z.string().max(2000).nullable().optional(),
+        startsAt: z.string(),
+        endsAt: z.string(),
+        address: z.string().max(240).nullable().optional(),
+        customerName: z.string().max(120).nullable().optional(),
+        customerPhone: z.string().max(40).nullable().optional(),
+        allowClash: z.boolean().optional(),
+      })
+      .parse(req.body ?? {});
+
+    let customerName = body.customerName || null;
+    let customerPhone = body.customerPhone || null;
+    let address = body.address || null;
+    if (body.enquiryId) {
+      const enq = await prisma.enquiry.findFirst({
+        where: { id: body.enquiryId, clientId: clientId(req) },
+      });
+      if (enq) {
+        customerName = customerName || enq.name;
+        customerPhone = customerPhone || enq.phone;
+        address = address || enq.postcode || null;
+      }
+    }
+
+    const result = await createAppointment({
+      clientId: clientId(req),
+      enquiryId: body.enquiryId,
+      title: body.title,
+      notes: body.notes,
+      startsAt: new Date(body.startsAt),
+      endsAt: new Date(body.endsAt),
+      address,
+      customerName,
+      customerPhone,
+      allowClash: body.allowClash,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/appointments/:id/on-my-way", requireClient, async (req, res, next) => {
+  try {
+    const { sendOnMyWay } = await import("../services/diary/appointments.js");
+    const result = await sendOnMyWay(clientId(req), req.params.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.patch("/appointments/:id", requireClient, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        status: z.enum(["SCHEDULED", "CONFIRMED", "ON_THE_WAY", "DONE", "CANCELLED", "NO_SHOW"]).optional(),
+        notes: z.string().max(2000).nullable().optional(),
+      })
+      .parse(req.body ?? {});
+    const existing = await prisma.appointment.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+    });
+    if (!existing) throw new ApiError(404, "not_found", "Appointment not found");
+    const updated = await prisma.appointment.update({
+      where: { id: existing.id },
+      data: {
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      },
+    });
+    if (body.status === "CANCELLED") {
+      await prisma.followUp.updateMany({
+        where: { appointmentId: existing.id, status: "PENDING" },
+        data: { status: "CANCELLED" },
+      });
+    }
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Certificates ----
+tradieRouter.get("/certificates", requireClient, async (req, res, next) => {
+  try {
+    const rows = await prisma.certificate.findMany({
+      where: { clientId: clientId(req) },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/certificates", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const { createCertificate } = await import("../services/certs/certificates.js");
+    const body = z
+      .object({
+        kind: z.enum(["GAS_SAFETY", "MINOR_WORKS", "EICR"]),
+        enquiryId: z.string().nullable().optional(),
+        siteAddress: z.string().max(240).nullable().optional(),
+        customerName: z.string().max(120).nullable().optional(),
+        customerPhone: z.string().max(40).nullable().optional(),
+        formData: z.record(z.unknown()).optional(),
+      })
+      .parse(req.body ?? {});
+    const row = await createCertificate({
+      clientId: clientId(req),
+      ...body,
+    });
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.get("/certificates/:id", requireClient, async (req, res, next) => {
+  try {
+    const row = await prisma.certificate.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+    });
+    if (!row) throw new ApiError(404, "not_found", "Certificate not found");
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.patch("/certificates/:id", requireClient, async (req, res, next) => {
+  try {
+    const { updateCertificate } = await import("../services/certs/certificates.js");
+    const body = z
+      .object({
+        siteAddress: z.string().max(240).nullable().optional(),
+        customerName: z.string().max(120).nullable().optional(),
+        customerPhone: z.string().max(40).nullable().optional(),
+        customerEmail: z.string().max(160).nullable().optional(),
+        formData: z.record(z.unknown()).optional(),
+      })
+      .parse(req.body ?? {});
+    const row = await updateCertificate(clientId(req), req.params.id, body);
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/certificates/:id/sign", requireClient, async (req, res, next) => {
+  try {
+    const { signCertificate } = await import("../services/certs/certificates.js");
+    const body = z.object({ signatureDataUrl: z.string().min(20) }).parse(req.body ?? {});
+    const row = await signCertificate(clientId(req), req.params.id, body.signatureDataUrl);
+    res.json(row);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/certificates/:id/send", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const { sendCertificate } = await import("../services/certs/certificates.js");
+    const row = await sendCertificate(clientId(req), req.params.id);
+    res.json(row);
   } catch (err) {
     next(err);
   }

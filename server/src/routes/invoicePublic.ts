@@ -4,6 +4,7 @@ import { ApiError } from "../middleware/error.js";
 import { formatGbp } from "../services/quotes/money.js";
 import { sendMessage } from "../services/messaging/sender.js";
 import { logMessage } from "../services/messaging/log.js";
+import { createInvoicePayLink } from "../services/invoices/invoice.js";
 
 export const invoicePublicRouter = Router();
 
@@ -22,6 +23,12 @@ invoicePublicRouter.get("/:token", async (req, res, next) => {
     });
     if (!invoice || invoice.status === "VOID") throw new ApiError(404, "not_found", "Invoice not found");
 
+    const amountDue = invoice.amountDuePence > 0 ? invoice.amountDuePence : invoice.totalPence;
+    const canPayOnline =
+      !!invoice.client.stripeConnectAccountId &&
+      invoice.client.stripeConnectOnboarded &&
+      (invoice.status === "SENT" || invoice.status === "OVERDUE" || invoice.status === "DRAFT");
+
     const wantsJson = (req.headers.accept || "").includes("application/json") || req.query.format === "json";
     if (wantsJson) {
       return res.json({
@@ -33,11 +40,16 @@ invoicePublicRouter.get("/:token", async (req, res, next) => {
         subtotalPence: invoice.subtotalPence,
         vatPence: invoice.vatPence,
         totalPence: invoice.totalPence,
+        amountDuePence: amountDue,
+        depositAppliedPence: invoice.depositAppliedPence,
         dueDate: invoice.dueDate,
         bankName: invoice.bankName,
         bankSortCode: invoice.bankSortCode,
         bankAccountName: invoice.bankAccountName,
         bankAccountNumber: invoice.bankAccountNumber,
+        canPayOnline,
+        pdfUrl: invoice.pdfUrl,
+        paidFlash: req.query.paid === "1",
       });
     }
 
@@ -59,10 +71,24 @@ invoicePublicRouter.get("/:token", async (req, res, next) => {
           </div>`
         : `<p class="note">Bank details will be provided by ${esc(invoice.client.businessName)}.</p>`;
 
-    const actions =
-      invoice.status === "SENT" || invoice.status === "OVERDUE"
-        ? `<form method="POST" action="/i/${esc(invoice.publicToken)}/paid"><button type="submit" class="ok">I've paid</button></form>`
-        : `<p class="status">Status: <strong>${esc(invoice.status)}</strong></p>`;
+    const paidFlash =
+      req.query.paid === "1"
+        ? `<p class="flash">Payment received — thank you!</p>`
+        : "";
+
+    let actions = "";
+    if (invoice.status === "PAID") {
+      actions = `<p class="status">Status: <strong>PAID</strong></p>`;
+    } else if (invoice.status === "SENT" || invoice.status === "OVERDUE" || invoice.status === "DRAFT") {
+      actions = `<div class="actions">`;
+      if (canPayOnline) {
+        actions += `<form method="POST" action="/i/${esc(invoice.publicToken)}/pay"><button type="submit" class="pay">Pay now · ${esc(formatGbp(amountDue))}</button></form>`;
+      }
+      actions += `<form method="POST" action="/i/${esc(invoice.publicToken)}/paid"><button type="submit" class="ok">I've paid by bank transfer</button></form>`;
+      actions += `</div>`;
+    } else {
+      actions = `<p class="status">Status: <strong>${esc(invoice.status)}</strong></p>`;
+    }
 
     res.type("html").send(`<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -76,9 +102,13 @@ th{background:#f1f5f9;font-size:12px;text-transform:uppercase;color:#64748b}
 .totals,.bank{margin-top:14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px}
 .totals div,.bank div{display:flex;justify-content:space-between;margin:4px 0}
 .total{font-weight:700;font-size:1.1rem}
-.ok{background:#15803d;color:#fff;border:none;padding:12px 18px;border-radius:10px;font-weight:700;cursor:pointer}
+.ok{background:#15803d;color:#fff;border:none;padding:12px 18px;border-radius:10px;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+.pay{background:#1d4ed8;color:#fff;border:none;padding:14px 18px;border-radius:10px;font-weight:700;cursor:pointer;width:100%;font-size:16px}
 .note{color:#475569;font-size:14px}
+.flash{background:#dcfce7;color:#166534;padding:12px;border-radius:10px;font-weight:600}
+.actions{margin-top:20px;display:flex;flex-direction:column;gap:8px}
 </style></head><body>
+${paidFlash}
 <h1>Invoice from ${esc(invoice.client.businessName)}</h1>
 ${invoice.client.vatNumber ? `<p class="sub">VAT: ${esc(invoice.client.vatNumber)}</p>` : ""}
 <p class="sub">${invoice.customerName ? `For ${esc(invoice.customerName)}` : ""}${invoice.reference ? ` · ${esc(invoice.reference)}` : ""}</p>
@@ -87,11 +117,22 @@ ${invoice.client.vatNumber ? `<p class="sub">VAT: ${esc(invoice.client.vatNumber
   <div><span>Subtotal</span><span>${esc(formatGbp(invoice.subtotalPence))}</span></div>
   <div><span>VAT</span><span>${esc(formatGbp(invoice.vatPence))}</span></div>
   <div class="total"><span>Total</span><span>${esc(formatGbp(invoice.totalPence))}</span></div>
+  ${invoice.depositAppliedPence > 0 ? `<div><span>Deposit paid</span><span>−${esc(formatGbp(invoice.depositAppliedPence))}</span></div><div class="total"><span>Amount due</span><span>${esc(formatGbp(amountDue))}</span></div>` : ""}
   ${invoice.dueDate ? `<div><span>Due</span><span>${esc(new Date(invoice.dueDate).toLocaleDateString("en-GB"))}</span></div>` : ""}
 </div>
 ${bankBlock}
-<div style="margin-top:20px">${actions}</div>
+${invoice.pdfUrl ? `<p class="note" style="margin-top:12px"><a href="${esc(invoice.pdfUrl)}">Download PDF</a></p>` : ""}
+${actions}
 </body></html>`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+invoicePublicRouter.post("/:token/pay", async (req, res, next) => {
+  try {
+    const { url } = await createInvoicePayLink(req.params.token);
+    res.redirect(303, url);
   } catch (err) {
     next(err);
   }
@@ -113,8 +154,9 @@ invoicePublicRouter.post("/:token/paid", async (req, res, next) => {
       data: { paidReportedAt: new Date(), status: invoice.status === "DRAFT" ? "SENT" : invoice.status },
     });
 
+    const amountDue = invoice.amountDuePence > 0 ? invoice.amountDuePence : invoice.totalPence;
     if (invoice.client.destPhone) {
-      const msg = `${invoice.customerName || "Customer"} says they've paid invoice ${invoice.reference || ""} (${formatGbp(invoice.totalPence)}). Confirm in the app.`;
+      const msg = `${invoice.customerName || "Customer"} says they've paid invoice ${invoice.reference || ""} (${formatGbp(amountDue)}). Confirm in the app.`;
       try {
         const results = await sendMessage({ to: invoice.client.destPhone, channel: invoice.client.destChannel, body: msg });
         await logMessage({

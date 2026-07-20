@@ -95,6 +95,10 @@ export interface TradieMe {
   bankSortCode: string | null;
   bankAccountName: string | null;
   bankAccountNumber: string | null;
+  googleReviewUrl: string | null;
+  defaultDepositPercent: number;
+  stripeConnectOnboarded: boolean;
+  stripeConnectAccountId: string | null;
   divertCodes: { noAnswer: string; busy: string; unreachable: string } | null;
   caps: { claude: boolean; whisper: boolean };
 }
@@ -238,6 +242,91 @@ export const tradieApi = {
       }[]
     >(`/jobs/${enquiryId}/messages`),
 
+  sendJobMessage: (enquiryId: string, text: string) =>
+    tRequest<{ ok: boolean; deliverOk: boolean }>(`/jobs/${enquiryId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+
+  connectOnboard: () =>
+    tRequest<{ ok: boolean; onboarded: boolean; url: string | null }>("/connect/onboard", {
+      method: "POST",
+      body: "{}",
+    }),
+
+  connectStatus: () =>
+    tRequest<{
+      configured: boolean;
+      onboarded: boolean;
+      chargesEnabled: boolean;
+      detailsSubmitted?: boolean;
+    }>("/connect/status"),
+
+  appointments: (from?: string, to?: string) => {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    const qs = q.toString();
+    return tRequest<AppointmentDto[]>(`/appointments${qs ? `?${qs}` : ""}`);
+  },
+
+  createAppointment: (body: {
+    enquiryId?: string | null;
+    title: string;
+    notes?: string | null;
+    startsAt: string;
+    endsAt: string;
+    address?: string | null;
+    customerName?: string | null;
+    customerPhone?: string | null;
+    allowClash?: boolean;
+  }) =>
+    tRequest<{ appointment: AppointmentDto; clashes: AppointmentDto[] }>("/appointments", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  appointmentOnMyWay: (id: string) =>
+    tRequest<{ appointment: AppointmentDto }>(`/appointments/${id}/on-my-way`, {
+      method: "POST",
+      body: "{}",
+    }),
+
+  patchAppointment: (id: string, body: { status?: string; notes?: string | null }) =>
+    tRequest<AppointmentDto>(`/appointments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  certificates: () => tRequest<CertificateDto[]>("/certificates"),
+
+  createCertificate: (body: {
+    kind: "GAS_SAFETY" | "MINOR_WORKS" | "EICR";
+    enquiryId?: string | null;
+    siteAddress?: string | null;
+    customerName?: string | null;
+    customerPhone?: string | null;
+    formData?: Record<string, unknown>;
+  }) => tRequest<CertificateDto>("/certificates", { method: "POST", body: JSON.stringify(body) }),
+
+  getCertificate: (id: string) => tRequest<CertificateDto>(`/certificates/${id}`),
+
+  updateCertificate: (
+    id: string,
+    body: {
+      siteAddress?: string | null;
+      customerName?: string | null;
+      customerPhone?: string | null;
+      formData?: Record<string, unknown>;
+    }
+  ) => tRequest<CertificateDto>(`/certificates/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  signCertificate: (id: string, signatureDataUrl: string) =>
+    tRequest<CertificateDto>(`/certificates/${id}/sign`, {
+      method: "POST",
+      body: JSON.stringify({ signatureDataUrl }),
+    }),
+
+  sendCertificate: (id: string) =>
+    tRequest<CertificateDto>(`/certificates/${id}/send`, { method: "POST", body: "{}" }),
+
   notesToQuote: (enquiryId: string, transcript: string) =>
     tRequest<QuoteDto>(`/jobs/${enquiryId}/notes`, {
       method: "POST",
@@ -275,8 +364,11 @@ export const tradieApi = {
     }
   ) => tRequest<QuoteDto>(`/quotes/${id}/lines`, { method: "PUT", body: JSON.stringify(body) }),
 
-  approve: (id: string) =>
-    tRequest<QuoteDto & { publicUrl: string }>(`/quotes/${id}/approve`, { method: "POST", body: "{}" }),
+  approve: (id: string, body?: { depositPercent?: number }) =>
+    tRequest<QuoteDto & { publicUrl: string }>(`/quotes/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
 
   deleteQuote: (id: string) => tRequest<{ ok: boolean }>(`/quotes/${id}`, { method: "DELETE" }),
 
@@ -330,6 +422,8 @@ export interface InvoiceDto {
   id: string;
   status: string;
   totalPence: number;
+  amountDuePence?: number;
+  depositAppliedPence?: number;
   reference: string | null;
   customerName: string | null;
   customerPhone: string | null;
@@ -340,6 +434,36 @@ export interface InvoiceDto {
   paidReportedAt: string | null;
   createdAt: string;
   lines?: { label: string; qty: number; unitPricePence: number }[];
+}
+
+export interface AppointmentDto {
+  id: string;
+  title: string;
+  notes: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  address: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  enquiryId: string | null;
+  enquiry?: { id: string; name: string; phone: string; postcode: string | null } | null;
+}
+
+export interface CertificateDto {
+  id: string;
+  kind: string;
+  status: string;
+  siteAddress: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  formData: Record<string, unknown>;
+  signatureDataUrl: string | null;
+  signedAt: string | null;
+  pdfUrl: string | null;
+  publicToken: string;
+  serviceDueAt: string | null;
+  createdAt: string;
 }
 
 export interface QuoteLineDto {

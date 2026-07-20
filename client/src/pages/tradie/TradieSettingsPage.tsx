@@ -25,10 +25,13 @@ export default function TradieSettingsPage() {
   const [destPhone, setDestPhone] = useState("");
   const [twilioNumber, setTwilioNumber] = useState("");
   const [missedCallMode, setMissedCallMode] = useState<"SMS_QUALIFY" | "VOICEMAIL">("SMS_QUALIFY");
+  const [googleReviewUrl, setGoogleReviewUrl] = useState("");
+  const [defaultDepositPercent, setDefaultDepositPercent] = useState(0);
 
   const [twilioMsg, setTwilioMsg] = useState("");
   const [greetingMsg, setGreetingMsg] = useState("");
   const [recording, setRecording] = useState(false);
+  const [connectMsg, setConnectMsg] = useState("");
 
   useEffect(() => {
     if (!me.data) return;
@@ -46,6 +49,8 @@ export default function TradieSettingsPage() {
     setDestPhone(me.data.destPhone || "");
     setTwilioNumber(me.data.twilioNumber || "");
     setMissedCallMode(me.data.missedCallMode || "SMS_QUALIFY");
+    setGoogleReviewUrl(me.data.googleReviewUrl || "");
+    setDefaultDepositPercent(me.data.defaultDepositPercent || 0);
   }, [me.data]);
 
   const twilioStatus = useQuery({
@@ -72,6 +77,8 @@ export default function TradieSettingsPage() {
         destPhone: destPhone || undefined,
         twilioNumber: twilioNumber || null,
         missedCallMode: modeOverride ?? missedCallMode,
+        googleReviewUrl: googleReviewUrl || null,
+        defaultDepositPercent,
       }),
     onSuccess: (r: {
       ok: boolean;
@@ -172,11 +179,22 @@ export default function TradieSettingsPage() {
     onSuccess: (r: { url: string }) => window.open(r.url, "_blank"),
   });
 
+  const connect = useMutation({
+    mutationFn: () => tradieApi.connectOnboard(),
+    onSuccess: (r: { ok: boolean; onboarded: boolean; url: string | null }) => {
+      qc.invalidateQueries({ queryKey: ["tradie-me"] });
+      if (r.onboarded) setConnectMsg("Online payments are enabled.");
+      else if (r.url) window.location.href = r.url;
+      else setConnectMsg("Could not start Connect onboarding.");
+    },
+    onError: (e: Error) => setConnectMsg(e.message),
+  });
+
   return (
     <div>
       <header className="t-page-head">
         <h2>Settings</h2>
-        <p>Your account, business details, and call rescue</p>
+        <p>Your account, business details, payments, and call rescue</p>
       </header>
 
       <div className="t-settings-group">
@@ -199,11 +217,28 @@ export default function TradieSettingsPage() {
                 <dd><code>{me.data.inboundEmail}</code></dd>
               </div>
             )}
+            <div className="t-kv">
+              <dt>Pay Now</dt>
+              <dd>{me.data?.stripeConnectOnboarded ? "Enabled" : "Not set up"}</dd>
+            </div>
           </dl>
           <div className="tradie-actions">
             <button className="primary t-btn--block" onClick={() => checkout.mutate()} disabled={checkout.isPending}>
               {checkout.isPending ? "Opening…" : "Subscribe / manage billing"}
             </button>
+            <button
+              type="button"
+              className="t-btn--block"
+              onClick={() => connect.mutate()}
+              disabled={connect.isPending}
+            >
+              {connect.isPending
+                ? "Opening…"
+                : me.data?.stripeConnectOnboarded
+                  ? "Refresh payment setup"
+                  : "Enable Pay Now (Stripe Connect)"}
+            </button>
+            {connectMsg && <p className="muted-text">{connectMsg}</p>}
           </div>
         </div>
       </div>
@@ -285,6 +320,38 @@ export default function TradieSettingsPage() {
             <label>
               Account number
               <input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="t-settings-group">
+        <p className="t-section-label">Reviews & deposits</p>
+        <div className="t-card">
+          <div className="form">
+            <label>
+              Google review link
+              <input
+                value={googleReviewUrl}
+                onChange={(e) => setGoogleReviewUrl(e.target.value)}
+                placeholder="https://g.page/r/…"
+              />
+              <span className="muted-text" style={{ fontWeight: 400 }}>
+                Customers get this by SMS after you mark an invoice paid.
+              </span>
+            </label>
+            <label>
+              Default deposit on quotes (%)
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={defaultDepositPercent}
+                onChange={(e) => setDefaultDepositPercent(Number(e.target.value) || 0)}
+              />
+              <span className="muted-text" style={{ fontWeight: 400 }}>
+                0 = off. Requires Pay Now (Stripe Connect) so customers can pay the deposit on accept.
+              </span>
             </label>
           </div>
         </div>

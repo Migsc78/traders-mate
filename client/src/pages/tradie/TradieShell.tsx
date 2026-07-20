@@ -17,10 +17,12 @@ const PRIMARY_TABS = [
   { to: "/t", label: "Jobs", end: true, Icon: IconJobs },
   { to: "/t/quotes", label: "Quotes", Icon: IconQuotes },
   { to: "/t/invoices", label: "Invoices", Icon: IconInvoices },
-  { to: "/t/customers", label: "Customers", Icon: IconCustomers },
+  { to: "/t/diary", label: "Diary", Icon: IconDiary },
 ] as const;
 
 const MORE_TABS = [
+  { to: "/t/customers", label: "Customers", Icon: IconCustomers },
+  { to: "/t/certificates", label: "Certs", Icon: IconCerts },
   { to: "/t/price-book", label: "Rates", Icon: IconRates },
   { to: "/t/settings", label: "Settings", Icon: IconSettings },
 ] as const;
@@ -166,6 +168,46 @@ function IconMore({ size = 22 }: { size?: number }) {
       <circle cx="5" cy="12" r="1.8" />
       <circle cx="12" cy="12" r="1.8" />
       <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  );
+}
+
+function IconDiary({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+    </svg>
+  );
+}
+
+function IconCerts({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 15l2 2 4-4" />
     </svg>
   );
 }

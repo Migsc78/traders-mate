@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,9 +17,11 @@ export default function TradieJobPage() {
   const [notes, setNotes] = useState("");
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState<QuoteDto | null>(null);
+  const [smsText, setSmsText] = useState("");
+  const [depositPercent, setDepositPercent] = useState(0);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-
+  const depositSeeded = useRef(false);
   const job = useQuery({
     queryKey: ["tradie-job", enquiryId],
     queryFn: () => tradieApi.job(enquiryId),
@@ -66,12 +68,20 @@ export default function TradieJobPage() {
   });
 
   const approve = useMutation({
-    mutationFn: () => tradieApi.approve(activeQuote!.id),
+    mutationFn: () => tradieApi.approve(activeQuote!.id, { depositPercent }),
     onSuccess: (q: QuoteDto & { publicUrl: string }) => {
       setDraft(q);
       alert(`Quote sent.\n${q.publicUrl}`);
       qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
       qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
+    },
+  });
+
+  const sendSms = useMutation({
+    mutationFn: () => tradieApi.sendJobMessage(enquiryId, smsText.trim()),
+    onSuccess: () => {
+      setSmsText("");
+      qc.invalidateQueries({ queryKey: ["tradie-messages", enquiryId] });
     },
   });
 
@@ -88,6 +98,18 @@ export default function TradieJobPage() {
     queryFn: () => tradieApi.jobMessages(enquiryId),
     enabled: !!session && !!enquiryId,
   });
+
+  const me = useQuery({
+    queryKey: ["tradie-me"],
+    queryFn: () => tradieApi.me(),
+    enabled: !!session,
+  });
+
+  useEffect(() => {
+    if (!me.data || depositSeeded.current) return;
+    depositSeeded.current = true;
+    if (me.data.defaultDepositPercent) setDepositPercent(me.data.defaultDepositPercent);
+  }, [me.data]);
 
   const makeInvoice = useMutation({
     mutationFn: () => tradieApi.invoiceFromQuote(activeQuote!.id),
@@ -291,6 +313,16 @@ export default function TradieJobPage() {
                     {saveLines.isPending ? "Saving…" : "Save edits"}
                   </button>
                 </div>
+                <label>
+                  Deposit on accept (%)
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={depositPercent}
+                    onChange={(e) => setDepositPercent(Number(e.target.value) || 0)}
+                  />
+                </label>
                 <div className="tradie-actions">
                   <button
                     className="primary t-btn--block"
@@ -350,6 +382,34 @@ export default function TradieJobPage() {
           ))}
         </ul>
         {messages.data?.length === 0 && <p className="muted-text">No messages logged for this job yet.</p>}
+        <div className="t-card" style={{ marginTop: 12 }}>
+          <label>
+            Reply by SMS
+            <textarea
+              rows={3}
+              value={smsText}
+              onChange={(e) => setSmsText(e.target.value)}
+              placeholder="Type a message to the customer…"
+            />
+          </label>
+          <button
+            type="button"
+            className="primary t-btn--block"
+            disabled={!smsText.trim() || sendSms.isPending}
+            onClick={() => sendSms.mutate()}
+          >
+            {sendSms.isPending ? "Sending…" : "Send SMS"}
+          </button>
+          {sendSms.isError && <p className="error">{(sendSms.error as Error).message}</p>}
+        </div>
+        <div className="tradie-actions" style={{ marginTop: 12 }}>
+          <Link className="t-btn--block" to={`/t/diary?enquiryId=${enquiryId}`}>
+            Book in diary →
+          </Link>
+          <Link className="t-btn--block" to={`/t/certificates?enquiryId=${enquiryId}`}>
+            New certificate →
+          </Link>
+        </div>
       </section>
     </div>
   );
