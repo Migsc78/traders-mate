@@ -81,15 +81,25 @@ export default function TradieShell() {
         </div>
       </header>
 
-      {me.data?.status === "TRIAL" && me.data.trialEndsAt && me.data.accountActive && (
-        <p className="muted-text t-trial-note">
-          Trial ends {new Date(me.data.trialEndsAt).toLocaleDateString("en-GB")} — subscribe anytime in Settings.
+      {me.data?.billingRequired && (
+        <p className="t-banner t-banner--danger">
+          Pay £{((me.data.trialPricePence ?? 1400) / 100).toFixed(0)} to unlock your{" "}
+          {me.data.trialDays ?? 14}-day trial — then £{((me.data.planPricePence ?? 4900) / 100).toFixed(0)} every 30
+          days.{" "}
+          <NavLink to="/t/settings">Open billing</NavLink>
         </p>
       )}
 
-      {me.data && !me.data.accountActive && (
+      {me.data?.status === "TRIAL" && me.data.trialEndsAt && me.data.accountActive && (
+        <p className="muted-text t-trial-note">
+          Trial ends {new Date(me.data.trialEndsAt).toLocaleDateString("en-GB")} — then £
+          {((me.data.planPricePence ?? 4900) / 100).toFixed(0)}/30 days unless you cancel in Settings.
+        </p>
+      )}
+
+      {me.data && !me.data.accountActive && !me.data.billingRequired && (
         <p className="t-banner t-banner--danger">
-          Account inactive — subscribe in Settings to send quotes and invoices.
+          Account inactive — manage billing in Settings to send quotes and invoices.
         </p>
       )}
 

@@ -5,11 +5,34 @@ import {
   verifyStripeSignature,
   mapEventToStatus,
   mapSubscriptionStatus,
+  retrieveSubscription,
 } from "../services/billing/stripe.js";
 import { markInvoicePaid } from "../services/invoices/invoice.js";
 import { sendMessage } from "../services/messaging/sender.js";
 
 export const stripeWebhookRouter = Router();
+
+async function applySubscriptionToClient(opts: {
+  clientId?: string | null;
+  customerId?: string | null;
+  status: "TRIAL" | "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED";
+  trialEndsAt?: Date | null;
+}) {
+  const data: {
+    status: typeof opts.status;
+    stripeCustomerId?: string;
+    trialEndsAt?: Date | null;
+  } = { status: opts.status };
+  if (opts.customerId) data.stripeCustomerId = opts.customerId;
+  if (opts.trialEndsAt !== undefined) data.trialEndsAt = opts.trialEndsAt;
+
+  if (opts.clientId) {
+    await prisma.client.update({ where: { id: opts.clientId }, data }).catch(() => undefined);
+  }
+  if (opts.customerId) {
+    await prisma.client.updateMany({ where: { stripeCustomerId: opts.customerId }, data });
+  }
+}
 
 stripeWebhookRouter.post("/", async (req, res) => {
   const sig = req.header("stripe-signature") || "";
@@ -32,6 +55,7 @@ stripeWebhookRouter.post("/", async (req, res) => {
   const customerId = (obj.customer as string) || undefined;
   const clientRef = (obj.client_reference_id as string) || undefined;
   const metadata = (obj.metadata as Record<string, string>) || {};
+  const metaClientId = metadata.clientId || undefined;
 
   // Connect / job payments (invoice Pay Now + quote deposits)
   if (event.type === "checkout.session.completed" && obj.mode === "payment") {
@@ -81,6 +105,28 @@ stripeWebhookRouter.post("/", async (req, res) => {
     return res.json({ received: true });
   }
 
+  // SaaS subscription checkout completed (£14 starter + trial on £49/mo)
+  if (event.type === "checkout.session.completed" && obj.mode === "subscription") {
+    try {
+      const subId = typeof obj.subscription === "string" ? obj.subscription : "";
+      const custId = typeof obj.customer === "string" ? obj.customer : customerId;
+      const clientId = clientRef || metaClientId;
+      const sub = subId ? await retrieveSubscription(subId) : null;
+      const mapped = sub ? mapSubscriptionStatus(sub.status) : "TRIAL";
+      if (mapped) {
+        await applySubscriptionToClient({
+          clientId,
+          customerId: custId || sub?.customer || null,
+          status: mapped,
+          trialEndsAt: sub?.trialEnd ?? new Date(Date.now() + env.TRIAL_DAYS * 24 * 60 * 60 * 1000),
+        });
+      }
+    } catch (e) {
+      console.error("[stripe] subscription checkout failed", e);
+    }
+    return res.json({ received: true });
+  }
+
   // Account updated — mark Connect onboarded when charges enabled
   if (event.type === "account.updated") {
     try {
@@ -98,19 +144,43 @@ stripeWebhookRouter.post("/", async (req, res) => {
     return res.json({ received: true });
   }
 
-  let status = mapEventToStatus(event.type || "");
-  if (event.type === "customer.subscription.updated" && typeof obj.status === "string") {
-    status = mapSubscriptionStatus(obj.status);
+  // Subscription lifecycle
+  if (
+    event.type === "customer.subscription.created" ||
+    event.type === "customer.subscription.updated"
+  ) {
+    try {
+      const statusRaw = typeof obj.status === "string" ? obj.status : "";
+      const mapped = mapSubscriptionStatus(statusRaw);
+      if (mapped) {
+        const trialEnd =
+          typeof obj.trial_end === "number" && obj.trial_end > 0
+            ? new Date(obj.trial_end * 1000)
+            : mapped === "ACTIVE"
+              ? null
+              : undefined;
+        const subMeta = (obj.metadata as Record<string, string>) || {};
+        await applySubscriptionToClient({
+          clientId: subMeta.clientId || metaClientId || null,
+          customerId: customerId || null,
+          status: mapped,
+          trialEndsAt: trialEnd,
+        });
+      }
+    } catch (e) {
+      console.error("[stripe] subscription update failed", e);
+    }
+    return res.json({ received: true });
   }
 
+  let status = mapEventToStatus(event.type || "");
   if (status) {
     try {
-      if (clientRef) {
-        await prisma.client.update({ where: { id: clientRef }, data: { status } }).catch(() => undefined);
-      }
-      if (customerId) {
-        await prisma.client.updateMany({ where: { stripeCustomerId: customerId }, data: { status } });
-      }
+      await applySubscriptionToClient({
+        clientId: clientRef || metaClientId || null,
+        customerId: customerId || null,
+        status,
+      });
     } catch (e) {
       console.error("[stripe] status update failed", e);
     }

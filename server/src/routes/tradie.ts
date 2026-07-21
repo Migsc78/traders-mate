@@ -54,9 +54,18 @@ function bearer(req: Request): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-function accountActive(status: string, trialEndsAt: Date | null | undefined): boolean {
-  if (status === "ACTIVE") return true;
+/**
+ * Paid-trial gate: TRIAL is only active after Stripe starter checkout (stripeCustomerId set)
+ * and before trialEndsAt. Unpaid signups can browse but cannot send quotes/SMS.
+ */
+function accountActive(
+  status: string,
+  trialEndsAt: Date | null | undefined,
+  stripeCustomerId?: string | null
+): boolean {
+  if (status === "ACTIVE" || status === "PAST_DUE") return true;
   if (status === "TRIAL") {
+    if (!stripeCustomerId) return false;
     if (!trialEndsAt) return true;
     return trialEndsAt.getTime() > Date.now();
   }
@@ -79,8 +88,14 @@ async function requireActiveAccount(req: Request, _res: Response, next: NextFunc
   try {
     const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
     if (!client) throw new ApiError(404, "not_found", "Client not found");
-    if (!accountActive(client.status, client.trialEndsAt)) {
-      throw new ApiError(402, "subscription_required", "Trial ended or account inactive — subscribe in Settings");
+    if (!accountActive(client.status, client.trialEndsAt, client.stripeCustomerId)) {
+      throw new ApiError(
+        402,
+        "subscription_required",
+        client.stripeCustomerId
+          ? "Trial ended or account inactive — manage billing in Settings"
+          : "Pay £14 to start your 14-day trial — open Billing in Settings"
+      );
     }
     next();
   } catch (err) {
@@ -180,7 +195,11 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       routeKey: client.routeKey,
       status: client.status,
       trialEndsAt: client.trialEndsAt,
-      accountActive: accountActive(client.status, client.trialEndsAt),
+      accountActive: accountActive(client.status, client.trialEndsAt, client.stripeCustomerId),
+      billingRequired: client.status === "TRIAL" && !client.stripeCustomerId,
+      trialDays: env.TRIAL_DAYS,
+      trialPricePence: env.SAAS_TRIAL_PRICE_PENCE,
+      planPricePence: env.SAAS_PLAN_PRICE_PENCE,
       destPhone: client.destPhone,
       twilioNumber: client.twilioNumber,
       greetingAudioUrl: client.greetingAudioUrl,
@@ -419,7 +438,27 @@ tradieRouter.delete("/me/greeting", requireClient, async (req, res, next) => {
 
 tradieRouter.post("/billing/checkout", requireClient, async (req, res, next) => {
   try {
-    const result = await createCheckoutSession({ clientId: clientId(req) });
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    const includeStarter = !client.stripeCustomerId;
+    const result = await createCheckoutSession({
+      clientId: client.id,
+      includeStarter,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/billing/portal", requireClient, async (req, res, next) => {
+  try {
+    const { createBillingPortalSession } = await import("../services/billing/stripe.js");
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client?.stripeCustomerId) {
+      throw new ApiError(400, "no_customer", "No billing customer yet — complete checkout first");
+    }
+    const result = await createBillingPortalSession({ customerId: client.stripeCustomerId });
     res.json(result);
   } catch (err) {
     next(err);

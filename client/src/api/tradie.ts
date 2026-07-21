@@ -86,6 +86,10 @@ export interface TradieMe {
   status: string;
   trialEndsAt: string | null;
   accountActive: boolean;
+  billingRequired?: boolean;
+  trialDays?: number;
+  trialPricePence?: number;
+  planPricePence?: number;
   destPhone: string;
   twilioNumber: string | null;
   greetingAudioUrl: string | null;
@@ -141,8 +145,11 @@ export const tradieApi = {
       sessionToken: string;
       clientId: string;
       routeKey: string;
-      trialEndsAt: string;
+      status?: string;
+      trialEndsAt: string | null;
       inboundEmail: string;
+      checkoutUrl?: string;
+      checkoutStub?: boolean;
     }>("/verify", body),
 
   loginStart: (phone: string) => signupRequest<{ ok: boolean }>("/login/start", { phone }),
@@ -210,6 +217,7 @@ export const tradieApi = {
     tRequest<{ ok: boolean; greetingAudioUrl: null }>("/me/greeting", { method: "DELETE" }),
 
   billingCheckout: () => tRequest<{ url: string; stub: boolean }>("/billing/checkout", { method: "POST", body: "{}" }),
+  billingPortal: () => tRequest<{ url: string }>("/billing/portal", { method: "POST", body: "{}" }),
 
   jobs: () =>
     tRequest<

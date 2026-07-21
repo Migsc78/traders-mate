@@ -244,6 +244,7 @@ async function main() {
       status: "TRIAL",
       phoneVerifiedAt: daysAgo(1),
       trialEndsAt: daysFromNow(10),
+      stripeCustomerId: "cus_seed_trial_electric",
       inboundEmailLocal: `${SEED.EMAIL_PREFIX}trial-electric`,
     },
   });

@@ -10,7 +10,10 @@ billingRouter.post("/checkout/:clientId", async (req, res, next) => {
   try {
     const client = await prisma.client.findUnique({ where: { id: req.params.clientId } });
     if (!client) throw new ApiError(404, "not_found", "Client not found");
-    const session = await createCheckoutSession({ clientId: client.id });
+    const session = await createCheckoutSession({
+      clientId: client.id,
+      includeStarter: !client.stripeCustomerId,
+    });
     res.json(session);
   } catch (err) {
     next(err);

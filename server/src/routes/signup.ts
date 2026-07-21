@@ -227,7 +227,7 @@ signupRouter.post("/verify", otpVerifyLimiter, async (req, res, next) => {
       throw new ApiError(403, "signups_closed", "Invite required — request early access from the homepage");
     }
 
-    const trialEndsAt = new Date(Date.now() + env.TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    // Trial clock + access start after £14 checkout completes (webhook sets trialEndsAt).
     let routeKey = newRouteKey();
     for (let i = 0; i < 5; i++) {
       const clash = await prisma.client.findUnique({ where: { routeKey } });
@@ -257,7 +257,7 @@ signupRouter.post("/verify", otpVerifyLimiter, async (req, res, next) => {
         routeKey,
         status: "TRIAL",
         phoneVerifiedAt: new Date(),
-        trialEndsAt,
+        trialEndsAt: null,
         inboundEmailLocal,
       },
     });
@@ -272,12 +272,21 @@ signupRouter.post("/verify", otpVerifyLimiter, async (req, res, next) => {
     await ensurePriceBook(client.id, client.tradeTitle);
     const session = await createSession(client.id);
 
+    const { createCheckoutSession } = await import("../services/billing/stripe.js");
+    const checkout = await createCheckoutSession({
+      clientId: client.id,
+      includeStarter: true,
+    });
+
     res.json({
       sessionToken: session.sessionToken,
       clientId: client.id,
       routeKey: client.routeKey,
+      status: client.status,
       trialEndsAt: client.trialEndsAt,
       inboundEmail: `${client.inboundEmailLocal}@${env.INBOUND_EMAIL_DOMAIN}`,
+      checkoutUrl: checkout.url,
+      checkoutStub: checkout.stub,
     });
   } catch (err) {
     next(err);

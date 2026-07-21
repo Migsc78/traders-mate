@@ -99,7 +99,11 @@ export default function TradieSignupPage() {
         inviteToken: inviteToken || undefined,
       });
       setTradieSession(result.sessionToken);
-      navigate("/t");
+      if (result.checkoutUrl && !result.checkoutStub) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      navigate("/t/settings?billing=start");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
@@ -121,7 +125,7 @@ export default function TradieSignupPage() {
         <div className="t-gate-brand">
           <div className="t-brand-mark">TM</div>
           <h1>Private beta</h1>
-          <p>We&apos;re testing with a small group of UK tradies before opening free trials.</p>
+          <p>We&apos;re testing with a small group of UK tradies before opening paid trials.</p>
         </div>
         <div className="t-gate-card">
           {inviteError ? (
@@ -152,11 +156,11 @@ export default function TradieSignupPage() {
     <div className="tradie-shell t-gate">
       <div className="t-gate-brand">
         <div className="t-brand-mark">TM</div>
-        <h1>{inviteOk ? "Create your account" : "Start your free trial"}</h1>
+        <h1>{inviteOk ? "Create your account" : "Start your 14-day trial"}</h1>
         <p>
           {inviteOk
             ? "Your early access invite is ready. Use the same mobile you applied with."
-            : "Quote from the van. Chase by SMS. Get paid."}
+            : "£14 for 14 days, then £49 every 30 days. Cancel anytime before day 14."}
         </p>
       </div>
 
@@ -211,7 +215,7 @@ export default function TradieSignupPage() {
             </label>
             {error && <p className="error">{error}</p>}
             <button className="primary t-btn--block" type="submit" disabled={busy}>
-              {busy ? "Creating account…" : "Verify & start"}
+              {busy ? "Creating account…" : "Verify & pay £14"}
             </button>
             <button type="button" className="linkish" onClick={() => setStep("form")}>
               Change details

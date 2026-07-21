@@ -54,8 +54,8 @@ export default function LandingPage() {
 
   const primaryCta = signupsOpen ? (
     <Link className="lp-btn lp-btn--primary lp-btn--nav" to="/signup">
-      <span className="lp-btn-full">Start free trial</span>
-      <span className="lp-btn-short">Free trial</span>
+      <span className="lp-btn-full">Start £14 trial</span>
+      <span className="lp-btn-short">£14 trial</span>
     </Link>
   ) : (
     <button type="button" className="lp-btn lp-btn--primary lp-btn--nav" onClick={openEarlyAccess}>
@@ -66,7 +66,7 @@ export default function LandingPage() {
 
   const heroPrimary = signupsOpen ? (
     <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/signup">
-      Start your free 14-day trial
+      Start your £14 / 14-day trial
     </Link>
   ) : (
     <button type="button" className="lp-btn lp-btn--primary lp-btn--lg" onClick={openEarlyAccess}>
@@ -143,7 +143,7 @@ export default function LandingPage() {
               </Link>
               {signupsOpen ? (
                 <Link className="lp-btn lp-btn--primary" to="/signup" onClick={closeMenu}>
-                  Start free trial
+                  Start £14 trial
                 </Link>
               ) : (
                 <button type="button" className="lp-btn lp-btn--primary" onClick={openEarlyAccess}>
@@ -183,7 +183,7 @@ export default function LandingPage() {
               </div>
               <p className="lp-fine">
                 {signupsOpen
-                  ? "No password. Sign up with a text code. Cancel anytime."
+                  ? "£14 for 14 days, then £49 every 30 days. Cancel anytime before day 14 — no £49 charge."
                   : "We’re testing with a small group of UK tradies. Public trials open soon."}
               </p>
             </div>
@@ -386,13 +386,13 @@ export default function LandingPage() {
             <h2>Stop losing work while you&apos;re doing the work</h2>
             <p>
               {signupsOpen
-                ? "Start a free 14-day trial. Quote from the van. Chase by SMS. Get paid via bank transfer — you confirm when the money lands."
+                ? "Start a £14 trial for 14 days. Quote from the van. Chase by SMS. Then £49 every 30 days unless you cancel."
                 : "We’re in private beta while we harden the product. Request early access, or sign in if you’re already on the list."}
             </p>
             <div className="lp-hero-cta">
               {signupsOpen ? (
                 <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/signup">
-                  Start free trial
+                  Start £14 trial
                 </Link>
               ) : (
                 <button type="button" className="lp-btn lp-btn--primary lp-btn--lg" onClick={openEarlyAccess}>
@@ -420,7 +420,7 @@ export default function LandingPage() {
           </div>
           <div className="lp-footer-links">
             {signupsOpen ? (
-              <Link to="/signup">Start free trial</Link>
+              <Link to="/signup">Start £14 trial</Link>
             ) : (
               <button type="button" className="lp-footer-btn" onClick={openEarlyAccess}>
                 Request early access

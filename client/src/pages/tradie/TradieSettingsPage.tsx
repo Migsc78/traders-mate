@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { setTradieSession, tradieApi } from "../../api/tradie";
 import { blobToDataUrl, blobToWav } from "../../lib/wav";
 import { StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
   const fileRef = useRef<HTMLInputElement>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const autoCheckoutRef = useRef(false);
 
   const [businessName, setBusinessName] = useState("");
   const [tradeTitle, setTradeTitle] = useState("");
@@ -176,8 +179,36 @@ export default function TradieSettingsPage() {
 
   const checkout = useMutation({
     mutationFn: () => tradieApi.billingCheckout(),
-    onSuccess: (r: { url: string }) => window.open(r.url, "_blank"),
+    onSuccess: (r: { url: string }) => {
+      window.location.href = r.url;
+    },
   });
+
+  const portal = useMutation({
+    mutationFn: () => tradieApi.billingPortal(),
+    onSuccess: (r: { url: string }) => {
+      window.location.href = r.url;
+    },
+  });
+
+  // After signup cancel / incomplete pay — reopen Stripe checkout once.
+  useEffect(() => {
+    const billing = searchParams.get("billing");
+    if (!me.data?.billingRequired) return;
+    if (billing !== "start" && billing !== "cancel") return;
+    if (autoCheckoutRef.current || checkout.isPending) return;
+    autoCheckoutRef.current = true;
+    setSearchParams({}, { replace: true });
+    checkout.mutate();
+  }, [me.data?.billingRequired, searchParams, checkout, setSearchParams]);
+
+  // Refresh account after successful Stripe return.
+  useEffect(() => {
+    if (searchParams.get("billing") === "success") {
+      void qc.invalidateQueries({ queryKey: ["tradie-me"] });
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, qc, setSearchParams]);
 
   const connect = useMutation({
     mutationFn: () => tradieApi.connectOnboard(),
@@ -223,9 +254,27 @@ export default function TradieSettingsPage() {
             </div>
           </dl>
           <div className="tradie-actions">
-            <button className="primary t-btn--block" onClick={() => checkout.mutate()} disabled={checkout.isPending}>
-              {checkout.isPending ? "Opening…" : "Subscribe / manage billing"}
-            </button>
+            {me.data?.billingRequired ? (
+              <button className="primary t-btn--block" onClick={() => checkout.mutate()} disabled={checkout.isPending}>
+                {checkout.isPending
+                  ? "Opening…"
+                  : `Pay £${((me.data.trialPricePence ?? 1400) / 100).toFixed(0)} — start ${me.data.trialDays ?? 14}-day trial`}
+              </button>
+            ) : (
+              <>
+                <button className="primary t-btn--block" onClick={() => portal.mutate()} disabled={portal.isPending}>
+                  {portal.isPending ? "Opening…" : "Manage billing / cancel"}
+                </button>
+                <button type="button" className="t-btn--block" onClick={() => checkout.mutate()} disabled={checkout.isPending}>
+                  {checkout.isPending ? "Opening…" : "Update subscription"}
+                </button>
+              </>
+            )}
+            <p className="muted-text" style={{ margin: "8px 0 0", fontSize: 13 }}>
+              £{((me.data?.trialPricePence ?? 1400) / 100).toFixed(0)} for {me.data?.trialDays ?? 14} days, then £
+              {((me.data?.planPricePence ?? 4900) / 100).toFixed(0)} every 30 days. Cancel before day 14 to avoid the
+              monthly charge.
+            </p>
             <button
               type="button"
               className="t-btn--block"
