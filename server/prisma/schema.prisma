@@ -679,3 +679,10 @@ model Certificate {
   @@index([enquiryId])
   @@index([serviceDueAt])
 }
+
+/// Platform key/value config (survives Railway redeploys; env still wins when set).
+model AppConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

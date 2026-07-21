@@ -90,12 +90,14 @@ app.use("/uploads", express.static(UPLOADS_DIR));
 app.use("/api", crmCors);
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/api/health", (_req, res) => {
+app.get("/api/health", async (_req, res) => {
+  const { getTwilioUkBundleSid } = await import("./services/appConfig.js");
+  const ukBundle = await getTwilioUkBundleSid().catch(() => "");
   res.json({
     ok: true,
     placesConfigured: !!getGooglePlacesApiKey(),
     twilioConfigured: twilioConfigured(),
-    twilioUkBundleConfigured: !!env.TWILIO_UK_BUNDLE_SID.trim(),
+    twilioUkBundleConfigured: !!ukBundle,
     claudeConfigured: claudeConfigured(),
     openaiConfigured: openaiConfigured(),
     publicBaseUrl: env.PUBLIC_BASE_URL,

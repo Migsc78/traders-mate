@@ -59,6 +59,8 @@ export interface SettingsView {
   twilioAuthToken: SettingsField;
   twilioSmsFrom: SettingsField;
   twilioWhatsappFrom: SettingsField;
+  twilioUkBundleSid?: SettingsField;
+  twilioUkAddressSid?: SettingsField;
   claudeApiKey: SettingsField;
   openaiApiKey: SettingsField;
   missedCallSayVoice: string;
@@ -72,6 +74,8 @@ export interface SettingsUpdate {
   twilioAuthToken?: string;
   twilioSmsFrom?: string;
   twilioWhatsappFrom?: string;
+  twilioUkBundleSid?: string;
+  twilioUkAddressSid?: string;
   claudeApiKey?: string;
   openaiApiKey?: string;
   missedCallSayVoice?: string;

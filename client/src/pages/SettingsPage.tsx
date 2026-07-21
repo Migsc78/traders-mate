@@ -25,6 +25,8 @@ export default function SettingsPage() {
   const [twilioAuthToken, setTwilioAuthToken] = useState("");
   const [twilioSmsFrom, setTwilioSmsFrom] = useState("");
   const [twilioWhatsappFrom, setTwilioWhatsappFrom] = useState("");
+  const [twilioUkBundleSid, setTwilioUkBundleSid] = useState("");
+  const [twilioUkAddressSid, setTwilioUkAddressSid] = useState("");
   const [claudeApiKey, setClaudeApiKey] = useState("");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [missedCallSayVoice, setMissedCallSayVoice] = useState("Polly.Amy");
@@ -47,6 +49,8 @@ export default function SettingsPage() {
         ...(twilioAuthToken.trim() ? { twilioAuthToken: twilioAuthToken.trim() } : {}),
         ...(twilioSmsFrom.trim() ? { twilioSmsFrom: twilioSmsFrom.trim() } : {}),
         ...(twilioWhatsappFrom.trim() ? { twilioWhatsappFrom: twilioWhatsappFrom.trim() } : {}),
+        ...(twilioUkBundleSid.trim() ? { twilioUkBundleSid: twilioUkBundleSid.trim() } : {}),
+        ...(twilioUkAddressSid.trim() ? { twilioUkAddressSid: twilioUkAddressSid.trim() } : {}),
         ...(claudeApiKey.trim() ? { claudeApiKey: claudeApiKey.trim() } : {}),
         ...(openaiApiKey.trim() ? { openaiApiKey: openaiApiKey.trim() } : {}),
         missedCallSayVoice: missedCallSayVoice.trim(),
@@ -61,6 +65,8 @@ export default function SettingsPage() {
       setTwilioAuthToken("");
       setTwilioSmsFrom("");
       setTwilioWhatsappFrom("");
+      setTwilioUkBundleSid("");
+      setTwilioUkAddressSid("");
       setClaudeApiKey("");
       setOpenaiApiKey("");
       setMissedCallSayVoice(next.missedCallSayVoice || "Polly.Amy");
@@ -178,7 +184,31 @@ export default function SettingsPage() {
                   onChange={(e) => setTwilioWhatsappFrom(e.target.value)}
                 />
               </label>
+              <label>
+                UK Mobile Bundle SID
+                <input
+                  type="text"
+                  autoComplete="off"
+                  placeholder={fieldHint(data?.twilioUkBundleSid) || "BU… (approved GB Mobile)"}
+                  value={twilioUkBundleSid}
+                  onChange={(e) => setTwilioUkBundleSid(e.target.value)}
+                />
+              </label>
+              <label>
+                UK Address SID
+                <input
+                  type="text"
+                  autoComplete="off"
+                  placeholder={fieldHint(data?.twilioUkAddressSid) || "AD… (GB address)"}
+                  value={twilioUkAddressSid}
+                  onChange={(e) => setTwilioUkAddressSid(e.target.value)}
+                />
+              </label>
             </div>
+            <p className="muted-text" style={{ marginTop: 8 }}>
+              Bundle + Address are required to auto-buy a dedicated inbound number for each paying tradie.
+              Saved in the database so Railway redeploys keep them.
+            </p>
           </section>
 
           <section className="card settings-section">
