@@ -60,7 +60,10 @@ export interface SearchSummary {
   qualified: number;
   created: number;
   updated: number;
+  mode?: "SITE_BUILD" | "SAAS_BETA";
 }
+
+export type SearchMode = "SITE_BUILD" | "SAAS_BETA";
 
 export interface JobProgress {
   phase: "fetch" | "process";

@@ -46,6 +46,8 @@ export interface SearchInput {
   center?: { lat: number; lng: number };
   radiusM?: number;
   maxResults?: number;
+  /** SITE_BUILD = no real website. SAAS_BETA = established tradies for product trials. */
+  mode?: "SITE_BUILD" | "SAAS_BETA";
 }
 
 export interface SettingsField {

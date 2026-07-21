@@ -294,8 +294,12 @@ export default function LeadDetailPage() {
 
         {tab === "website" && (
           <section className="client-section">
-            <h2>Website & domain</h2>
-            <p className="muted-text">Demo site and suggested .co.uk for this lead.</p>
+            <h2>{lead.websiteClass === "PROPER" ? "Web presence & convert" : "Website & domain"}</h2>
+            <p className="muted-text">
+              {lead.websiteClass === "PROPER"
+                ? "Strong beta candidate — they already have a site. Convert or invite them to trial TradiesMate."
+                : "Demo site and suggested .co.uk for this lead (site-build pitch)."}
+            </p>
             <dl className="kv">
               <dt>Existing website</dt>
               <dd>
@@ -308,36 +312,44 @@ export default function LeadDetailPage() {
                 )}{" "}
                 <span className="muted-text">({lead.websiteCheck})</span>
               </dd>
-              <dt>Suggested domain</dt>
-              <dd>{lead.domainSuggested ?? "—"}</dd>
-              <dt>Demo site</dt>
-              <dd>
-                {lead.siteSlug ? (
-                  <div className="site-links">
-                    <a href={`/sites/${lead.siteSlug}/`} target="_blank" rel="noreferrer">
-                      View site ↗
-                    </a>
-                    <a href={api.downloadSiteUrl(lead.id)}>Download HTML</a>
-                    {lead.siteGeneratedAt && (
-                      <span className="muted-text">
-                        Built {new Date(lead.siteGeneratedAt).toLocaleString()}
-                      </span>
+              {lead.websiteClass !== "PROPER" && (
+                <>
+                  <dt>Suggested domain</dt>
+                  <dd>{lead.domainSuggested ?? "—"}</dd>
+                  <dt>Demo site</dt>
+                  <dd>
+                    {lead.siteSlug ? (
+                      <div className="site-links">
+                        <a href={`/sites/${lead.siteSlug}/`} target="_blank" rel="noreferrer">
+                          View site ↗
+                        </a>
+                        <a href={api.downloadSiteUrl(lead.id)}>Download HTML</a>
+                        {lead.siteGeneratedAt && (
+                          <span className="muted-text">
+                            Built {new Date(lead.siteGeneratedAt).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      "Not built yet"
                     )}
-                  </div>
-                ) : (
-                  "Not built yet"
-                )}
-              </dd>
+                  </dd>
+                </>
+              )}
             </dl>
             <div className="drawer-actions" style={{ marginTop: 16 }}>
-              <button className="build" onClick={() => generate.mutate()} disabled={generate.isPending || !lead.phone}>
-                {generate.isPending ? "Building…" : lead.siteGeneratedAt ? "Rebuild demo site" : "Build demo site"}
-              </button>
+              {lead.websiteClass !== "PROPER" && (
+                <button className="build" onClick={() => generate.mutate()} disabled={generate.isPending || !lead.phone}>
+                  {generate.isPending ? "Building…" : lead.siteGeneratedAt ? "Rebuild demo site" : "Build demo site"}
+                </button>
+              )}
               <button className="convert" onClick={() => convert.mutate()} disabled={convert.isPending || !lead.phone}>
                 {convert.isPending ? "Converting…" : "Convert to client"}
               </button>
             </div>
-            {!lead.phone && <p className="muted-text">Add a phone number (via Google refresh) before building or converting.</p>}
+            {!lead.phone && (
+              <p className="muted-text">Add a phone number (via Google refresh) before building or converting.</p>
+            )}
             {generate.isError && <p className="error">{(generate.error as Error).message}</p>}
           </section>
         )}

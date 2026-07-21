@@ -1,6 +1,6 @@
 // Lightweight assertions for the pure logic. Run: npm test (uses tsx, no framework).
 import assert from "node:assert";
-import { classifyWebsite, needsWebsite } from "../services/classify.js";
+import { classifyWebsite, needsWebsite, isSaasBetaWebFit } from "../services/classify.js";
 import { scoreLead } from "../services/score.js";
 import { domainCandidates } from "../utils/slug.js";
 import { registrableDomain } from "../utils/domain.js";
@@ -29,21 +29,87 @@ test("SOCIAL_ONLY needs", () => assert.equal(needsWebsite("SOCIAL_ONLY"), true))
 test("PROPER_DEAD needs", () => assert.equal(needsWebsite("PROPER_DEAD"), true));
 test("PROPER does not", () => assert.equal(needsWebsite("PROPER"), false));
 
+console.log("isSaasBetaWebFit");
+test("PROPER with reviews ok", () => assert.equal(isSaasBetaWebFit("PROPER", 12, 8, 15).ok, true));
+test("PROPER thin reviews", () => assert.equal(isSaasBetaWebFit("PROPER", 3, 8, 15).reason, "thin_reviews"));
+test("SOCIAL busy ok", () => assert.equal(isSaasBetaWebFit("SOCIAL_ONLY", 20, 8, 15).ok, true));
+test("NONE rejected", () => assert.equal(isSaasBetaWebFit("NONE", 50, 8, 15).reason, "no_proper_site"));
+
 console.log("registrableDomain");
 test("co.uk keeps 3 labels", () => assert.equal(registrableDomain("https://www.joes-plumbing.co.uk/contact"), "joes-plumbing.co.uk"));
 test(".com keeps 2 labels", () => assert.equal(registrableDomain("https://foo.bar.example.com"), "example.com"));
 
 console.log("scoreLead");
-test("social-only active mobile beats bare none", () => {
-  const hot = scoreLead({ websiteClass: "SOCIAL_ONLY", occupation: "electrician", rating: 4.8, userRatingCount: 40, lastReviewAt: new Date(), phoneIsMobile: true, domainAvailable: true });
-  const cold = scoreLead({ websiteClass: "NONE", occupation: "handyman", rating: 3.2, userRatingCount: 1, lastReviewAt: null, phoneIsMobile: false, domainAvailable: false });
+test("social-only active mobile beats bare none (site-build)", () => {
+  const hot = scoreLead({
+    websiteClass: "SOCIAL_ONLY",
+    occupation: "electrician",
+    rating: 4.8,
+    userRatingCount: 40,
+    lastReviewAt: new Date(),
+    phoneIsMobile: true,
+    domainAvailable: true,
+    mode: "SITE_BUILD",
+  });
+  const cold = scoreLead({
+    websiteClass: "NONE",
+    occupation: "handyman",
+    rating: 3.2,
+    userRatingCount: 1,
+    lastReviewAt: null,
+    phoneIsMobile: false,
+    domainAvailable: false,
+    mode: "SITE_BUILD",
+  });
   assert.ok(hot > cold, `expected ${hot} > ${cold}`);
   assert.ok(hot <= 100 && cold >= 0);
 });
 test("5.0 with 1 review not treated as sweet", () => {
-  const thin = scoreLead({ websiteClass: "NONE", occupation: "plumber", rating: 5.0, userRatingCount: 1, lastReviewAt: null, phoneIsMobile: false, domainAvailable: false });
-  const solid = scoreLead({ websiteClass: "NONE", occupation: "plumber", rating: 4.6, userRatingCount: 20, lastReviewAt: null, phoneIsMobile: false, domainAvailable: false });
+  const thin = scoreLead({
+    websiteClass: "NONE",
+    occupation: "plumber",
+    rating: 5.0,
+    userRatingCount: 1,
+    lastReviewAt: null,
+    phoneIsMobile: false,
+    domainAvailable: false,
+    mode: "SITE_BUILD",
+  });
+  const solid = scoreLead({
+    websiteClass: "NONE",
+    occupation: "plumber",
+    rating: 4.6,
+    userRatingCount: 20,
+    lastReviewAt: null,
+    phoneIsMobile: false,
+    domainAvailable: false,
+    mode: "SITE_BUILD",
+  });
   assert.ok(solid > thin, `expected solid ${solid} > thin ${thin}`);
+});
+test("saas beta prefers PROPER over NONE", () => {
+  const proper = scoreLead({
+    websiteClass: "PROPER",
+    occupation: "plumber",
+    rating: 4.6,
+    userRatingCount: 25,
+    lastReviewAt: new Date(),
+    phoneIsMobile: true,
+    domainAvailable: false,
+    hasEmail: true,
+    mode: "SAAS_BETA",
+  });
+  const none = scoreLead({
+    websiteClass: "NONE",
+    occupation: "plumber",
+    rating: 4.6,
+    userRatingCount: 25,
+    lastReviewAt: new Date(),
+    phoneIsMobile: true,
+    domainAvailable: true,
+    mode: "SAAS_BETA",
+  });
+  assert.ok(proper > none, `expected proper ${proper} > none ${none}`);
 });
 
 console.log("domainCandidates");

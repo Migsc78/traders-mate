@@ -28,3 +28,29 @@ export function classifyWebsite(websiteUri?: string | null): WebsiteClass {
 export function needsWebsite(cls: WebsiteClass): boolean {
   return cls === "NONE" || cls === "SOCIAL_ONLY" || cls === "DIRECTORY_ONLY" || cls === "PROPER_DEAD";
 }
+
+/**
+ * SaaS beta: prefer live proper sites; allow busy social-only profiles.
+ * DIRECTORY / NONE / dead sites are site-build territory, not beta.
+ */
+export function isSaasBetaWebFit(
+  cls: WebsiteClass,
+  userRatingCount: number,
+  minProperReviews: number,
+  minSocialReviews: number
+): { ok: boolean; reason: string | null } {
+  if (cls === "PROPER") {
+    if (userRatingCount < minProperReviews) {
+      return { ok: false, reason: "thin_reviews" };
+    }
+    return { ok: true, reason: null };
+  }
+  if (cls === "SOCIAL_ONLY") {
+    if (userRatingCount < minSocialReviews) {
+      return { ok: false, reason: "thin_social" };
+    }
+    return { ok: true, reason: null };
+  }
+  return { ok: false, reason: "no_proper_site" };
+}
+

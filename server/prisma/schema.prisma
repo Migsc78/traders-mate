@@ -158,16 +158,23 @@ model Lead {
 }
 
 model SearchRun {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   occupation  String
   town        String?
   centerLat   Float?
   centerLng   Float?
   radiusM     Int?
-  resultCount Int      @default(0)
-  newCount    Int      @default(0)
-  createdAt   DateTime @default(now())
+  /// SITE_BUILD = no real website (demo site pitch). SAAS_BETA = established tradies for product beta.
+  mode        SearchMode @default(SITE_BUILD)
+  resultCount Int        @default(0)
+  newCount    Int        @default(0)
+  createdAt   DateTime   @default(now())
   leads       Lead[]
+}
+
+enum SearchMode {
+  SITE_BUILD
+  SAAS_BETA
 }
 
 // A converted client (the paying tradie) — the CRM tenant we route leads to.

@@ -24,6 +24,7 @@ const bodySchema = z
     center: z.object({ lat: z.number(), lng: z.number() }).optional(),
     radiusM: z.number().int().min(500).max(50000).optional(),
     maxResults: z.number().int().min(1).max(120).default(60),
+    mode: z.enum(["SITE_BUILD", "SAAS_BETA"]).default("SAAS_BETA"),
   })
   .refine((d) => d.town || (d.center && d.radiusM), {
     message: "Provide either a town, or a center + radiusM",

@@ -1,5 +1,10 @@
 import { prisma } from "../db.js";
-import { classifyWebsite, needsWebsite, type WebsiteClass } from "./classify.js";
+import {
+  SAAS_BETA_MIN_REVIEWS_PROPER,
+  SAAS_BETA_MIN_REVIEWS_SOCIAL,
+  type SearchMode,
+} from "../config/scoring.js";
+import { classifyWebsite, isSaasBetaWebFit, needsWebsite, type WebsiteClass } from "./classify.js";
 import { checkReachable } from "./reachability.js";
 import { scrapeEmailFromWebsite } from "./emailScrape.js";
 import {
@@ -76,11 +81,21 @@ export interface ProcessedLead {
   priorityScore: number;
 }
 
+export type ProcessPlaceOptions = {
+  mode?: SearchMode;
+};
+
 /**
  * Full enrichment for one raw Place: classify -> reachability -> gate ->
- * domain check -> score. Pure-ish (only outbound HTTP for checks).
+ * domain check (site-build) -> score.
  */
-export async function processPlace(place: PlaceResult, occupation: string, town: string): Promise<ProcessedLead> {
+export async function processPlace(
+  place: PlaceResult,
+  occupation: string,
+  town: string,
+  opts: ProcessPlaceOptions = {}
+): Promise<ProcessedLead> {
+  const mode: SearchMode = opts.mode ?? "SITE_BUILD";
   const displayName = place.displayName?.text?.trim() || "(unnamed)";
   const phone = place.nationalPhoneNumber || place.internationalPhoneNumber || null;
   const businessStatus = mapBizStatus(place.businessStatus);
@@ -100,7 +115,12 @@ export async function processPlace(place: PlaceResult, occupation: string, town:
     scrapedEmail = await reachLimiter.schedule(() => scrapeEmailFromWebsite(websiteUri));
   }
 
-  // --- Qualification gate ---
+  const lastReviewAt = latestReview(place);
+  const rating = place.rating ?? null;
+  const userRatingCount = place.userRatingCount ?? 0;
+  const phoneIsMobile = isMobile(phone ?? undefined);
+
+  // --- Qualification gate (mode-aware) ---
   let qualified = true;
   let disqualifiedReason: string | null = null;
 
@@ -110,26 +130,34 @@ export async function processPlace(place: PlaceResult, occupation: string, town:
   } else if (!phone) {
     qualified = false;
     disqualifiedReason = "no_phone";
-  } else if (!needsWebsite(websiteClass)) {
-    qualified = false;
-    disqualifiedReason = "has_website";
+  } else if (mode === "SITE_BUILD") {
+    if (!needsWebsite(websiteClass)) {
+      qualified = false;
+      disqualifiedReason = "has_website";
+    }
+  } else {
+    const fit = isSaasBetaWebFit(
+      websiteClass,
+      userRatingCount,
+      SAAS_BETA_MIN_REVIEWS_PROPER,
+      SAAS_BETA_MIN_REVIEWS_SOCIAL
+    );
+    if (!fit.ok) {
+      qualified = false;
+      disqualifiedReason = fit.reason;
+    }
   }
 
-  // --- Domain check (only worth doing for qualified leads) ---
+  // --- Domain check (site-build only — pitch for registering a site) ---
   let domainSuggested: string | null = null;
   let domainAvailable: ProcessedLead["domainAvailable"] = "UNKNOWN";
   let affiliateUrl: string | null = null;
-  if (qualified) {
+  if (qualified && mode === "SITE_BUILD") {
     const d = await checkDomain(displayName, town);
     domainSuggested = d.suggested;
     domainAvailable = d.state;
     affiliateUrl = d.affiliateLink;
   }
-
-  const lastReviewAt = latestReview(place);
-  const rating = place.rating ?? null;
-  const userRatingCount = place.userRatingCount ?? 0;
-  const phoneIsMobile = isMobile(phone ?? undefined);
 
   const priorityScore = qualified
     ? scoreLead({
@@ -140,6 +168,8 @@ export async function processPlace(place: PlaceResult, occupation: string, town:
         lastReviewAt,
         phoneIsMobile,
         domainAvailable: domainAvailable === "AVAILABLE",
+        hasEmail: !!scrapedEmail,
+        mode,
       })
     : 0;
 
@@ -185,6 +215,7 @@ export interface SearchSummary {
   qualified: number;
   created: number;
   updated: number;
+  mode: SearchMode;
 }
 
 function searchProgress(partial: Omit<JobProgress, "percent"> & { percent?: number }): JobProgress {
@@ -197,11 +228,21 @@ function searchProgress(partial: Omit<JobProgress, "percent"> & { percent?: numb
 
 /** Orchestrates a full search: Places -> process each -> upsert (dedupe by placeId). */
 export async function runSearch(
-  params: SearchParams,
+  params: SearchParams & { mode?: SearchMode },
   onProgress?: (progress: JobProgress) => void
 ): Promise<SearchSummary> {
+  const mode: SearchMode = params.mode ?? "SITE_BUILD";
+
   onProgress?.(
-    searchProgress({ phase: "fetch", current: 0, total: 1, message: "Searching Google Places…" })
+    searchProgress({
+      phase: "fetch",
+      current: 0,
+      total: 1,
+      message:
+        mode === "SAAS_BETA"
+          ? "Searching Google Places for beta candidates…"
+          : "Searching Google Places…",
+    })
   );
 
   const places = await searchPlaces(params);
@@ -222,6 +263,7 @@ export async function runSearch(
       centerLat: params.center?.lat ?? null,
       centerLng: params.center?.lng ?? null,
       radiusM: params.radiusM ?? null,
+      mode,
     },
   });
 
@@ -234,7 +276,7 @@ export async function runSearch(
 
   await Promise.all(
     places.map(async (place) => {
-      const lead = await processPlace(place, params.occupation, townLabel);
+      const lead = await processPlace(place, params.occupation, townLabel, { mode });
       if (lead.qualified) qualifiedCount += 1;
 
       const existing = await prisma.lead.findUnique({ where: { placeId: lead.placeId }, select: { id: true } });
@@ -249,6 +291,7 @@ export async function runSearch(
         update: {
           ...(({ email: _e, ...rest }) => rest)(data),
           ...(data.email ? { email: data.email } : {}),
+          searchRunId: run.id,
           lastFetchedAt: new Date(),
         },
       });
@@ -279,7 +322,7 @@ export async function runSearch(
     searchProgress({ phase: "process", current: total, total: Math.max(total, 1), message: "Done", percent: 100 })
   );
 
-  return { searchRunId: run.id, found: total, qualified: qualifiedCount, created, updated };
+  return { searchRunId: run.id, found: total, qualified: qualifiedCount, created, updated, mode };
 }
 
 export function toDbData(lead: ProcessedLead) {
@@ -303,7 +346,8 @@ export function toDbData(lead: ProcessedLead) {
     lastReviewAt: lead.lastReviewAt,
     photoCount: lead.photoCount,
     domainSuggested: lead.domainSuggested,
-    domainAvailable: lead.domainAvailable,    affiliateUrl: lead.affiliateUrl,
+    domainAvailable: lead.domainAvailable,
+    affiliateUrl: lead.affiliateUrl,
     email: lead.email,
     primaryType: lead.primaryType,
     editorialSummary: lead.editorialSummary,
@@ -314,4 +358,3 @@ export function toDbData(lead: ProcessedLead) {
     priorityScore: lead.priorityScore,
   };
 }
-

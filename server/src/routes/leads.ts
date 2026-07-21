@@ -11,13 +11,22 @@ export const leadsRouter = Router();
 const csvList = (v?: string) => (v ? v.split(",").map((s) => s.trim()).filter(Boolean) : undefined);
 
 async function refreshLeadById(id: string) {
-  const existing = await prisma.lead.findUnique({ where: { id } });
+  const existing = await prisma.lead.findUnique({
+    where: { id },
+    include: { searchRun: { select: { mode: true } } },
+  });
   if (!existing) throw new ApiError(404, "not_found", "Lead not found");
 
   const place = await getPlace(existing.placeId);
   if (!place) throw new ApiError(404, "place_gone", "Place no longer available on Google");
 
-  const reprocessed = await processPlace({ ...place, id: existing.placeId }, existing.occupation, existing.town);
+  const mode = existing.searchRun?.mode ?? "SITE_BUILD";
+  const reprocessed = await processPlace(
+    { ...place, id: existing.placeId },
+    existing.occupation,
+    existing.town,
+    { mode }
+  );
   const data = toDbData(reprocessed);
   return prisma.lead.update({
     where: { id: existing.id },
