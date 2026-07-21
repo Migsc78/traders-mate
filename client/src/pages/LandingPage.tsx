@@ -468,7 +468,7 @@ export default function LandingPage() {
                 Request early access
               </button>
             )}
-            <a href="mailto:hello@tradiesmate.co.uk">Contact</a>
+            <a href="mailto:info@tradiesmate.co.uk">Contact</a>
           </div>
           <p className="lp-footer-note">© {new Date().getFullYear()} TradiesMate. Made for the tools, not the desk.</p>
         </div>

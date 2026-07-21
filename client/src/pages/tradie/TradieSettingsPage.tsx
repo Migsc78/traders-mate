@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { setTradieSession, tradieApi } from "../../api/tradie";
 import { blobToDataUrl, blobToWav } from "../../lib/wav";
+import { supportMailto, SUPPORT_EMAIL } from "../../lib/supportMail";
 import { StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
@@ -291,6 +292,28 @@ export default function TradieSettingsPage() {
           </div>
         </div>
       </div>
+
+      {me.data?.accountActive && (
+        <div className="t-settings-group">
+          <p className="t-section-label">Support</p>
+          <div className="t-card">
+            <p className="muted-text" style={{ margin: "0 0 12px" }}>
+              Need help with your account, number, quotes, or billing? Email us and we&apos;ll treat
+              it as a support ticket.
+            </p>
+            <a
+              className="primary t-btn--block"
+              style={{ display: "block", textAlign: "center", textDecoration: "none" }}
+              href={supportMailto({
+                businessName: me.data.businessName,
+                routeKey: me.data.routeKey,
+              })}
+            >
+              Email {SUPPORT_EMAIL}
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="t-settings-group">
         <p className="t-section-label">Business</p>

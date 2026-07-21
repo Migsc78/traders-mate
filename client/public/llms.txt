@@ -3,7 +3,8 @@
 > TradiesMate is UK software for tradespeople. It rescues missed calls with a dedicated number and SMS qualification, drafts van-friendly quotes from your rates, sends accept links, chases payment, takes card deposits (Pay Now), and keeps diary and certificates in one place.
 
 Website: https://tradiesmate.co.uk
-Contact: hello@tradiesmate.co.uk
+Contact: info@tradiesmate.co.uk
+Support (active customers): support@tradiesmate.co.uk
 
 ## Who it is for
 

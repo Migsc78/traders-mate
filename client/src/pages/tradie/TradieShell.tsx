@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getTradieSession, setTradieSession, tradieApi } from "../../api/tradie";
+import { supportMailto } from "../../lib/supportMail";
 import {
   IconCustomers,
   IconInvoices,
@@ -179,6 +180,18 @@ export default function TradieShell() {
                   <span>{label}</span>
                 </NavLink>
               ))}
+              {me.data?.accountActive && (
+                <a
+                  href={supportMailto({
+                    businessName: me.data.businessName,
+                    routeKey: me.data.routeKey,
+                  })}
+                  onClick={() => setMoreOpen(false)}
+                >
+                  <IconSupport />
+                  <span>Email support</span>
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -199,6 +212,25 @@ function IconMore({ size = 22 }: { size?: number }) {
       <circle cx="5" cy="12" r="1.8" />
       <circle cx="12" cy="12" r="1.8" />
       <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  );
+}
+
+function IconSupport({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 6h16v10H8l-4 3V6z" />
+      <path d="M8 11h8M8 14h5" />
     </svg>
   );
 }
