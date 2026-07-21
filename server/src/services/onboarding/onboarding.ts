@@ -80,7 +80,8 @@ export async function sendWelcomeOnboardingSms(clientId: string): Promise<boolea
 
   const results = await sendMessage({
     to: client.destPhone,
-    channel: client.destChannel === "WHATSAPP" ? "WHATSAPP" : "SMS",
+    // Onboarding must reach the tradie reliably — prefer SMS even if their job alerts are WhatsApp.
+    channel: "SMS",
     body,
   });
   const ok = results.some((r) => r.ok);

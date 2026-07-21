@@ -95,6 +95,7 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     placesConfigured: !!getGooglePlacesApiKey(),
     twilioConfigured: twilioConfigured(),
+    twilioUkBundleConfigured: !!env.TWILIO_UK_BUNDLE_SID.trim(),
     claudeConfigured: claudeConfigured(),
     openaiConfigured: openaiConfigured(),
     publicBaseUrl: env.PUBLIC_BASE_URL,

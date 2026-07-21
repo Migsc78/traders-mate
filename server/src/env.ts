@@ -44,6 +44,10 @@ const schema = z.object({
   TWILIO_AUTH_TOKEN: z.string().default(""),
   TWILIO_SMS_FROM: z.string().default(""),
   TWILIO_WHATSAPP_FROM: z.string().default(""),
+  /** Approved regulatory Bundle SID (BU…) required to buy GB Mobile/Local numbers. */
+  TWILIO_UK_BUNDLE_SID: z.string().default(""),
+  /** Optional Address SID (AD…) if the GB regulation also requires an address. */
+  TWILIO_UK_ADDRESS_SID: z.string().default(""),
 
   // Missed-call receptionist TTS + first SMS (overridable in CRM Settings)
   MISSED_CALL_SAY_VOICE: z.string().default("Polly.Amy"),

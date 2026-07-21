@@ -345,16 +345,22 @@ export async function fetchAccountInfo(): Promise<{
 export { voiceWebhookUrl, smsWebhookUrl, digitsOnly };
 
 /**
- * Search available UK numbers (Local first, then Mobile) that support voice + SMS.
+ * Search available UK numbers (Mobile first when a regulatory bundle is set — better for divert;
+ * Local otherwise). Voice + SMS required.
  */
 export async function searchAvailableUkNumbers(opts?: {
   limit?: number;
+  preferMobile?: boolean;
 }): Promise<Array<{ phoneNumber: string; friendlyName: string | null; type: "Local" | "Mobile" }>> {
   if (!twilioConfigured()) throw new Error("Twilio is not configured");
   const limit = Math.min(20, Math.max(1, opts?.limit ?? 5));
   const out: Array<{ phoneNumber: string; friendlyName: string | null; type: "Local" | "Mobile" }> = [];
+  const preferMobile = opts?.preferMobile ?? !!env.TWILIO_UK_BUNDLE_SID.trim();
+  const types = preferMobile
+    ? (["Mobile", "Local"] as const)
+    : (["Local", "Mobile"] as const);
 
-  for (const type of ["Local", "Mobile"] as const) {
+  for (const type of types) {
     if (out.length >= limit) break;
     const url =
       `${accountBase()}/AvailablePhoneNumbers/GB/${type}.json` +
@@ -386,10 +392,15 @@ export async function searchAvailableUkNumbers(opts?: {
 export async function purchasePhoneNumber(opts: {
   phoneNumber: string;
   friendlyName?: string;
+  /** Number type from availability search — used for clearer errors. */
+  numberType?: "Local" | "Mobile";
 }): Promise<{ sid: string; phoneNumber: string }> {
   if (!twilioConfigured()) throw new Error("Twilio is not configured");
   const voiceUrl = voiceWebhookUrl();
   const smsUrl = smsWebhookUrl();
+  const bundleSid = env.TWILIO_UK_BUNDLE_SID.trim();
+  const addressSid = env.TWILIO_UK_ADDRESS_SID.trim();
+
   const params = new URLSearchParams({
     PhoneNumber: opts.phoneNumber,
     VoiceUrl: voiceUrl,
@@ -398,6 +409,9 @@ export async function purchasePhoneNumber(opts: {
     SmsMethod: "POST",
     FriendlyName: opts.friendlyName || `TradiesMate ${opts.phoneNumber}`,
   });
+  if (bundleSid) params.set("BundleSid", bundleSid);
+  if (addressSid) params.set("AddressSid", addressSid);
+
   const res = await fetch(`${accountBase()}/IncomingPhoneNumbers.json`, {
     method: "POST",
     headers: {
@@ -410,23 +424,48 @@ export async function purchasePhoneNumber(opts: {
     sid?: string;
     phone_number?: string;
     message?: string;
+    code?: number;
   };
   if (!res.ok || !json.sid || !json.phone_number) {
-    throw new Error(json.message || `Twilio purchase failed (${res.status})`);
+    const msg = json.message || `Twilio purchase failed (${res.status})`;
+    const needsBundle =
+      /bundle/i.test(msg) || json.code === 21649 || /Bundle required/i.test(msg);
+    if (needsBundle && !bundleSid) {
+      throw new Error(
+        `UK ${opts.numberType || "phone"} numbers need an approved regulatory Bundle. ` +
+          `Set TWILIO_UK_BUNDLE_SID on Railway (Twilio Console → Phone Numbers → Regulatory Compliance → Bundles). ` +
+          `Twilio said: ${msg}`
+      );
+    }
+    if (needsBundle && bundleSid) {
+      throw new Error(
+        `Bundle ${bundleSid} was rejected for this GB ${opts.numberType || "number"}. ` +
+          `Check the Bundle covers that number type and is approved. Twilio said: ${msg}`
+      );
+    }
+    throw new Error(msg);
   }
   return { sid: json.sid, phoneNumber: json.phone_number };
 }
 
 /** Buy first available UK voice+SMS number and wire webhooks. */
-export async function purchaseAndConfigureUkNumber(opts: {
+export async function purchaseAndConfigureUkNumber(opts?: {
   friendlyName?: string;
 }): Promise<{ sid: string; phoneNumber: string }> {
   const available = await searchAvailableUkNumbers({ limit: 5 });
   if (!available.length) {
     throw new Error("No UK Twilio numbers available to purchase right now — try again shortly");
   }
+  // Prefer first Mobile hit when present (better for call divert), else Local
+  const pick =
+    available.find((n) => n.type === "Mobile") || available[0];
   return purchasePhoneNumber({
-    phoneNumber: available[0].phoneNumber,
-    friendlyName: opts.friendlyName,
+    phoneNumber: pick.phoneNumber,
+    friendlyName: opts?.friendlyName,
+    numberType: pick.type,
   });
+}
+
+export function ukRegulatoryBundleConfigured(): boolean {
+  return !!env.TWILIO_UK_BUNDLE_SID.trim();
 }

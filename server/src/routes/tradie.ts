@@ -680,7 +680,8 @@ tradieRouter.post("/onboarding/test-alert", requireClient, async (req, res, next
     const text = `TradiesMate test alert for ${updated.businessName}: when a missed call becomes a job, you'll get a text like this on this number.`;
     const results = await sendMessage({
       to: phone,
-      channel: updated.destChannel === "WHATSAPP" ? "WHATSAPP" : "SMS",
+      // Wizard test uses SMS so it works before WhatsApp is configured.
+      channel: "SMS",
       body: text,
     });
     const ok = results.some((r) => r.ok);
@@ -692,7 +693,7 @@ tradieRouter.post("/onboarding/test-alert", requireClient, async (req, res, next
     await logMessage({
       clientId: updated.id,
       direction: "OUTBOUND",
-      channel: updated.destChannel === "WHATSAPP" ? "WHATSAPP" : "SMS",
+      channel: "SMS",
       toAddr: phone,
       body: text,
       status: "sent",
