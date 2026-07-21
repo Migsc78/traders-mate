@@ -206,7 +206,7 @@ export default function TwilioPage() {
             <Kpi
               label="Numbers on account"
               value={n(d.numbers.totalOnTwilio)}
-              hint={`${n(d.numbers.assignedToClients)} assigned · ${n(d.numbers.unassignedCount)} free`}
+              hint={`${n(d.numbers.assignedToClients)} assigned · ${n(d.pool?.available)} spare in pool`}
             />
             <Kpi
               label="This month (Twilio)"
@@ -294,6 +294,53 @@ export default function TwilioPage() {
               </div>
             </section>
           </div>
+
+          <section className="card settings-section dash-panel">
+            <div className="settings-section-head">
+              <h2>Spare number pool</h2>
+              <p>
+                Available numbers are given to the next paying tradie before buying a new one from Twilio.
+              </p>
+            </div>
+            {(d.pool?.rows?.length ?? 0) === 0 ? (
+              <p className="muted-text">Pool empty — next signup will purchase a new UK mobile.</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Number</th>
+                      <th>Status</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.pool!.rows.map(
+                      (r: {
+                        id: string;
+                        phoneNumber: string;
+                        sid: string;
+                        status: string;
+                        notes: string | null;
+                      }) => (
+                      <tr key={r.id}>
+                        <td>
+                          <code>{r.phoneNumber}</code>
+                        </td>
+                        <td>
+                          <span className={r.status === "AVAILABLE" ? "badge green" : "badge"}>
+                            {r.status}
+                          </span>
+                        </td>
+                        <td className="muted-text">{r.notes || "—"}</td>
+                      </tr>
+                    )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
           <section className="card settings-section dash-panel">
             <div className="settings-section-head">

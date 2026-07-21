@@ -395,6 +395,17 @@ export interface TwilioAdminStats {
     expectedSmsUrl: string;
   };
   balance: { currency: string; balance: string } | null;
+  pool?: {
+    available: number;
+    rows: {
+      id: string;
+      phoneNumber: string;
+      sid: string;
+      status: string;
+      assignedClientId: string | null;
+      notes: string | null;
+    }[];
+  };
   numbers: {
     totalOnTwilio: number;
     assignedToClients: number;

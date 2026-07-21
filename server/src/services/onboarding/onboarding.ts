@@ -16,11 +16,12 @@ function divertCodes(twilioE164: string) {
   };
 }
 
-/** Buy + attach a Twilio number if the client does not have one yet. */
+/** Buy or claim a Twilio number if the client does not have one yet. Prefers spare pool. */
 export async function provisionNumberForClient(clientId: string): Promise<{
   phoneNumber: string | null;
   sid: string | null;
   provisioned: boolean;
+  fromPool?: boolean;
   error?: string;
 }> {
   const client = await prisma.client.findUnique({ where: { id: clientId } });
@@ -44,6 +45,33 @@ export async function provisionNumberForClient(clientId: string): Promise<{
   }
 
   try {
+    const { claimNumberFromPool } = await import("../twilio/numberPool.js");
+    const fromPool = await claimNumberFromPool({
+      clientId,
+      friendlyName: `TradiesMate ${client.businessName}`.slice(0, 64),
+    });
+    if (fromPool) {
+      return {
+        phoneNumber: fromPool.phoneNumber,
+        sid: fromPool.sid,
+        provisioned: true,
+        fromPool: true,
+      };
+    }
+
+    // Re-check — another request may have assigned while we looked at the pool
+    const again = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { twilioNumber: true, twilioNumberSid: true },
+    });
+    if (again?.twilioNumber) {
+      return {
+        phoneNumber: again.twilioNumber,
+        sid: again.twilioNumberSid,
+        provisioned: false,
+      };
+    }
+
     const bought = await purchaseAndConfigureUkNumber({
       friendlyName: `TradiesMate ${client.businessName}`.slice(0, 64),
     });
@@ -54,7 +82,23 @@ export async function provisionNumberForClient(clientId: string): Promise<{
         twilioNumberSid: bought.sid,
       },
     });
-    return { phoneNumber: bought.phoneNumber, sid: bought.sid, provisioned: true };
+    // Track as assigned inventory so we can release to pool later
+    await prisma.twilioNumberPool.upsert({
+      where: { sid: bought.sid },
+      create: {
+        phoneNumber: bought.phoneNumber,
+        sid: bought.sid,
+        status: "ASSIGNED",
+        assignedClientId: clientId,
+        notes: "Purchased on provision",
+      },
+      update: {
+        phoneNumber: bought.phoneNumber,
+        status: "ASSIGNED",
+        assignedClientId: clientId,
+      },
+    });
+    return { phoneNumber: bought.phoneNumber, sid: bought.sid, provisioned: true, fromPool: false };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[onboarding] provision number failed", clientId, msg);

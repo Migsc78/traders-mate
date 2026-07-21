@@ -238,6 +238,25 @@ model Client {
   @@index([twilioNumber])
 }
 
+enum TwilioPoolStatus {
+  AVAILABLE
+  ASSIGNED
+}
+
+/// Spare / inventory Twilio numbers — claim before buying a new one.
+model TwilioNumberPool {
+  id               String           @id @default(cuid())
+  phoneNumber      String           @unique
+  sid              String           @unique
+  status           TwilioPoolStatus @default(AVAILABLE)
+  assignedClientId String?          @unique
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([status])
+}
+
 // A routed customer enquiry (the actual lead delivered to a client).
 model Enquiry {
   id           String        @id @default(cuid())

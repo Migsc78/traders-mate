@@ -92,12 +92,15 @@ app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", async (_req, res) => {
   const { getTwilioUkBundleSid } = await import("./services/appConfig.js");
+  const { countAvailablePoolNumbers } = await import("./services/twilio/numberPool.js");
   const ukBundle = await getTwilioUkBundleSid().catch(() => "");
+  const poolAvailable = await countAvailablePoolNumbers().catch(() => 0);
   res.json({
     ok: true,
     placesConfigured: !!getGooglePlacesApiKey(),
     twilioConfigured: twilioConfigured(),
     twilioUkBundleConfigured: !!ukBundle,
+    twilioPoolAvailable: poolAvailable,
     claudeConfigured: claudeConfigured(),
     openaiConfigured: openaiConfigured(),
     publicBaseUrl: env.PUBLIC_BASE_URL,

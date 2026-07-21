@@ -244,6 +244,12 @@ twilioAdminRouter.get("/", async (_req, res, next) => {
     });
 
     const sid = getTwilioAccountSid();
+    const { countAvailablePoolNumbers } = await import("../services/twilio/numberPool.js");
+    const poolAvailable = await countAvailablePoolNumbers().catch(() => 0);
+    const poolRows = await prisma.twilioNumberPool.findMany({
+      orderBy: [{ status: "asc" }, { createdAt: "asc" }],
+      take: 50,
+    });
 
     res.json({
       generatedAt: new Date().toISOString(),
@@ -260,6 +266,17 @@ twilioAdminRouter.get("/", async (_req, res, next) => {
         expectedSmsUrl,
       },
       balance,
+      pool: {
+        available: poolAvailable,
+        rows: poolRows.map((r) => ({
+          id: r.id,
+          phoneNumber: r.phoneNumber,
+          sid: r.sid,
+          status: r.status,
+          assignedClientId: r.assignedClientId,
+          notes: r.notes,
+        })),
+      },
       numbers: {
         totalOnTwilio: numberRows.length,
         assignedToClients: numberRows.filter((n) => n.assignedClient).length,
