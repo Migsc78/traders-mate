@@ -1,58 +1,51 @@
+/**
+ * Generate TradiesMate favicon + PWA icons from the orange TM brand mark.
+ * Run: npm run icons
+ */
 import fs from "node:fs";
 import path from "node:path";
-import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
+import { Resvg } from "@resvg/resvg-js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
 const iconsDir = path.join(publicDir, "icons");
 fs.mkdirSync(iconsDir, { recursive: true });
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" rx="96" fill="#1f3864"/><text x="256" y="300" text-anchor="middle" font-family="Arial Black,Arial" font-size="220" fill="#fff">TM</text></svg>`;
-fs.writeFileSync(path.join(publicDir, "favicon.svg"), svg);
+const ACCENT = "#ff5a1f";
 
-function crc32(buf) {
-  let c = ~0;
-  for (let i = 0; i < buf.length; i++) {
-    c ^= buf[i];
-    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
-  }
-  return ~c >>> 0;
+function brandSvg(size) {
+  const rx = Math.round(size * 0.22);
+  const fontSize = Math.round(size * 0.41);
+  const y = Math.round(size * 0.63);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <rect width="${size}" height="${size}" rx="${rx}" fill="${ACCENT}"/>
+  <text
+    x="${size / 2}"
+    y="${y}"
+    text-anchor="middle"
+    font-family="Arial Black, Arial, Helvetica, sans-serif"
+    font-weight="800"
+    font-size="${fontSize}"
+    fill="#ffffff"
+  >TM</text>
+</svg>`;
 }
 
-function chunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length);
-  const td = Buffer.concat([Buffer.from(type), data]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(td));
-  return Buffer.concat([len, td, crc]);
+function writePng(size, outPath) {
+  const resvg = new Resvg(brandSvg(size), {
+    fitTo: { mode: "width", value: size },
+    font: { loadSystemFonts: true },
+  });
+  const png = resvg.render().asPng();
+  fs.writeFileSync(outPath, png);
 }
 
-function solidPng(size, r, g, b, out) {
-  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 2;
-  const row = Buffer.alloc(1 + size * 3);
-  const rows = [];
-  for (let y = 0; y < size; y++) {
-    row[0] = 0;
-    for (let x = 0; x < size; x++) {
-      const i = 1 + x * 3;
-      row[i] = r;
-      row[i + 1] = g;
-      row[i + 2] = b;
-    }
-    rows.push(Buffer.from(row));
-  }
-  const idat = zlib.deflateSync(Buffer.concat(rows));
-  const png = Buffer.concat([sig, chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0))]);
-  fs.writeFileSync(out, png);
-}
+fs.writeFileSync(path.join(publicDir, "favicon.svg"), brandSvg(512));
+writePng(180, path.join(iconsDir, "apple-touch-icon.png"));
+writePng(192, path.join(iconsDir, "icon-192.png"));
+writePng(512, path.join(iconsDir, "icon-512.png"));
+writePng(512, path.join(iconsDir, "icon-512-maskable.png"));
 
-solidPng(192, 31, 56, 100, path.join(iconsDir, "icon-192.png"));
-solidPng(512, 31, 56, 100, path.join(iconsDir, "icon-512.png"));
-console.log("Wrote favicon + icons");
+console.log("Wrote favicon.svg + icons (180/192/512) in orange TM brand mark");
