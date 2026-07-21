@@ -7,11 +7,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icons/*.png"],
+      includeAssets: ["favicon.svg", "icons/*.png", "og-image.png", "robots.txt", "sitemap.xml", "llms.txt"],
       manifest: {
         name: "TradiesMate",
         short_name: "TradiesMate",
-        description: "Quote faster. Chase by SMS. Get paid.",
+        description:
+          "Missed-call rescue, van quotes, Pay Now, diary and certificates for UK trades.",
         theme_color: "#ff5a1f",
         background_color: "#fff7f2",
         display: "standalone",
@@ -39,8 +40,19 @@ export default defineConfig({
       workbox: {
         navigateFallback: "/index.html",
         // Public quote/invoice pages are proxied to Railway — never serve the SPA shell for them.
-        navigateFallbackDenylist: [/^\/api\//, /^\/i\//, /^\/q\//, /^\/uploads\//, /^\/sites\//],
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/i\//,
+          /^\/q\//,
+          /^\/cert\//,
+          /^\/uploads\//,
+          /^\/sites\//,
+          /^\/robots\.txt$/,
+          /^\/sitemap\.xml$/,
+          /^\/llms\.txt$/,
+          /^\/og-image\.png$/,
+        ],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,txt,xml,woff2}"],
       },
     }),
   ],

@@ -28,6 +28,7 @@ import DashboardPage from "./pages/DashboardPage";
 import TwilioPage from "./pages/TwilioPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminAuthGate from "./components/AdminAuthGate";
+import RouteSeo from "./components/RouteSeo";
 import "./styles.css";
 import "./tradie.css";
 
@@ -49,6 +50,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <RouteSeo />
         <Routes>
           <Route path="/signup" element={<TradieSignupPage />} />
           <Route path="/t/auth" element={<TradieAuthPage />} />

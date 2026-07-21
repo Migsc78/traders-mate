@@ -566,6 +566,45 @@ body:has(.lp) {
   line-height: 1.45;
 }
 
+/* ---------- faq ---------- */
+.lp-faq-list {
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+}
+.lp-faq-item {
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  background: var(--lp-surface);
+  padding: 0 18px;
+}
+.lp-faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--lp-font-display);
+  font-weight: 800;
+  font-size: 1.02rem;
+  padding: 16px 0;
+}
+.lp-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+.lp-faq-item summary::after {
+  content: "+";
+  float: right;
+  font-weight: 700;
+  color: var(--lp-accent, #ff5a1f);
+}
+.lp-faq-item[open] summary::after {
+  content: "–";
+}
+.lp-faq-item p {
+  margin: 0 0 16px;
+  color: var(--lp-ink-soft);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
 /* ---------- audience ---------- */
 .lp-audience-inner {
   display: grid;

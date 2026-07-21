@@ -1,0 +1,38 @@
+# TradiesMate
+
+> TradiesMate is UK software for tradespeople. It rescues missed calls with a dedicated number and SMS qualification, drafts van-friendly quotes from your rates, sends accept links, chases payment, takes card deposits (Pay Now), and keeps diary and certificates in one place.
+
+Website: https://tradiesmate.co.uk
+Contact: hello@tradiesmate.co.uk
+
+## Who it is for
+
+Plumbers, electricians, heating engineers, roofers, decorators, locksmiths, and other UK trades who lose work when they cannot answer the phone on the tools.
+
+## What it does
+
+- Dedicated UK TradiesMate number with call divert for missed-call rescue
+- SMS job qualification (or voicemail → job)
+- Voice memo / notes → draft quote from your price book (GBP, VAT)
+- Customer SMS links to accept or decline quotes
+- Auto-reminders for quotes and invoices
+- Bank-transfer invoices and optional Stripe card deposits (Pay Now)
+- Job diary and trade certificates from the same job
+- Sign-in with one-time SMS code (no password)
+
+## Pricing
+
+- Trial: £14 for 14 days
+- Then: £49 every 30 days unless cancelled
+- Cancel before day 14 to avoid the £49 charge
+
+## Public pages
+
+- Home: https://tradiesmate.co.uk/
+- Start trial / signup: https://tradiesmate.co.uk/signup
+- Sign in (tradies): https://tradiesmate.co.uk/t/auth
+
+## Optional
+
+- Sitemap: https://tradiesmate.co.uk/sitemap.xml
+- Brand / product name: TradiesMate (not “Traders Mate”)

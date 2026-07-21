@@ -8,6 +8,7 @@ const LANDING_LINKS = [
   { href: "#story", label: "The problem" },
   { href: "#how", label: "How it works" },
   { href: "#features", label: "Features" },
+  { href: "#faq", label: "FAQ" },
 ] as const;
 
 export default function LandingPage() {
@@ -379,6 +380,46 @@ export default function LandingPage() {
               <li>Decorating</li>
               <li>Locksmith</li>
             </ul>
+          </div>
+        </section>
+
+        <section className="lp-section lp-faq" id="faq" aria-labelledby="faq-heading">
+          <div className="lp-wrap">
+            <div className="lp-section-head">
+              <p className="lp-eyebrow">FAQ</p>
+              <h2 id="faq-heading">Common questions</h2>
+            </div>
+            <div className="lp-faq-list">
+              <details className="lp-faq-item">
+                <summary>What is TradiesMate?</summary>
+                <p>
+                  Software for UK tradespeople. You get a dedicated UK number to divert missed calls
+                  to, SMS job qualification, van-friendly quotes from your rates, payment chase, Pay
+                  Now card deposits, a job diary, and certificates — in one place.
+                </p>
+              </details>
+              <details className="lp-faq-item">
+                <summary>How does missed-call rescue work?</summary>
+                <p>
+                  Divert missed calls to your TradiesMate number. Callers get an SMS to qualify the
+                  job (or leave a voicemail), and a clean lead lands on your Jobs list.
+                </p>
+              </details>
+              <details className="lp-faq-item">
+                <summary>How much does it cost?</summary>
+                <p>
+                  £14 for a 14-day trial, then £49 every 30 days unless you cancel. Cancel before day
+                  14 to avoid the £49 charge.
+                </p>
+              </details>
+              <details className="lp-faq-item">
+                <summary>Who is it for?</summary>
+                <p>
+                  Plumbers, electricians, heating engineers, roofers, decorators, locksmiths, and
+                  other UK trades who lose work when they can&apos;t answer on the tools.
+                </p>
+              </details>
+            </div>
           </div>
         </section>
 

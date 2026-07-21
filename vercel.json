@@ -16,6 +16,9 @@
       "source": "/cert/:path*",
       "destination": "https://traders-mate-production.up.railway.app/cert/:path*"
     },
-    { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/|assets/|robots\\.txt|sitemap\\.xml|llms\\.txt|og-image\\.png|favicon\\.svg|icons/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

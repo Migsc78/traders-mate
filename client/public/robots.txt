@@ -1,0 +1,21 @@
+# https://tradiesmate.co.uk/robots.txt
+User-agent: *
+Allow: /
+Allow: /signup
+Allow: /llms.txt
+
+# App shells — not for search indexes
+Disallow: /t
+Disallow: /t/
+Disallow: /admin
+Disallow: /admin/
+
+# Proxied / private surfaces
+Disallow: /api/
+Disallow: /q/
+Disallow: /i/
+Disallow: /cert/
+Disallow: /uploads/
+Disallow: /sites/
+
+Sitemap: https://tradiesmate.co.uk/sitemap.xml

@@ -1,23 +1,35 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ff5a1f" />
+    <meta name="robots" content="index, follow" />
     <meta
       name="description"
-      content="TradiesMate helps UK trades turn missed calls into quoted jobs — SMS rescue, van-friendly quotes, and automatic chase for quotes and invoices."
+      content="TradiesMate helps UK trades turn missed calls into quoted jobs — dedicated number, SMS rescue, van quotes, Pay Now, diary and certificates."
     />
-    <meta property="og:title" content="TradiesMate — Quote from the van" />
+    <link rel="canonical" href="https://tradiesmate.co.uk/" />
+    <meta property="og:site_name" content="TradiesMate" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:title" content="TradiesMate — Turn missed calls into quoted jobs" />
     <meta property="og:url" content="https://tradiesmate.co.uk/" />
     <meta
       property="og:description"
-      content="Turn missed calls into quoted jobs. Built for UK plumbers, electricians, heating engineers, and other trades."
+      content="Dedicated UK number, SMS missed-call rescue, van-friendly quotes, Pay Now deposits, diary and certificates. Built for plumbers, electricians and UK trades."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/icons/icon-512.png" />
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:image" content="/icons/icon-512.png" />
+    <meta property="og:image" content="https://tradiesmate.co.uk/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="TradiesMate — Turn missed calls into quoted jobs" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TradiesMate — Turn missed calls into quoted jobs" />
+    <meta
+      name="twitter:description"
+      content="Dedicated UK number, SMS missed-call rescue, van-friendly quotes, Pay Now deposits, diary and certificates."
+    />
+    <meta name="twitter:image" content="https://tradiesmate.co.uk/og-image.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="TradiesMate" />
@@ -33,6 +45,90 @@
     />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <title>TradiesMate — Turn missed calls into quoted jobs</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://tradiesmate.co.uk/#organization",
+            "name": "TradiesMate",
+            "url": "https://tradiesmate.co.uk/",
+            "logo": "https://tradiesmate.co.uk/icons/icon-512.png",
+            "email": "hello@tradiesmate.co.uk",
+            "areaServed": {
+              "@type": "Country",
+              "name": "United Kingdom"
+            }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://tradiesmate.co.uk/#website",
+            "url": "https://tradiesmate.co.uk/",
+            "name": "TradiesMate",
+            "description": "UK software for trades: missed-call rescue, quoting, payments, diary and certificates.",
+            "publisher": { "@id": "https://tradiesmate.co.uk/#organization" },
+            "inLanguage": "en-GB"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://tradiesmate.co.uk/#app",
+            "name": "TradiesMate",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web, iOS, Android",
+            "url": "https://tradiesmate.co.uk/",
+            "image": "https://tradiesmate.co.uk/og-image.png",
+            "description": "Turn missed calls into quoted jobs. Dedicated UK number, SMS rescue, van quotes, Pay Now, diary and certificates for UK trades.",
+            "offers": {
+              "@type": "Offer",
+              "priceCurrency": "GBP",
+              "price": "14.00",
+              "description": "£14 for 14 days, then £49 every 30 days",
+              "url": "https://tradiesmate.co.uk/signup"
+            },
+            "publisher": { "@id": "https://tradiesmate.co.uk/#organization" }
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://tradiesmate.co.uk/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "What is TradiesMate?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "TradiesMate is software for UK tradespeople. You get a dedicated UK number to divert missed calls to, SMS job qualification, van-friendly quotes from your rates, payment chase, Pay Now card deposits, a job diary, and certificates."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How does missed-call rescue work?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "You divert missed calls to your TradiesMate number. Callers get an SMS to qualify the job (or leave a voicemail), and a clean lead lands on your Jobs list."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How much does TradiesMate cost?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "£14 for a 14-day trial, then £49 every 30 days unless you cancel. Cancel before day 14 to avoid the £49 charge."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Who is TradiesMate for?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Plumbers, electricians, heating engineers, roofers, decorators, locksmiths, and other UK trades who lose work when they cannot answer the phone on the tools."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
