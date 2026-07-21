@@ -206,7 +206,7 @@ export default function TwilioPage() {
             <Kpi
               label="Numbers on account"
               value={n(d.numbers.totalOnTwilio)}
-              hint={`${n(d.numbers.assignedToClients)} assigned · ${n(d.pool?.available)} spare in pool`}
+              hint={`${n(d.numbers.assignedToClients)} assigned · ${n(d.pool?.available ?? 0)} spare in pool`}
             />
             <Kpi
               label="This month (Twilio)"
