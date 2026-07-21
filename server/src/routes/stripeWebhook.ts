@@ -9,6 +9,7 @@ import {
 } from "../services/billing/stripe.js";
 import { markInvoicePaid } from "../services/invoices/invoice.js";
 import { sendMessage } from "../services/messaging/sender.js";
+import { startOnboardingAfterPayment } from "../services/onboarding/onboarding.js";
 
 export const stripeWebhookRouter = Router();
 
@@ -26,11 +27,31 @@ async function applySubscriptionToClient(opts: {
   if (opts.customerId) data.stripeCustomerId = opts.customerId;
   if (opts.trialEndsAt !== undefined) data.trialEndsAt = opts.trialEndsAt;
 
+  const ids = new Set<string>();
   if (opts.clientId) {
     await prisma.client.update({ where: { id: opts.clientId }, data }).catch(() => undefined);
+    ids.add(opts.clientId);
   }
   if (opts.customerId) {
-    await prisma.client.updateMany({ where: { stripeCustomerId: opts.customerId }, data });
+    const updated = await prisma.client.updateMany({ where: { stripeCustomerId: opts.customerId }, data });
+    if (updated.count > 0) {
+      const rows = await prisma.client.findMany({
+        where: { stripeCustomerId: opts.customerId },
+        select: { id: true },
+      });
+      for (const r of rows) ids.add(r.id);
+    } else if (opts.customerId && opts.clientId) {
+      // first time linking customer id — already updated via clientId
+    }
+  }
+
+  // First unlock into paid trial / active → provision number + welcome SMS
+  if (opts.status === "TRIAL" || opts.status === "ACTIVE") {
+    for (const id of ids) {
+      void startOnboardingAfterPayment(id).catch((e) =>
+        console.error("[stripe] onboarding start failed", id, e)
+      );
+    }
   }
 }
 

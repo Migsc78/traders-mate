@@ -343,3 +343,90 @@ export async function fetchAccountInfo(): Promise<{
 }
 
 export { voiceWebhookUrl, smsWebhookUrl, digitsOnly };
+
+/**
+ * Search available UK numbers (Local first, then Mobile) that support voice + SMS.
+ */
+export async function searchAvailableUkNumbers(opts?: {
+  limit?: number;
+}): Promise<Array<{ phoneNumber: string; friendlyName: string | null; type: "Local" | "Mobile" }>> {
+  if (!twilioConfigured()) throw new Error("Twilio is not configured");
+  const limit = Math.min(20, Math.max(1, opts?.limit ?? 5));
+  const out: Array<{ phoneNumber: string; friendlyName: string | null; type: "Local" | "Mobile" }> = [];
+
+  for (const type of ["Local", "Mobile"] as const) {
+    if (out.length >= limit) break;
+    const url =
+      `${accountBase()}/AvailablePhoneNumbers/GB/${type}.json` +
+      `?VoiceEnabled=true&SmsEnabled=true&PageSize=${limit}`;
+    const res = await fetch(url, { headers: { Authorization: authHeader() } });
+    const json = (await res.json().catch(() => ({}))) as {
+      available_phone_numbers?: Array<{ phone_number?: string; friendly_name?: string }>;
+      message?: string;
+    };
+    if (!res.ok) {
+      // Mobile may be unavailable on some accounts — continue to next type
+      console.warn(`[twilio] available ${type} search failed`, json.message || res.status);
+      continue;
+    }
+    for (const n of json.available_phone_numbers || []) {
+      if (!n.phone_number) continue;
+      out.push({
+        phoneNumber: n.phone_number,
+        friendlyName: n.friendly_name ?? null,
+        type,
+      });
+      if (out.length >= limit) break;
+    }
+  }
+  return out;
+}
+
+/** Purchase a specific Twilio number and return sid + E.164. */
+export async function purchasePhoneNumber(opts: {
+  phoneNumber: string;
+  friendlyName?: string;
+}): Promise<{ sid: string; phoneNumber: string }> {
+  if (!twilioConfigured()) throw new Error("Twilio is not configured");
+  const voiceUrl = voiceWebhookUrl();
+  const smsUrl = smsWebhookUrl();
+  const params = new URLSearchParams({
+    PhoneNumber: opts.phoneNumber,
+    VoiceUrl: voiceUrl,
+    VoiceMethod: "POST",
+    SmsUrl: smsUrl,
+    SmsMethod: "POST",
+    FriendlyName: opts.friendlyName || `TradiesMate ${opts.phoneNumber}`,
+  });
+  const res = await fetch(`${accountBase()}/IncomingPhoneNumbers.json`, {
+    method: "POST",
+    headers: {
+      Authorization: authHeader(),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params,
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    sid?: string;
+    phone_number?: string;
+    message?: string;
+  };
+  if (!res.ok || !json.sid || !json.phone_number) {
+    throw new Error(json.message || `Twilio purchase failed (${res.status})`);
+  }
+  return { sid: json.sid, phoneNumber: json.phone_number };
+}
+
+/** Buy first available UK voice+SMS number and wire webhooks. */
+export async function purchaseAndConfigureUkNumber(opts: {
+  friendlyName?: string;
+}): Promise<{ sid: string; phoneNumber: string }> {
+  const available = await searchAvailableUkNumbers({ limit: 5 });
+  if (!available.length) {
+    throw new Error("No UK Twilio numbers available to purchase right now — try again shortly");
+  }
+  return purchasePhoneNumber({
+    phoneNumber: available[0].phoneNumber,
+    friendlyName: opts.friendlyName,
+  });
+}

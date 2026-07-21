@@ -197,6 +197,11 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       trialEndsAt: client.trialEndsAt,
       accountActive: accountActive(client.status, client.trialEndsAt, client.stripeCustomerId),
       billingRequired: client.status === "TRIAL" && !client.stripeCustomerId,
+      onboardingRequired:
+        !client.onboardingCompletedAt && !!client.stripeCustomerId && client.status === "TRIAL",
+      onboardingStep: client.onboardingStep,
+      onboardingCompletedAt: client.onboardingCompletedAt,
+      onboardingDivertConfirmedAt: client.onboardingDivertConfirmedAt,
       trialDays: env.TRIAL_DAYS,
       trialPricePence: env.SAAS_TRIAL_PRICE_PENCE,
       planPricePence: env.SAAS_PLAN_PRICE_PENCE,
@@ -460,6 +465,368 @@ tradieRouter.post("/billing/portal", requireClient, async (req, res, next) => {
     }
     const result = await createBillingPortalSession({ customerId: client.stripeCustomerId });
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Onboarding wizard ----
+tradieRouter.get("/onboarding", requireClient, async (req, res, next) => {
+  try {
+    const {
+      buildOnboardingView,
+      provisionNumberForClient,
+    } = await import("../services/onboarding/onboarding.js");
+    let client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+
+    // Lazy provision if paid but no number yet
+    if (client.stripeCustomerId && !client.twilioNumber && !client.onboardingCompletedAt) {
+      await provisionNumberForClient(client.id);
+      client = await prisma.client.findUnique({ where: { id: client.id } });
+      if (!client) throw new ApiError(404, "not_found", "Client not found");
+    }
+
+    const since =
+      client.onboardingDivertConfirmedAt ||
+      new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const recentMissed = await prisma.missedCall.count({
+      where: { clientId: client.id, createdAt: { gte: since } },
+    });
+
+    // Persist detection so polling / later steps stay green
+    if (recentMissed > 0 && !client.onboardingTestCallAt && client.onboardingStep >= 2) {
+      client = await prisma.client.update({
+        where: { id: client.id },
+        data: {
+          onboardingTestCallAt: new Date(),
+          onboardingStep: Math.max(client.onboardingStep, 3),
+        },
+      });
+    }
+
+    const view = buildOnboardingView(client);
+    const {
+      previewRatesForTrade,
+      resolveTradePreset,
+      tradeTitleForPreset,
+      TRADE_PRESETS,
+    } = await import("../services/quotes/priceBook.js");
+    const priceBookCount = await prisma.priceBookItem.count({
+      where: { clientId: client.id, active: true },
+    });
+    const existingRates =
+      priceBookCount > 0
+        ? await prisma.priceBookItem.findMany({
+            where: { clientId: client.id, active: true },
+            orderBy: [{ isCallout: "desc" }, { label: "asc" }],
+            take: 8,
+            select: {
+              sku: true,
+              label: true,
+              unit: true,
+              unitPricePence: true,
+              isCallout: true,
+            },
+          })
+        : [];
+    const tradePreset = resolveTradePreset(client.tradeTitle);
+    const ratePreview =
+      existingRates.length > 0
+        ? existingRates
+        : previewRatesForTrade(tradeTitleForPreset(tradePreset));
+
+    res.json({
+      ...view,
+      testCallDetected: recentMissed > 0 || !!client.onboardingTestCallAt,
+      recentMissedCalls: recentMissed,
+      priceBookCount,
+      hasRates: priceBookCount > 0,
+      tradePreset,
+      tradePresets: TRADE_PRESETS.map((p) => ({ id: p.id, label: p.label })),
+      ratePreview,
+      hasBankDetails: !!(
+        client.bankSortCode &&
+        client.bankAccountName &&
+        client.bankAccountNumber
+      ),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/provision-number", requireClient, async (req, res, next) => {
+  try {
+    const { provisionNumberForClient, buildOnboardingView } = await import(
+      "../services/onboarding/onboarding.js"
+    );
+    const result = await provisionNumberForClient(clientId(req));
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    if (result.error && !result.phoneNumber) {
+      throw new ApiError(502, "provision_failed", result.error);
+    }
+    res.json({ ...result, onboarding: buildOnboardingView(client) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/step", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView, ONBOARDING_LAST_STEP } = await import(
+      "../services/onboarding/onboarding.js"
+    );
+    const body = z
+      .object({
+        step: z.number().int().min(0).max(ONBOARDING_LAST_STEP).optional(),
+        advance: z.boolean().optional(),
+      })
+      .parse(req.body ?? {});
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+
+    let nextStep = client.onboardingStep;
+    if (typeof body.step === "number") nextStep = body.step;
+    else if (body.advance) nextStep = Math.min(ONBOARDING_LAST_STEP, client.onboardingStep + 1);
+
+    const updated = await prisma.client.update({
+      where: { id: client.id },
+      data: { onboardingStep: nextStep },
+    });
+    res.json(buildOnboardingView(updated));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/confirm-divert", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView } = await import("../services/onboarding/onboarding.js");
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    const updated = await prisma.client.update({
+      where: { id: client.id },
+      data: {
+        onboardingDivertConfirmedAt: new Date(),
+        onboardingStep: Math.max(3, client.onboardingStep),
+      },
+    });
+    res.json(buildOnboardingView(updated));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/confirm-test", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView } = await import("../services/onboarding/onboarding.js");
+    const updated = await prisma.client.update({
+      where: { id: clientId(req) },
+      data: {
+        onboardingTestCallAt: new Date(),
+        onboardingStep: 4,
+      },
+    });
+    res.json(buildOnboardingView(updated));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.patch("/onboarding/alerts", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView } = await import("../services/onboarding/onboarding.js");
+    const body = z.object({ destPhone: z.string().min(8).max(30) }).parse(req.body ?? {});
+    const phone = toE164UK(body.destPhone);
+    if (!phone.startsWith("+") || phone.replace(/\D/g, "").length < 10) {
+      throw new ApiError(400, "bad_phone", "Enter a valid UK mobile (07… or +44…)");
+    }
+    const updated = await prisma.client.update({
+      where: { id: clientId(req) },
+      data: {
+        destPhone: phone,
+        onboardingStep: 5,
+      },
+    });
+    res.json(buildOnboardingView(updated));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/test-alert", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView } = await import("../services/onboarding/onboarding.js");
+    const body = z.object({ destPhone: z.string().min(8).max(30).optional() }).parse(req.body ?? {});
+    const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+
+    const phone = toE164UK(body.destPhone?.trim() || client.destPhone);
+    if (!phone.startsWith("+") || phone.replace(/\D/g, "").length < 10) {
+      throw new ApiError(400, "bad_phone", "Enter a valid UK mobile (07… or +44…)");
+    }
+
+    // Persist if they edited the number before testing
+    let updated = client;
+    if (phone !== client.destPhone) {
+      updated = await prisma.client.update({
+        where: { id: client.id },
+        data: { destPhone: phone },
+      });
+    }
+
+    const text = `TradiesMate test alert for ${updated.businessName}: when a missed call becomes a job, you'll get a text like this on this number.`;
+    const results = await sendMessage({
+      to: phone,
+      channel: updated.destChannel === "WHATSAPP" ? "WHATSAPP" : "SMS",
+      body: text,
+    });
+    const ok = results.some((r) => r.ok);
+    if (!ok) {
+      const err = results.map((r) => r.error).filter(Boolean).join("; ") || "send_failed";
+      throw new ApiError(502, "sms_failed", `Could not send test alert: ${err}`);
+    }
+
+    await logMessage({
+      clientId: updated.id,
+      direction: "OUTBOUND",
+      channel: updated.destChannel === "WHATSAPP" ? "WHATSAPP" : "SMS",
+      toAddr: phone,
+      body: text,
+      status: "sent",
+    });
+
+    res.json({ ok: true, to: phone, onboarding: buildOnboardingView(updated) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/seed-rates", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView } = await import("../services/onboarding/onboarding.js");
+    const {
+      ensurePriceBook,
+      listPriceBook,
+      tradeTitleForPreset,
+      resolveTradePreset,
+      previewRatesForTrade,
+    } = await import("../services/quotes/priceBook.js");
+    const body = z
+      .object({
+        tradePreset: z.enum(["plumber", "electrician", "heating"]).optional(),
+      })
+      .parse(req.body ?? {});
+
+    let client = await prisma.client.findUnique({ where: { id: clientId(req) } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+
+    const preset = body.tradePreset ?? resolveTradePreset(client.tradeTitle);
+    const tradeTitle = tradeTitleForPreset(preset);
+
+    if (client.tradeTitle !== tradeTitle) {
+      client = await prisma.client.update({
+        where: { id: client.id },
+        data: { tradeTitle },
+      });
+    }
+
+    const before = await prisma.priceBookItem.count({ where: { clientId: client.id } });
+    const seeded = await ensurePriceBook(client.id, tradeTitle);
+    const items = await listPriceBook(client.id);
+    const preview = items.slice(0, 8).map((i) => ({
+      sku: i.sku,
+      label: i.label,
+      unit: i.unit,
+      unitPricePence: i.unitPricePence,
+      isCallout: i.isCallout,
+    }));
+
+    // Stay on step 5 so UI can show confirmation; continue advances to 6
+    const updated = await prisma.client.update({
+      where: { id: client.id },
+      data: { onboardingStep: Math.max(client.onboardingStep, 5) },
+    });
+
+    res.json({
+      seeded,
+      alreadyHad: before > 0,
+      count: items.length,
+      items: preview.length ? preview : previewRatesForTrade(tradeTitle),
+      onboarding: buildOnboardingView(updated),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/confirm-rates", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView } = await import("../services/onboarding/onboarding.js");
+    const updated = await prisma.client.update({
+      where: { id: clientId(req) },
+      data: { onboardingStep: 6 },
+    });
+    res.json(buildOnboardingView(updated));
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.patch("/onboarding/bank", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView } = await import("../services/onboarding/onboarding.js");
+    const { normalizeBankFields, hasBankDetails } = await import("../services/onboarding/bank.js");
+    const body = z
+      .object({
+        bankName: z.string().max(80).optional(),
+        bankSortCode: z.string().max(20).optional(),
+        bankAccountName: z.string().max(80).optional(),
+        bankAccountNumber: z.string().max(20).optional(),
+      })
+      .parse(req.body ?? {});
+    const cid = clientId(req);
+    const existing = await prisma.client.findUnique({
+      where: { id: cid },
+      select: { onboardingStep: true },
+    });
+    if (!existing) throw new ApiError(404, "not_found", "Client not found");
+
+    const normalized = normalizeBankFields(body);
+    const updated = await prisma.client.update({
+      where: { id: cid },
+      data: {
+        bankName: normalized.bankName,
+        bankSortCode: normalized.bankSortCode,
+        bankAccountName: normalized.bankAccountName,
+        bankAccountNumber: normalized.bankAccountNumber,
+        onboardingStep: Math.max(existing.onboardingStep, 6),
+      },
+    });
+    res.json({
+      ...buildOnboardingView(updated),
+      hasBankDetails: hasBankDetails(updated),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/onboarding/complete", requireClient, async (req, res, next) => {
+  try {
+    const { buildOnboardingView, ONBOARDING_LAST_STEP } = await import(
+      "../services/onboarding/onboarding.js"
+    );
+    const updated = await prisma.client.update({
+      where: { id: clientId(req) },
+      data: {
+        onboardingCompletedAt: new Date(),
+        onboardingStep: ONBOARDING_LAST_STEP,
+      },
+    });
+    res.json(buildOnboardingView(updated));
   } catch (err) {
     next(err);
   }
@@ -1009,6 +1376,18 @@ tradieRouter.post("/connect/onboard", requireClient, async (req, res, next) => {
     } = await import("../services/billing/connect.js");
     if (!stripeConfigured()) throw new ApiError(400, "stripe_off", "Stripe is not configured on the server");
 
+    const body = z
+      .object({
+        returnPath: z.string().max(200).optional(),
+        refreshPath: z.string().max(200).optional(),
+      })
+      .parse(req.body ?? {});
+
+    const safePath = (p: string | undefined, fallback: string) => {
+      if (!p || !p.startsWith("/t")) return fallback;
+      return p;
+    };
+
     const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
     if (!client) throw new ApiError(404, "not_found", "Client not found");
 
@@ -1033,10 +1412,12 @@ tradieRouter.post("/connect/onboard", requireClient, async (req, res, next) => {
     }
 
     const base = appPublicUrl();
+    const returnPath = safePath(body.returnPath, "/t/settings?connect=return");
+    const refreshPath = safePath(body.refreshPath, "/t/settings?connect=refresh");
     const link = await createConnectOnboardingLink({
       accountId,
-      refreshUrl: `${base}/t/settings?connect=refresh`,
-      returnUrl: `${base}/t/settings?connect=return`,
+      refreshUrl: `${base}${refreshPath}`,
+      returnUrl: `${base}${returnPath}`,
     });
     res.json({ ok: true, onboarded: false, url: link.url });
   } catch (err) {

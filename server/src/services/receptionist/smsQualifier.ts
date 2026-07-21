@@ -39,6 +39,9 @@ export async function handleMissedCallInboundSms(opts: {
         conversation: [],
       },
     });
+    void import("../onboarding/onboarding.js")
+      .then((m) => m.markOnboardingTestCallIfNeeded(client.id))
+      .catch(() => undefined);
   }
 
   const convo = (Array.isArray(missed.conversation) ? missed.conversation : []) as ConvoTurn[];

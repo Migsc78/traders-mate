@@ -188,6 +188,13 @@ model Client {
   phoneVerifiedAt  DateTime?
   trialEndsAt      DateTime?
   twilioNumber     String? // dedicated Twilio number for missed-call divert
+  twilioNumberSid  String? // Twilio IncomingPhoneNumber SID when auto-provisioned
+  /// Setup wizard: 0 welcome … 6 get-paid; completed when onboardingCompletedAt set
+  onboardingStep   Int          @default(0)
+  onboardingCompletedAt DateTime?
+  onboardingDivertConfirmedAt DateTime?
+  onboardingTestCallAt DateTime?
+  welcomeSmsSentAt DateTime?
   greetingAudioUrl String? // public URL Twilio/UI use to play the greeting
   greetingPlayToken String? @unique // /api/public/greeting/:token (survives redeploys)
   greetingAudioData Bytes? // WAV/MP3 bytes in Postgres — disk uploads are wiped on Railway redeploy

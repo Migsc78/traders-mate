@@ -67,6 +67,17 @@ export default function TradieShell() {
   const subtitle = [me.data?.tradeTitle, me.data?.town].filter(Boolean).join(" · ") || "Quoting & jobs";
   const moreActive = MORE_TABS.some((t) => location.pathname.startsWith(t.to));
   const onJobDetail = location.pathname.startsWith("/t/jobs/");
+  const onOnboarding = location.pathname.startsWith("/t/onboarding");
+
+  // Paid but setup incomplete → send to wizard (except settings / billing return)
+  if (
+    me.data?.onboardingRequired &&
+    me.data.accountActive &&
+    !onOnboarding &&
+    !location.pathname.startsWith("/t/settings")
+  ) {
+    return <Navigate to="/t/onboarding" replace />;
+  }
 
   return (
     <div className={`tradie-shell tradie-shell--app${onJobDetail ? " tradie-shell--detail" : ""}`}>
@@ -90,6 +101,16 @@ export default function TradieShell() {
         </p>
       )}
 
+      {me.data?.accountActive &&
+        !me.data.onboardingDivertConfirmedAt &&
+        !me.data.billingRequired &&
+        !onOnboarding && (
+        <p className="t-banner">
+          Finish call divert so missed calls are rescued.{" "}
+          <NavLink to="/t/onboarding">Continue setup</NavLink>
+        </p>
+      )}
+
       {me.data?.status === "TRIAL" && me.data.trialEndsAt && me.data.accountActive && (
         <p className="muted-text t-trial-note">
           Trial ends {new Date(me.data.trialEndsAt).toLocaleDateString("en-GB")} — then £
@@ -107,7 +128,7 @@ export default function TradieShell() {
         <Outlet context={{ me: me.data }} />
       </div>
 
-      {!onJobDetail && (
+      {!onJobDetail && !onOnboarding && (
         <nav className="tradie-bottom-nav" aria-label="Tradie navigation">
           {PRIMARY_TABS.map(({ to, label, Icon, ...rest }) => (
             <NavLink

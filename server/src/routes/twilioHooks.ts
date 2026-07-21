@@ -126,6 +126,10 @@ async function handleMissedVoice(opts: {
     },
   });
 
+  void import("../services/onboarding/onboarding.js")
+    .then((m) => m.markOnboardingTestCallIfNeeded(client.id))
+    .catch(() => undefined);
+
   const vars = { businessName: client.businessName };
   const voice = getMissedCallSayVoice();
 

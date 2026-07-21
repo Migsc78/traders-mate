@@ -37,6 +37,25 @@ const HEATING: SeedItem[] = [
   { sku: "POWERFLUSH", label: "Powerflush", tradeTag: "heating", unit: "JOB", unitPricePence: 35000 },
 ];
 
+export const TRADE_PRESETS = [
+  { id: "plumber", label: "Plumber", tradeTitle: "Plumber" },
+  { id: "electrician", label: "Electrician", tradeTitle: "Electrician" },
+  { id: "heating", label: "Heating / gas", tradeTitle: "Heating engineer" },
+] as const;
+
+export type TradePresetId = (typeof TRADE_PRESETS)[number]["id"];
+
+export function resolveTradePreset(tradeTitle: string | null | undefined): TradePresetId {
+  const t = (tradeTitle || "").toLowerCase();
+  if (/electr|spark/.test(t)) return "electrician";
+  if (/heat|gas|boiler/.test(t)) return "heating";
+  return "plumber";
+}
+
+export function tradeTitleForPreset(preset: TradePresetId): string {
+  return TRADE_PRESETS.find((p) => p.id === preset)?.tradeTitle ?? "Plumber";
+}
+
 function templateForTrade(tradeTitle: string | null | undefined): SeedItem[] {
   const t = (tradeTitle || "").toLowerCase();
   if (/electr|spark/.test(t)) return ELECTRICIAN;
@@ -44,6 +63,17 @@ function templateForTrade(tradeTitle: string | null | undefined): SeedItem[] {
   if (/plumb/.test(t)) return PLUMBER;
   // Default mixed starter — plumber-leaning for general trades
   return PLUMBER;
+}
+
+/** Preview starter rates for a trade (does not write to DB). */
+export function previewRatesForTrade(tradeTitle: string | null | undefined) {
+  return templateForTrade(tradeTitle).map((i) => ({
+    sku: i.sku,
+    label: i.label,
+    unit: i.unit,
+    unitPricePence: i.unitPricePence,
+    isCallout: i.isCallout ?? false,
+  }));
 }
 
 /** Seed price book once if empty. Safe to call repeatedly. */

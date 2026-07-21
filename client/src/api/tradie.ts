@@ -87,6 +87,10 @@ export interface TradieMe {
   trialEndsAt: string | null;
   accountActive: boolean;
   billingRequired?: boolean;
+  onboardingRequired?: boolean;
+  onboardingStep?: number;
+  onboardingCompletedAt?: string | null;
+  onboardingDivertConfirmedAt?: string | null;
   trialDays?: number;
   trialPricePence?: number;
   planPricePence?: number;
@@ -219,6 +223,104 @@ export const tradieApi = {
   billingCheckout: () => tRequest<{ url: string; stub: boolean }>("/billing/checkout", { method: "POST", body: "{}" }),
   billingPortal: () => tRequest<{ url: string }>("/billing/portal", { method: "POST", body: "{}" }),
 
+  onboarding: () =>
+    tRequest<{
+      step: number;
+      lastStep: number;
+      completed: boolean;
+      divertConfirmed: boolean;
+      testCallAt: string | null;
+      twilioNumber: string | null;
+      hasNumber: boolean;
+      divertCodes: { noAnswer: string; busy: string; unreachable: string } | null;
+      destPhone: string;
+      businessName: string;
+      tradeTitle: string | null;
+      bank: {
+        bankName: string | null;
+        bankSortCode: string | null;
+        bankAccountName: string | null;
+        bankAccountNumber: string | null;
+      };
+      stripeConnectOnboarded: boolean;
+      trialEndsAt: string | null;
+      trialDays: number;
+      trialPricePence: number;
+      planPricePence: number;
+      testCallDetected: boolean;
+      recentMissedCalls: number;
+      priceBookCount: number;
+      hasRates: boolean;
+      tradePreset: "plumber" | "electrician" | "heating";
+      tradePresets: { id: "plumber" | "electrician" | "heating"; label: string }[];
+      ratePreview: {
+        sku: string | null;
+        label: string;
+        unit: string;
+        unitPricePence: number;
+        isCallout: boolean;
+      }[];
+      hasBankDetails: boolean;
+    }>("/onboarding"),
+
+  onboardingProvisionNumber: () =>
+    tRequest<{ phoneNumber: string | null; provisioned: boolean; error?: string }>("/onboarding/provision-number", {
+      method: "POST",
+      body: "{}",
+    }),
+
+  onboardingStep: (body: { step?: number; advance?: boolean }) =>
+    tRequest<Record<string, unknown>>("/onboarding/step", { method: "POST", body: JSON.stringify(body) }),
+
+  onboardingConfirmDivert: () =>
+    tRequest<Record<string, unknown>>("/onboarding/confirm-divert", { method: "POST", body: "{}" }),
+
+  onboardingConfirmTest: () =>
+    tRequest<Record<string, unknown>>("/onboarding/confirm-test", { method: "POST", body: "{}" }),
+
+  onboardingAlerts: (destPhone: string) =>
+    tRequest<Record<string, unknown>>("/onboarding/alerts", {
+      method: "PATCH",
+      body: JSON.stringify({ destPhone }),
+    }),
+
+  onboardingTestAlert: (destPhone?: string) =>
+    tRequest<{ ok: boolean; to: string }>("/onboarding/test-alert", {
+      method: "POST",
+      body: JSON.stringify(destPhone ? { destPhone } : {}),
+    }),
+
+  onboardingSeedRates: (tradePreset?: "plumber" | "electrician" | "heating") =>
+    tRequest<{
+      seeded: number;
+      alreadyHad: boolean;
+      count: number;
+      items: {
+        sku: string | null;
+        label: string;
+        unit: string;
+        unitPricePence: number;
+        isCallout: boolean;
+      }[];
+      onboarding: Record<string, unknown>;
+    }>("/onboarding/seed-rates", {
+      method: "POST",
+      body: JSON.stringify(tradePreset ? { tradePreset } : {}),
+    }),
+
+  onboardingConfirmRates: () =>
+    tRequest<Record<string, unknown>>("/onboarding/confirm-rates", { method: "POST", body: "{}" }),
+
+  onboardingBank: (body: {
+    bankName?: string;
+    bankSortCode?: string;
+    bankAccountName?: string;
+    bankAccountNumber?: string;
+  }) => tRequest<Record<string, unknown>>("/onboarding/bank", { method: "PATCH", body: JSON.stringify(body) }),
+
+  onboardingComplete: () =>
+    tRequest<Record<string, unknown>>("/onboarding/complete", { method: "POST", body: "{}" }),
+
   jobs: () =>
     tRequest<
       {
@@ -256,10 +358,10 @@ export const tradieApi = {
       body: JSON.stringify({ text }),
     }),
 
-  connectOnboard: () =>
+  connectOnboard: (opts?: { returnPath?: string; refreshPath?: string }) =>
     tRequest<{ ok: boolean; onboarded: boolean; url: string | null }>("/connect/onboard", {
       method: "POST",
-      body: "{}",
+      body: JSON.stringify(opts ?? {}),
     }),
 
   connectStatus: () =>
