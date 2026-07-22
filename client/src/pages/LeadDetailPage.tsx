@@ -90,6 +90,24 @@ export default function LeadDetailPage() {
     },
   });
 
+  const deleteLead = useMutation({
+    mutationFn: () => api.deleteLead(leadId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      navigate("/admin/leads");
+    },
+  });
+
+  const confirmDelete = () => {
+    if (
+      window.confirm(
+        `Delete ${lead?.displayName ?? "this lead"}? Converted clients are kept; only the lead row is removed.`
+      )
+    ) {
+      deleteLead.mutate();
+    }
+  };
+
   const refreshFromGoogle = async () => {
     if (!lead) return;
     setRefreshing(true);
@@ -159,10 +177,14 @@ export default function LeadDetailPage() {
           <button className="convert" onClick={() => convert.mutate()} disabled={convert.isPending || !lead.phone}>
             {convert.isPending ? "Converting…" : "Convert to client"}
           </button>
+          <button className="danger" onClick={confirmDelete} disabled={deleteLead.isPending}>
+            {deleteLead.isPending ? "Deleting…" : "Delete"}
+          </button>
         </div>
       </div>
 
       {convert.isError && <p className="error">{(convert.error as Error).message}</p>}
+      {deleteLead.isError && <p className="error">{(deleteLead.error as Error).message}</p>}
 
       <nav className="client-tabs" aria-label="Lead sections">
         {TABS.map((t) => (

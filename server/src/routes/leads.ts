@@ -164,6 +164,29 @@ leadsRouter.post("/bulk/mark-screened", async (req, res, next) => {
   }
 });
 
+/** Delete leads. Converted clients are kept — we only clear Client.leadId. */
+async function deleteLeadsByIds(ids: string[]) {
+  const unique = [...new Set(ids)];
+  await prisma.$transaction(async (tx) => {
+    await tx.client.updateMany({
+      where: { leadId: { in: unique } },
+      data: { leadId: null },
+    });
+    await tx.lead.deleteMany({ where: { id: { in: unique } } });
+  });
+  return { deleted: unique.length };
+}
+
+leadsRouter.post("/bulk/delete", async (req, res, next) => {
+  try {
+    const { ids } = bulkIdsSchema.parse(req.body);
+    const result = await deleteLeadsByIds(ids);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 leadsRouter.post("/export", async (req, res, next) => {
   try {
     const { ids } = exportSchema.parse(req.body ?? {});
@@ -208,6 +231,18 @@ leadsRouter.patch("/:id", async (req, res, next) => {
     };
     const lead = await prisma.lead.update({ where: { id: req.params.id }, data });
     res.json(lead);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/leads/:id
+leadsRouter.delete("/:id", async (req, res, next) => {
+  try {
+    const existing = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!existing) throw new ApiError(404, "not_found", "Lead not found");
+    await deleteLeadsByIds([existing.id]);
+    res.json({ ok: true, deleted: 1 });
   } catch (err) {
     next(err);
   }

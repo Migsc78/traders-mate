@@ -624,6 +624,14 @@ export const api = {
   updateLead: (id: string, patch: Partial<Pick<Lead, "outreachStatus" | "notes" | "email">> & { tpsCheckedAt?: string | null }) =>
     request<Lead>(`/api/leads/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
 
+  deleteLead: (id: string) => request<{ ok: boolean; deleted: number }>(`/api/leads/${id}`, { method: "DELETE" }),
+
+  bulkDeleteLeads: (ids: string[]) =>
+    request<{ deleted: number }>("/api/leads/bulk/delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
+
   refreshLead: (id: string) => request<Lead>(`/api/leads/${id}/refresh`, { method: "POST" }),
 
   bulkRefreshLeads: (ids: string[]) =>

@@ -101,6 +101,24 @@ export default function LeadsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 
+  const bulkDelete = useMutation({
+    mutationFn: () => api.bulkDeleteLeads(selectedIds),
+    onSuccess: () => {
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+
+  const confirmBulkDelete = () => {
+    if (
+      window.confirm(
+        `Delete ${selected.size} selected lead${selected.size === 1 ? "" : "s"}? Converted clients are kept.`
+      )
+    ) {
+      bulkDelete.mutate();
+    }
+  };
+
   return (
     <div className="page">
       <ProgressOverlay
@@ -134,12 +152,18 @@ export default function LeadsPage() {
           <button onClick={() => bulkScreen.mutate()} disabled={bulkScreen.isPending}>
             {bulkScreen.isPending ? "Updating…" : "Mark TPS-screened"}
           </button>
+          <button className="danger" onClick={confirmBulkDelete} disabled={bulkDelete.isPending}>
+            {bulkDelete.isPending ? "Deleting…" : "Delete"}
+          </button>
           <button onClick={() => api.exportCsv(selectedIds)}>Export selected</button>
           <button className="linkish" onClick={() => setSelected(new Set())}>
             Clear selection
           </button>
           {bulkRefresh.isError && !refreshing && (
             <span className="error inline-error">{(bulkRefresh.error as Error).message}</span>
+          )}
+          {bulkDelete.isError && (
+            <span className="error inline-error">{(bulkDelete.error as Error).message}</span>
           )}
           {refreshResult && refreshResult.failed > 0 && !refreshing && (
             <span className="muted-text">
