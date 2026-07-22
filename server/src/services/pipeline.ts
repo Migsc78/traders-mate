@@ -245,7 +245,23 @@ export async function runSearch(
     })
   );
 
-  const places = await searchPlaces(params);
+  const places = await searchPlaces({
+    ...params,
+    onPage: ({ page, totalSoFar, maxResults }) => {
+      onProgress?.(
+        searchProgress({
+          phase: "fetch",
+          current: Math.min(totalSoFar || 1, maxResults),
+          total: maxResults,
+          message:
+            totalSoFar === 0
+              ? `Fetching Google Places page ${page}…`
+              : `Fetched ${totalSoFar} businesses (page ${page})…`,
+          percent: Math.min(14, 3 + page * 3),
+        })
+      );
+    },
+  });
 
   onProgress?.(
     searchProgress({

@@ -2,7 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { env } from "../env.js";
-import { endSse, initSse, sendSse } from "../lib/sse.js";
+import { endSse, initSse, sendSse, startSseHeartbeat } from "../lib/sse.js";
 import { PlacesError } from "../services/places.js";
 import { runSearch } from "../services/pipeline.js";
 import { ApiError } from "../middleware/error.js";
@@ -23,7 +23,7 @@ const bodySchema = z
     town: z.string().min(1).max(80).optional(),
     center: z.object({ lat: z.number(), lng: z.number() }).optional(),
     radiusM: z.number().int().min(500).max(50000).optional(),
-    maxResults: z.number().int().min(1).max(120).default(60),
+    maxResults: z.number().int().min(1).max(120).default(40),
     mode: z.enum(["SITE_BUILD", "SAAS_BETA"]).default("SAAS_BETA"),
   })
   .refine((d) => d.town || (d.center && d.radiusM), {
@@ -41,9 +41,11 @@ searchRouter.post("/", limiter, async (req, res, next) => {
 });
 
 searchRouter.post("/stream", limiter, async (req, res, next) => {
+  let stopHeartbeat: (() => void) | undefined;
   try {
     const params = bodySchema.parse(req.body);
     initSse(res);
+    stopHeartbeat = startSseHeartbeat(res);
 
     const summary = await runSearch(params, (progress) => sendSse(res, "progress", progress));
     sendSse(res, "complete", summary);
@@ -54,12 +56,20 @@ searchRouter.post("/stream", limiter, async (req, res, next) => {
         err instanceof PlacesError || err instanceof ApiError
           ? err.message
           : err instanceof Error
-            ? err.message
+            ? err.name === "TimeoutError" || err.message.includes("aborted")
+              ? "Google Places timed out — try fewer results or retry."
+              : err.message
             : "Search failed";
-      sendSse(res, "error", { message });
-      endSse(res);
+      try {
+        sendSse(res, "error", { message });
+        endSse(res);
+      } catch {
+        /* client already gone */
+      }
       return;
     }
     next(err);
+  } finally {
+    stopHeartbeat?.();
   }
 });

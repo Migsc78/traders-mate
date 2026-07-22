@@ -19,14 +19,24 @@ export async function postSse<TComplete>(
   onProgress?: (progress: JobProgress) => void
 ): Promise<TComplete> {
   const opToken = getOperatorToken();
-  const res = await fetch(apiUrl(url), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(opToken ? { Authorization: `Bearer ${opToken}`, "x-operator-token": opToken } : {}),
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(url), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(opToken ? { Authorization: `Bearer ${opToken}`, "x-operator-token": opToken } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "network error";
+    throw new Error(
+      /failed to fetch|networkerror|load failed|network error/i.test(msg)
+        ? "Connection to the API dropped during search. Try fewer max results, or retry in a moment."
+        : msg
+    );
+  }
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -46,27 +56,34 @@ export async function postSse<TComplete>(
   let buffer = "";
   let complete: TComplete | undefined;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() ?? "";
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
 
-    for (const part of parts) {
-      const parsed = parseSseChunk(part);
-      if (!parsed) continue;
+      for (const part of parts) {
+        const parsed = parseSseChunk(part);
+        if (!parsed) continue;
 
-      if (parsed.event === "progress") {
-        onProgress?.(JSON.parse(parsed.data) as JobProgress);
-      } else if (parsed.event === "complete") {
-        complete = JSON.parse(parsed.data) as TComplete;
-      } else if (parsed.event === "error") {
-        const err = JSON.parse(parsed.data) as { message?: string };
-        throw new Error(err.message || "Operation failed");
+        if (parsed.event === "progress") {
+          onProgress?.(JSON.parse(parsed.data) as JobProgress);
+        } else if (parsed.event === "complete") {
+          complete = JSON.parse(parsed.data) as TComplete;
+        } else if (parsed.event === "error") {
+          const err = JSON.parse(parsed.data) as { message?: string };
+          throw new Error(err.message || "Operation failed");
+        }
       }
     }
+  } catch (err) {
+    if (err instanceof Error && /failed to fetch|networkerror|load failed|network error/i.test(err.message)) {
+      throw new Error("Connection to the API dropped during search. Try fewer max results, or retry in a moment.");
+    }
+    throw err;
   }
 
   if (complete === undefined) throw new Error("Stream ended without a result");

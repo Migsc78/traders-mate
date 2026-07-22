@@ -15,7 +15,7 @@ export default function SearchPage() {
   const [searchMode, setSearchMode] = useState<SearchMode>("SAAS_BETA");
   const [center, setCenter] = useState({ lat: 51.319, lng: -0.558 }); // Woking
   const [radiusM, setRadiusM] = useState(8000);
-  const [maxResults, setMaxResults] = useState(60);
+  const [maxResults, setMaxResults] = useState(30);
   const [searching, setSearching] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
   const [progressPercent, setProgressPercent] = useState(0);

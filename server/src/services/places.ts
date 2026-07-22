@@ -87,6 +87,7 @@ async function call(endpoint: string, body: Record<string, unknown>, fieldMask: 
             "X-Goog-FieldMask": fieldMask,
           },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(45_000),
         });
 
         const json = (await res.json().catch(() => ({}))) as SearchResponse;
@@ -118,6 +119,8 @@ export interface SearchParams {
   center?: { lat: number; lng: number };
   radiusM?: number;
   maxResults: number;
+  /** Fired after each Places page so SSE can stay alive / show progress. */
+  onPage?: (info: { page: number; totalSoFar: number; maxResults: number }) => void;
 }
 
 /** Text search, optionally biased to a map circle, paginating up to maxResults. */
@@ -125,6 +128,7 @@ export async function searchPlaces(params: SearchParams): Promise<PlaceResult[]>
   const results: PlaceResult[] = [];
   let pageToken: string | undefined;
   const useMap = !!params.center && !!params.radiusM;
+  let page = 0;
 
   do {
     const remaining = params.maxResults - results.length;
@@ -146,9 +150,14 @@ export async function searchPlaces(params: SearchParams): Promise<PlaceResult[]>
 
     if (pageToken) body.pageToken = pageToken;
 
+    page += 1;
+    params.onPage?.({ page, totalSoFar: results.length, maxResults: params.maxResults });
+
     const json = await call("places:searchText", body, searchFieldMask());
     if (json.places) results.push(...json.places);
     pageToken = json.nextPageToken;
+
+    params.onPage?.({ page, totalSoFar: results.length, maxResults: params.maxResults });
 
     // pageToken needs a brief moment before it is usable
     if (pageToken && results.length < params.maxResults) {
@@ -171,6 +180,7 @@ export async function getPlace(placeId: string): Promise<PlaceResult | null> {
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": placeFieldMask(),
       },
+      signal: AbortSignal.timeout(30_000),
     });
     const json = (await res.json().catch(() => ({}))) as PlaceResult & { error?: { status?: string; message?: string } };
     if (res.status === 404) return null;
