@@ -248,16 +248,17 @@ export async function runSearch(
   const places = await searchPlaces({
     ...params,
     onPage: ({ page, totalSoFar, maxResults }) => {
+      const fetchPct = Math.min(14, Math.round((totalSoFar / Math.max(maxResults, 1)) * 14) || 4);
       onProgress?.(
         searchProgress({
           phase: "fetch",
-          current: Math.min(totalSoFar || 1, maxResults),
+          current: Math.min(Math.max(totalSoFar, 1), maxResults),
           total: maxResults,
           message:
             totalSoFar === 0
-              ? `Fetching Google Places page ${page}…`
-              : `Fetched ${totalSoFar} businesses (page ${page})…`,
-          percent: Math.min(14, 3 + page * 3),
+              ? `Fetching Google Places (page ${page})…`
+              : `Fetched ${totalSoFar} of up to ${maxResults} businesses…`,
+          percent: fetchPct,
         })
       );
     },

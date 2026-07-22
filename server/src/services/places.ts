@@ -125,13 +125,17 @@ export interface SearchParams {
 
 /** Text search, optionally biased to a map circle, paginating up to maxResults. */
 export async function searchPlaces(params: SearchParams): Promise<PlaceResult[]> {
-  const results: PlaceResult[] = [];
+  const byId = new Map<string, PlaceResult>();
   let pageToken: string | undefined;
   const useMap = !!params.center && !!params.radiusM;
   let page = 0;
+  // Google can keep handing nextPageToken after the useful set is exhausted — hard-stop.
+  const maxPages = Math.min(8, Math.max(3, Math.ceil(params.maxResults / 10) + 2));
 
   do {
-    const remaining = params.maxResults - results.length;
+    const remaining = params.maxResults - byId.size;
+    if (remaining <= 0) break;
+
     const pageSize = Math.max(1, Math.min(20, remaining));
     const body: Record<string, unknown> = {
       textQuery: useMap ? params.occupation : `${params.occupation}${params.town ? ` in ${params.town}` : ""}`,
@@ -151,21 +155,28 @@ export async function searchPlaces(params: SearchParams): Promise<PlaceResult[]>
     if (pageToken) body.pageToken = pageToken;
 
     page += 1;
-    params.onPage?.({ page, totalSoFar: results.length, maxResults: params.maxResults });
+    params.onPage?.({ page, totalSoFar: byId.size, maxResults: params.maxResults });
 
+    const before = byId.size;
     const json = await call("places:searchText", body, searchFieldMask());
-    if (json.places) results.push(...json.places);
+    for (const place of json.places ?? []) {
+      if (place.id && !byId.has(place.id)) byId.set(place.id, place);
+    }
     pageToken = json.nextPageToken;
+    const added = byId.size - before;
 
-    params.onPage?.({ page, totalSoFar: results.length, maxResults: params.maxResults });
+    params.onPage?.({ page, totalSoFar: byId.size, maxResults: params.maxResults });
+
+    // Stop when Google is out of useful results (empty / all duplicates) or page budget hit.
+    if (added === 0 || !pageToken || byId.size >= params.maxResults || page >= maxPages) {
+      break;
+    }
 
     // pageToken needs a brief moment before it is usable
-    if (pageToken && results.length < params.maxResults) {
-      await new Promise((r) => setTimeout(r, 1500));
-    }
-  } while (pageToken && results.length < params.maxResults);
+    await new Promise((r) => setTimeout(r, 1500));
+  } while (true);
 
-  return results.slice(0, params.maxResults);
+  return Array.from(byId.values()).slice(0, params.maxResults);
 }
 
 /** Re-fetch a single place by ID (for the refresh route). */
