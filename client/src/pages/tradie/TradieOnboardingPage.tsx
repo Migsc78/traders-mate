@@ -358,7 +358,7 @@ export default function TradieOnboardingPage() {
 
         {step === 2 && (
           <>
-            <p>Dial these once on your work mobile (UK networks):</p>
+            <p>Dial these once on your <strong>work mobile</strong> (the phone that rings for jobs). These codes go to your network — not to us:</p>
             {d.divertCodes ? (
               <ul className="t-divert-list">
                 <li>
@@ -374,6 +374,11 @@ export default function TradieOnboardingPage() {
             ) : (
               <p className="error">No number yet — go back and get a number first.</p>
             )}
+            <p className="muted-text">
+              Tip: do <strong>No answer</strong> and <strong>Busy</strong> first — those cover most missed calls.
+              If &quot;Off / no signal&quot; fails with a network error, skip it for now (common on weak signal) and use
+              Phone settings → Calls → Call forwarding if your network allows.
+            </p>
             <p className="muted-text">To cancel divert later: ##002#</p>
             <button
               className="primary t-btn--block"

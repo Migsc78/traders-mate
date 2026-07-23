@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { setTradieSession, tradieApi } from "../../api/tradie";
-import { blobToDataUrl, blobToWav } from "../../lib/wav";
+import { blobToDataUrl, prepareGreetingUpload, preferredRecorderMime } from "../../lib/wav";
 import { supportMailto, SUPPORT_EMAIL } from "../../lib/supportMail";
 import { StatusPill } from "./ui";
 
@@ -120,12 +120,9 @@ export default function TradieSettingsPage() {
 
   const uploadGreeting = useMutation({
     mutationFn: async (blob: Blob) => {
-      const wav = await blobToWav(blob);
-      if (wav.size > 2 * 1024 * 1024) {
-        throw new Error("Greeting too long — keep it under about 20 seconds");
-      }
-      const dataUrl = await blobToDataUrl(wav);
-      return tradieApi.uploadGreeting("audio/wav", dataUrl);
+      const prepared = await prepareGreetingUpload(blob);
+      const dataUrl = await blobToDataUrl(prepared.blob);
+      return tradieApi.uploadGreeting(prepared.contentType, dataUrl);
     },
     onSuccess: () => {
       setGreetingMsg("Greeting saved — callers will hear your voice instead of the robot.");
@@ -145,24 +142,29 @@ export default function TradieSettingsPage() {
 
   const startGreetingRec = async () => {
     setGreetingMsg("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("This browser can't record audio — use Upload WAV/MP3 instead");
+    }
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : MediaRecorder.isTypeSupported("audio/mp4")
-        ? "audio/mp4"
-        : "";
+    const mime = preferredRecorderMime();
     const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
     chunksRef.current = [];
     rec.ondataavailable = (e) => {
       if (e.data.size) chunksRef.current.push(e.data);
     };
+    rec.onerror = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setRecording(false);
+      setGreetingMsg("Recording failed — try Upload WAV/MP3 instead");
+    };
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+      const blob = new Blob(chunksRef.current, { type: rec.mimeType || mime || "audio/webm" });
       uploadGreeting.mutate(blob);
     };
     mediaRef.current = rec;
-    rec.start();
+    // Timeslice so mobile browsers actually emit data before stop
+    rec.start(250);
     setRecording(true);
   };
 
@@ -494,11 +496,17 @@ export default function TradieSettingsPage() {
           )}
 
           {me.data?.divertCodes && (
-            <ul className="t-divert-list">
-              <li><span>No answer</span> <code>{me.data.divertCodes.noAnswer}</code></li>
-              <li><span>Busy</span> <code>{me.data.divertCodes.busy}</code></li>
-              <li><span>Off / no signal</span> <code>{me.data.divertCodes.unreachable}</code></li>
-            </ul>
+            <>
+              <ul className="t-divert-list">
+                <li><span>No answer</span> <code>{me.data.divertCodes.noAnswer}</code></li>
+                <li><span>Busy</span> <code>{me.data.divertCodes.busy}</code></li>
+                <li><span>Off / no signal</span> <code>{me.data.divertCodes.unreachable}</code></li>
+              </ul>
+              <p className="muted-text" style={{ marginTop: 8 }}>
+                Dial on your work mobile. If &quot;Off / no signal&quot; fails with a network error, skip it — No answer + Busy
+                still catch most missed calls. Weak signal often blocks unreachable divert.
+              </p>
+            </>
           )}
 
           <p className="t-section-label" style={{ marginTop: 18 }}>After the greeting</p>
