@@ -14,6 +14,7 @@ import {
   savePriceBookItems,
   upsertPriceBookRows,
 } from "../services/quotes/priceBook.js";
+import { createMagicLogin } from "../services/quotes/magicAuth.js";
 
 export const clientsRouter = Router();
 
@@ -290,6 +291,18 @@ clientsRouter.delete("/:id", async (req, res, next) => {
 clientsRouter.post("/:id/send-invoice", async (req, res, next) => {
   try {
     res.json(await sendInvoiceLink(req.params.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/clients/:id/impersonate — one-time magic link so admin can open the tradie app as this client */
+clientsRouter.post("/:id/impersonate", async (req, res, next) => {
+  try {
+    const client = await prisma.client.findUnique({ where: { id: req.params.id } });
+    if (!client) throw new ApiError(404, "not_found", "Client not found");
+    const magic = await createMagicLogin(client.id);
+    res.json({ url: magic.url, expiresAt: magic.expiresAt.toISOString() });
   } catch (err) {
     next(err);
   }

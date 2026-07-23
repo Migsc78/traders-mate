@@ -713,6 +713,13 @@ export const api = {
       body: JSON.stringify({}),
     }),
 
+  /** Admin-only: open tradie app as this client via one-time magic link */
+  impersonateClient: (id: string) =>
+    request<{ url: string; expiresAt: string }>(`/api/clients/${id}/impersonate`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
   bulkSendClientInvoices: (ids: string[]) =>
     request<{ sent: number; results: { id: string; ok: boolean; delivered?: boolean; error?: string }[] }>(
       "/api/clients/bulk/send-invoice",

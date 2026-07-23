@@ -88,6 +88,22 @@ export default function ClientDetailPage() {
     mutationFn: () => api.sendClientInvoice(clientId),
   });
 
+  const impersonate = useMutation({
+    mutationFn: async () => {
+      // Open synchronously on click so mobile/desktop popup blockers don't kill the tab.
+      const tab = window.open("about:blank", "_blank");
+      try {
+        const r = await api.impersonateClient(clientId);
+        if (tab) tab.location.href = r.url;
+        else window.location.href = r.url;
+        return r;
+      } catch (err) {
+        tab?.close();
+        throw err;
+      }
+    },
+  });
+
   const rebuildSite = useMutation({
     mutationFn: () => api.rebuildClientSite(clientId),
     onSuccess: (r: { previewUrl: string }) => {
@@ -214,9 +230,20 @@ export default function ClientDetailPage() {
           </div>
         </div>
         <div className="head-actions">
-          <a className="buttonish" href="/t/auth" target="_blank" rel="noreferrer">
-            Tradie login ↗
-          </a>
+          <button
+            type="button"
+            className="buttonish"
+            onClick={() => impersonate.mutate()}
+            disabled={impersonate.isPending}
+            title="Open the tradie app signed in as this client"
+          >
+            {impersonate.isPending ? "Opening…" : "Tradie login ↗"}
+          </button>
+          {impersonate.isError && (
+            <p className="error" style={{ margin: "8px 0 0" }}>
+              {(impersonate.error as Error).message}
+            </p>
+          )}
         </div>
       </div>
 
@@ -496,12 +523,18 @@ export default function ClientDetailPage() {
             {save.isError && <p className="error">{(save.error as Error).message}</p>}
 
             <h3 style={{ marginTop: 24 }}>Tradie inbox</h3>
-            <p className="muted-text">Magic-link job list for quoting (voice / notes → draft → send).</p>
+            <p className="muted-text">Opens the tradie app signed in as this client (one-time magic link).</p>
             <div className="site-links">
-              <a href="/t/auth" target="_blank" rel="noreferrer">
-                Open tradie login ↗
-              </a>
+              <button
+                type="button"
+                className="link"
+                onClick={() => impersonate.mutate()}
+                disabled={impersonate.isPending}
+              >
+                {impersonate.isPending ? "Opening…" : "Open as this tradie ↗"}
+              </button>
             </div>
+            {impersonate.isError && <p className="error">{(impersonate.error as Error).message}</p>}
             <p className="muted-text">
               Route key: <code>{client.routeKey}</code>
             </p>
