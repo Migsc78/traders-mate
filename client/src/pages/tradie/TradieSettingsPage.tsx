@@ -506,6 +506,9 @@ export default function TradieSettingsPage() {
                 Dial on your work mobile. If &quot;Off / no signal&quot; fails with a network error, skip it — No answer + Busy
                 still catch most missed calls. Weak signal often blocks unreachable divert.
               </p>
+              <p className="muted-text" style={{ marginTop: 8 }}>
+                Wrong number or want it off? Dial <code>##002#</code> to cancel all conditional divert.
+              </p>
             </>
           )}
 
