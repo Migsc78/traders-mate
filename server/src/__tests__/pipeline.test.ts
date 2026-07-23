@@ -5,6 +5,12 @@ import { scoreLead } from "../services/score.js";
 import { domainCandidates } from "../utils/slug.js";
 import { registrableDomain } from "../utils/domain.js";
 import { interpretAvailability, ionosApiKeyHeader } from "../services/ionos.js";
+import {
+  extractEmailFromHtml,
+  findContactLinks,
+  contactPathCandidates,
+  resolveSameSiteUrl,
+} from "../services/emailScrape.js";
 
 let passed = 0;
 function test(name: string, fn: () => void) {
@@ -130,5 +136,27 @@ test("garbage -> UNKNOWN", () => assert.equal(interpretAvailability("nope"), "UN
 
 console.log("ionos.ionosApiKeyHeader");
 test("no key -> null", () => assert.equal(ionosApiKeyHeader(), null));
+
+console.log("emailScrape");
+test("mailto preferred", () => {
+  const html = `<a href="mailto:hello@joesplumbing.co.uk">Email</a> ignore@sentry.io`;
+  assert.equal(extractEmailFromHtml(html), "hello@joesplumbing.co.uk");
+});
+test("ignores junk domains", () => {
+  assert.equal(extractEmailFromHtml("contact example@schema.org thanks"), null);
+});
+test("finds contact link same site", () => {
+  const html = `<nav><a href="/contact-us">Contact us</a></nav>`;
+  const links = findContactLinks("https://joesplumbing.co.uk/", html);
+  assert.ok(links.some((u) => u.includes("/contact-us")));
+});
+test("rejects off-site contact link", () => {
+  assert.equal(resolveSameSiteUrl("https://joesplumbing.co.uk/", "https://facebook.com/joe"), null);
+});
+test("contact path candidates", () => {
+  const paths = contactPathCandidates("https://www.joesplumbing.co.uk/home");
+  assert.ok(paths.some((p) => p.endsWith("/contact")));
+  assert.ok(paths.every((p) => p.startsWith("https://www.joesplumbing.co.uk")));
+});
 
 console.log(`\nAll ${passed} assertions passed.`);

@@ -68,6 +68,14 @@ export default function LeadDetailPage() {
     onSuccess: invalidate,
   });
 
+  const scrapeEmail = useMutation({
+    mutationFn: () => api.scrapeLeadEmail(leadId),
+    onSuccess: (result: { email: string | null; found: boolean }) => {
+      if (result.email) setEmail(result.email);
+      invalidate();
+    },
+  });
+
   const statusMutation = useMutation({
     mutationFn: (status: OutreachStatus) => api.updateLead(leadId, { outreachStatus: status }),
     onSuccess: invalidate,
@@ -306,10 +314,26 @@ export default function LeadDetailPage() {
               <button className="primary" onClick={() => save.mutate()} disabled={save.isPending}>
                 {save.isPending ? "Saving…" : "Save notes & email"}
               </button>
+              <button
+                type="button"
+                onClick={() => scrapeEmail.mutate()}
+                disabled={scrapeEmail.isPending || !lead.websiteUri}
+                title={lead.websiteUri ? "Scrape homepage + contact pages" : "No website URL on this lead"}
+              >
+                {scrapeEmail.isPending ? "Scraping…" : "Re-scrape email from site"}
+              </button>
               <button onClick={() => markScreened.mutate()} disabled={markScreened.isPending}>
                 {markScreened.isPending ? "Updating…" : "Mark TPS-screened today"}
               </button>
             </div>
+            {scrapeEmail.isSuccess && (
+              <p className="muted-text" style={{ marginTop: 8 }}>
+                {scrapeEmail.data.found
+                  ? `Found ${scrapeEmail.data.email}`
+                  : "No email found on homepage or contact pages — add manually if you have one."}
+              </p>
+            )}
+            {scrapeEmail.isError && <p className="error">{(scrapeEmail.error as Error).message}</p>}
             {save.isError && <p className="error">{(save.error as Error).message}</p>}
           </section>
         )}

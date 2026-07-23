@@ -5,6 +5,8 @@ import { toCsv } from "../utils/csv.js";
 import { ApiError } from "../middleware/error.js";
 import { getPlace } from "../services/places.js";
 import { processPlace, toDbData } from "../services/pipeline.js";
+import { scrapeEmailFromWebsite } from "../services/emailScrape.js";
+import { reachLimiter } from "../lib/limiter.js";
 
 export const leadsRouter = Router();
 
@@ -36,6 +38,38 @@ async function refreshLeadById(id: string) {
       lastFetchedAt: new Date(),
     },
   });
+}
+
+async function scrapeEmailForLeadId(id: string) {
+  const existing = await prisma.lead.findUnique({
+    where: { id },
+    select: { id: true, websiteUri: true, email: true, displayName: true },
+  });
+  if (!existing) throw new ApiError(404, "not_found", "Lead not found");
+  if (!existing.websiteUri) {
+    throw new ApiError(400, "no_website", "This lead has no website URL to scrape");
+  }
+
+  const scraped = await reachLimiter.schedule(() => scrapeEmailFromWebsite(existing.websiteUri!));
+  if (!scraped) {
+    return {
+      id: existing.id,
+      email: existing.email,
+      found: false as const,
+      previousEmail: existing.email,
+    };
+  }
+
+  const updated = await prisma.lead.update({
+    where: { id: existing.id },
+    data: { email: scraped },
+  });
+  return {
+    id: updated.id,
+    email: updated.email,
+    found: true as const,
+    previousEmail: existing.email,
+  };
 }
 
 const listQuery = z.object({
@@ -187,6 +221,45 @@ leadsRouter.post("/bulk/delete", async (req, res, next) => {
   }
 });
 
+leadsRouter.post("/bulk/scrape-email", async (req, res, next) => {
+  try {
+    const { ids } = bulkIdsSchema.parse(req.body);
+    let found = 0;
+    let missing = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const lead = await prisma.lead.findUnique({
+          where: { id },
+          select: { websiteUri: true, displayName: true },
+        });
+        if (!lead?.websiteUri) {
+          skipped += 1;
+          continue;
+        }
+        const result = await scrapeEmailForLeadId(id);
+        if (result.found) found += 1;
+        else missing += 1;
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Scrape failed";
+        errors.push(message);
+      }
+    }
+
+    res.json({
+      found,
+      missing,
+      skipped,
+      failed: errors.length,
+      errors: errors.length ? errors.slice(0, 10) : undefined,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 leadsRouter.post("/export", async (req, res, next) => {
   try {
     const { ids } = exportSchema.parse(req.body ?? {});
@@ -253,6 +326,16 @@ leadsRouter.post("/:id/refresh", async (req, res, next) => {
   try {
     const updated = await refreshLeadById(req.params.id);
     res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/leads/:id/scrape-email — re-run website email scrape (homepage + contact pages)
+leadsRouter.post("/:id/scrape-email", async (req, res, next) => {
+  try {
+    const result = await scrapeEmailForLeadId(req.params.id);
+    res.json(result);
   } catch (err) {
     next(err);
   }

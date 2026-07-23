@@ -109,6 +109,18 @@ export default function LeadsPage() {
     },
   });
 
+  const [scrapeNotice, setScrapeNotice] = useState("");
+  const bulkScrapeEmail = useMutation({
+    mutationFn: () => api.bulkScrapeLeadEmails(selectedIds),
+    onSuccess: (r: { found: number; missing: number; skipped: number; failed: number }) => {
+      setScrapeNotice(
+        `Email scrape: ${r.found} found, ${r.missing} not found, ${r.skipped} skipped (no website)` +
+          (r.failed ? `, ${r.failed} failed` : "")
+      );
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+
   const confirmBulkDelete = () => {
     if (
       window.confirm(
@@ -152,6 +164,9 @@ export default function LeadsPage() {
           <button onClick={() => bulkScreen.mutate()} disabled={bulkScreen.isPending}>
             {bulkScreen.isPending ? "Updating…" : "Mark TPS-screened"}
           </button>
+          <button onClick={() => bulkScrapeEmail.mutate()} disabled={bulkScrapeEmail.isPending}>
+            {bulkScrapeEmail.isPending ? "Scraping emails…" : "Re-scrape emails"}
+          </button>
           <button className="danger" onClick={confirmBulkDelete} disabled={bulkDelete.isPending}>
             {bulkDelete.isPending ? "Deleting…" : "Delete"}
           </button>
@@ -165,12 +180,23 @@ export default function LeadsPage() {
           {bulkDelete.isError && (
             <span className="error inline-error">{(bulkDelete.error as Error).message}</span>
           )}
+          {bulkScrapeEmail.isError && (
+            <span className="error inline-error">{(bulkScrapeEmail.error as Error).message}</span>
+          )}
           {refreshResult && refreshResult.failed > 0 && !refreshing && (
             <span className="muted-text">
               {refreshResult.refreshed} refreshed, {refreshResult.failed} failed
             </span>
           )}
         </div>
+      )}
+      {scrapeNotice && (
+        <p className="muted-text">
+          {scrapeNotice}{" "}
+          <button type="button" className="linkish" onClick={() => setScrapeNotice("")}>
+            dismiss
+          </button>
+        </p>
       )}
 
       <ScoreLegend />

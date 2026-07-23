@@ -646,6 +646,18 @@ export const api = {
       body: JSON.stringify({ ids }),
     }),
 
+  scrapeLeadEmail: (id: string) =>
+    request<{ id: string; email: string | null; found: boolean; previousEmail: string | null }>(
+      `/api/leads/${id}/scrape-email`,
+      { method: "POST", body: JSON.stringify({}) }
+    ),
+
+  bulkScrapeLeadEmails: (ids: string[]) =>
+    request<{ found: number; missing: number; skipped: number; failed: number; errors?: string[] }>(
+      "/api/leads/bulk/scrape-email",
+      { method: "POST", body: JSON.stringify({ ids }) }
+    ),
+
   generateSite: (id: string) =>
     request<{ slug: string; previewUrl: string }>(`/api/leads/${id}/site`, { method: "POST", body: JSON.stringify({}) }),
 
