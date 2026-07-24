@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../../api/tradie";
+import { DivertManualGuide } from "./DivertManualGuide";
 
 const STEPS = [
   "Welcome",
@@ -376,17 +377,17 @@ export default function TradieOnboardingPage() {
             )}
             <p className="muted-text">
               Tip: do <strong>No answer</strong> and <strong>Busy</strong> first — those cover most missed calls.
-              If &quot;Off / no signal&quot; fails with a network error, skip it for now (common on weak signal) and use
-              Phone settings → Calls → Call forwarding if your network allows.
+              If &quot;Off / no signal&quot; fails with a network error, skip it (common on weak signal).
             </p>
             <p className="muted-text">To cancel divert later: ##002#</p>
+            <DivertManualGuide twilioNumber={d.twilioNumber} />
             <button
               className="primary t-btn--block"
               type="button"
               disabled={!d.divertCodes || confirmDivert.isPending}
               onClick={() => confirmDivert.mutate()}
             >
-              I&apos;ve dialled the codes
+              I&apos;ve set divert
             </button>
             <button type="button" className="linkish" onClick={() => setStep.mutate(1)}>
               Back

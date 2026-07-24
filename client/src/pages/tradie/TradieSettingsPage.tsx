@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { setTradieSession, tradieApi } from "../../api/tradie";
 import { blobToDataUrl, prepareGreetingUpload, preferredRecorderMime } from "../../lib/wav";
 import { supportMailto, SUPPORT_EMAIL } from "../../lib/supportMail";
+import { DivertManualGuide } from "./DivertManualGuide";
 import { StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
@@ -509,6 +510,7 @@ export default function TradieSettingsPage() {
               <p className="muted-text" style={{ marginTop: 8 }}>
                 Wrong number or want it off? Dial <code>##002#</code> to cancel all conditional divert.
               </p>
+              <DivertManualGuide twilioNumber={me.data.twilioNumber} />
             </>
           )}
 
