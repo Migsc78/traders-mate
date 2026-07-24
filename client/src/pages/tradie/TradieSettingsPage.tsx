@@ -619,7 +619,7 @@ export default function TradieSettingsPage() {
             <input
               ref={fileRef}
               type="file"
-              accept="audio/wav,audio/mpeg,audio/mp3,audio/mp4,.wav,.mp3,.m4a"
+              accept="audio/wav,audio/mpeg,audio/mp3,.wav,.mp3"
               hidden
               onChange={(e) => void onGreetingFile(e.target.files?.[0] ?? null)}
             />

@@ -44,24 +44,24 @@ export function audioBufferToWav(buffer: AudioBuffer): Blob {
   return new Blob([ab], { type: "audio/wav" });
 }
 
-/** True when we can upload without decodeAudioData (Twilio-friendly types). */
+/** True when we can upload without decodeAudioData (Twilio-friendly types only). */
 export function isDirectUploadAudio(type: string): boolean {
   const t = type.toLowerCase();
-  return /wav|mpeg|mp3|mp4|m4a|x-m4a|x-wav/.test(t);
+  // Twilio <Play> accepts wav/mp3 — NOT mp4/m4a/aac (error 12300 → scramble/noise).
+  return /(audio\/)?(wav|x-wav|mpeg|mp3)\b/.test(t) && !/mp4|m4a|aac|webm/.test(t);
 }
 
 export function greetingUploadContentType(blob: Blob): string {
   const t = (blob.type || "").split(";")[0]!.trim().toLowerCase();
   if (t.includes("wav")) return "audio/wav";
   if (t.includes("mpeg") || t.includes("mp3")) return "audio/mpeg";
-  if (t.includes("mp4") || t.includes("m4a")) return "audio/mp4";
-  return t.startsWith("audio/") ? t : "audio/wav";
+  return "audio/wav";
 }
 
 /**
  * Convert browser recordings to WAV for Twilio.
  * WebM often fails decodeAudioData on mobile ("Load failed") — callers should prefer
- * uploading mp4/wav when conversion fails.
+ * uploading mp3/wav when conversion fails.
  */
 export async function blobToWav(blob: Blob): Promise<Blob> {
   if (blob.type.toLowerCase().includes("wav")) return blob;
@@ -86,7 +86,7 @@ export async function blobToWav(blob: Blob): Promise<Blob> {
   }
 }
 
-/** Prepare a recorded/uploaded blob for the greeting API. */
+/** Prepare a recorded/uploaded blob for the greeting API. Always ends as wav/mp3 for Twilio. */
 export async function prepareGreetingUpload(blob: Blob): Promise<{ contentType: string; blob: Blob }> {
   if (blob.size < 800) {
     throw new Error("Recording was empty — hold for a few seconds, then Stop & save");
@@ -97,7 +97,7 @@ export async function prepareGreetingUpload(blob: Blob): Promise<{ contentType: 
   if (isDirectUploadAudio(blob.type)) {
     return { contentType: greetingUploadContentType(blob), blob };
   }
-  // MediaRecorder WebM/Opus → WAV for Twilio
+  // MediaRecorder mp4/webm/aac → WAV (Twilio cannot play audio/mp4)
   const wav = await blobToWav(blob);
   return { contentType: "audio/wav", blob: wav };
 }

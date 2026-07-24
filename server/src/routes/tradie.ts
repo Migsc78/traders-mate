@@ -367,9 +367,6 @@ const GREETING_TYPES = new Set([
   "audio/x-wav",
   "audio/mpeg",
   "audio/mp3",
-  "audio/mp4",
-  "audio/m4a",
-  "audio/x-m4a",
 ]);
 const MAX_GREETING_BYTES = 2 * 1024 * 1024; // ~30s WAV / short mp3
 
@@ -385,7 +382,11 @@ tradieRouter.post("/me/greeting", requireClient, async (req, res, next) => {
 
     const contentType = body.contentType.split(";")[0]!.trim().toLowerCase();
     if (!GREETING_TYPES.has(contentType) && !contentType.endsWith("wav") && !contentType.endsWith("mpeg")) {
-      throw new ApiError(400, "bad_type", "Upload a WAV or MP3 greeting (Twilio cannot play WebM)");
+      throw new ApiError(
+        400,
+        "bad_type",
+        "Upload a WAV or MP3 greeting (Twilio cannot play MP4/M4A — re-record or convert first)"
+      );
     }
 
     const raw = body.dataBase64.includes(",") ? body.dataBase64.split(",")[1]! : body.dataBase64;
