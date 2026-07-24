@@ -76,10 +76,18 @@ export function previewRatesForTrade(tradeTitle: string | null | undefined) {
   }));
 }
 
-/** Seed price book once if empty. Safe to call repeatedly. */
-export async function ensurePriceBook(clientId: string, tradeTitle?: string | null): Promise<number> {
-  const count = await prisma.priceBookItem.count({ where: { clientId } });
-  if (count > 0) return 0;
+/** Seed price book once if empty. Safe to call repeatedly. Pass replace to wipe and reseed. */
+export async function ensurePriceBook(
+  clientId: string,
+  tradeTitle?: string | null,
+  opts?: { replace?: boolean }
+): Promise<number> {
+  if (opts?.replace) {
+    await prisma.priceBookItem.deleteMany({ where: { clientId } });
+  } else {
+    const count = await prisma.priceBookItem.count({ where: { clientId } });
+    if (count > 0) return 0;
+  }
   const client = tradeTitle
     ? { tradeTitle }
     : await prisma.client.findUnique({ where: { id: clientId }, select: { tradeTitle: true } });

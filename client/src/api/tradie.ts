@@ -290,10 +290,14 @@ export const tradieApi = {
       body: JSON.stringify(destPhone ? { destPhone } : {}),
     }),
 
-  onboardingSeedRates: (tradePreset?: "plumber" | "electrician" | "heating") =>
+  onboardingSeedRates: (
+    tradePreset?: "plumber" | "electrician" | "heating",
+    opts?: { replace?: boolean }
+  ) =>
     tRequest<{
       seeded: number;
       alreadyHad: boolean;
+      replaced?: boolean;
       count: number;
       items: {
         sku: string | null;
@@ -305,7 +309,10 @@ export const tradieApi = {
       onboarding: Record<string, unknown>;
     }>("/onboarding/seed-rates", {
       method: "POST",
-      body: JSON.stringify(tradePreset ? { tradePreset } : {}),
+      body: JSON.stringify({
+        ...(tradePreset ? { tradePreset } : {}),
+        ...(opts?.replace ? { replace: true } : {}),
+      }),
     }),
 
   onboardingConfirmRates: () =>

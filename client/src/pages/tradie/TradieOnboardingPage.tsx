@@ -211,15 +211,18 @@ export default function TradieOnboardingPage() {
   });
 
   const seedRates = useMutation({
-    mutationFn: () => tradieApi.onboardingSeedRates(tradePreset),
+    mutationFn: (opts?: { replace?: boolean }) => tradieApi.onboardingSeedRates(tradePreset, opts),
     onSuccess: (r: {
       seeded: number;
       alreadyHad: boolean;
+      replaced?: boolean;
       count: number;
     }) => {
       setRatesReady(true);
-      if (r.alreadyHad) {
-        setRatesMsg(`You already have ${r.count} rates — edit anytime in Rates.`);
+      if (r.replaced) {
+        setRatesMsg(`Replaced with ${r.seeded} starter rates for your trade.`);
+      } else if (r.alreadyHad) {
+        setRatesMsg(`You already have ${r.count} rates — pick another trade to replace, or edit in Rates.`);
       } else {
         setRatesMsg(`Loaded ${r.seeded} starter rates for your trade.`);
       }
@@ -491,38 +494,37 @@ export default function TradieOnboardingPage() {
         {step === 5 && (
           <>
             <p>
-              Voice quotes pull prices from your rate book. Pick your trade and we&apos;ll load starter
-              rates — change any figure later in Rates.
+              Voice quotes pull prices from your rate book. Choose your trade to preview starter rates,
+              then load them — you can change any figure later in Rates.
             </p>
-            {!ratesReady && (
-              <div className="t-onboard-presets" role="group" aria-label="Trade">
-                {(
-                  d.tradePresets?.length
-                    ? d.tradePresets
-                    : ([
-                        { id: "plumber", label: "Plumber" },
-                        { id: "electrician", label: "Electrician" },
-                        { id: "heating", label: "Heating / gas" },
-                      ] as { id: TradePreset; label: string }[])
-                ).map((p: { id: TradePreset; label: string }) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={tradePreset === p.id ? "t-onboard-preset is-active" : "t-onboard-preset"}
-                    onClick={() => {
-                      setTradePreset(p.id);
-                      setRatesMsg("");
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="t-onboard-presets" role="group" aria-label="Trade">
+              {(
+                d.tradePresets?.length
+                  ? d.tradePresets
+                  : ([
+                      { id: "plumber", label: "Plumber" },
+                      { id: "electrician", label: "Electrician" },
+                      { id: "heating", label: "Heating / gas" },
+                    ] as { id: TradePreset; label: string }[])
+              ).map((p: { id: TradePreset; label: string }) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={tradePreset === p.id ? "t-onboard-preset is-active" : "t-onboard-preset"}
+                  onClick={() => {
+                    setTradePreset(p.id);
+                    setRatesMsg("");
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
             <ul className="t-onboard-rates">
-              {(ratesReady && d.ratePreview?.length
-                ? d.ratePreview
-                : RATE_PREVIEWS[tradePreset]
+              {(
+                ratesReady && tradePreset === (d.tradePreset || "plumber") && d.ratePreview?.length
+                  ? d.ratePreview
+                  : RATE_PREVIEWS[tradePreset]
               ).map(
                 (row: {
                   label: string;
@@ -551,7 +553,7 @@ export default function TradieOnboardingPage() {
                 {ratesMsg}
               </p>
             )}
-            {ratesReady && !ratesMsg && d.priceBookCount > 0 && (
+            {ratesReady && !ratesMsg && d.priceBookCount > 0 && tradePreset === (d.tradePreset || "plumber") && (
               <p className="t-onboard-ok" style={{ marginTop: 0 }}>
                 You already have {d.priceBookCount} rates ready.
               </p>
@@ -560,10 +562,28 @@ export default function TradieOnboardingPage() {
               <button
                 className="primary t-btn--block"
                 type="button"
-                onClick={() => seedRates.mutate()}
+                onClick={() => seedRates.mutate({})}
                 disabled={seedRates.isPending}
               >
                 {seedRates.isPending ? "Loading…" : "Load these starter rates"}
+              </button>
+            ) : tradePreset !== (d.tradePreset || "plumber") ? (
+              <button
+                className="primary t-btn--block"
+                type="button"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Replace your current rate book with these starter rates? Any edits you’ve already made will be lost."
+                    )
+                  ) {
+                    return;
+                  }
+                  seedRates.mutate({ replace: true });
+                }}
+                disabled={seedRates.isPending}
+              >
+                {seedRates.isPending ? "Loading…" : "Replace with these starter rates"}
               </button>
             ) : (
               <button

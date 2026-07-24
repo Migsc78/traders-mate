@@ -70,12 +70,13 @@ export default function TradieShell() {
   const onJobDetail = location.pathname.startsWith("/t/jobs/");
   const onOnboarding = location.pathname.startsWith("/t/onboarding");
 
-  // Paid but setup incomplete → send to wizard (except settings / billing return)
+  // Paid but setup incomplete → send to wizard (except settings / rates / billing return)
   if (
     me.data?.onboardingRequired &&
     me.data.accountActive &&
     !onOnboarding &&
-    !location.pathname.startsWith("/t/settings")
+    !location.pathname.startsWith("/t/settings") &&
+    !location.pathname.startsWith("/t/price-book")
   ) {
     return <Navigate to="/t/onboarding" replace />;
   }

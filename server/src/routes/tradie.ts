@@ -719,6 +719,8 @@ tradieRouter.post("/onboarding/seed-rates", requireClient, async (req, res, next
     const body = z
       .object({
         tradePreset: z.enum(["plumber", "electrician", "heating"]).optional(),
+        /** Wipe existing rates and load the chosen trade’s starters (onboarding “change trade”). */
+        replace: z.boolean().optional(),
       })
       .parse(req.body ?? {});
 
@@ -736,7 +738,8 @@ tradieRouter.post("/onboarding/seed-rates", requireClient, async (req, res, next
     }
 
     const before = await prisma.priceBookItem.count({ where: { clientId: client.id } });
-    const seeded = await ensurePriceBook(client.id, tradeTitle);
+    const replace = !!body.replace && before > 0;
+    const seeded = await ensurePriceBook(client.id, tradeTitle, { replace });
     const items = await listPriceBook(client.id);
     const preview = items.slice(0, 8).map((i) => ({
       sku: i.sku,
@@ -754,7 +757,8 @@ tradieRouter.post("/onboarding/seed-rates", requireClient, async (req, res, next
 
     res.json({
       seeded,
-      alreadyHad: before > 0,
+      alreadyHad: before > 0 && !replace,
+      replaced: replace,
       count: items.length,
       items: preview.length ? preview : previewRatesForTrade(tradeTitle),
       onboarding: buildOnboardingView(updated),
