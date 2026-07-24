@@ -1043,14 +1043,39 @@ a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38,
   background: var(--t-surface);
 }
 .t-divert-manual > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   cursor: pointer;
   font-weight: 600;
   font-size: 14px;
   color: var(--t-ink);
-  list-style-position: outside;
+  list-style: none;
+  user-select: none;
+}
+.t-divert-manual > summary::-webkit-details-marker {
+  display: none;
+}
+.t-divert-manual > summary::marker {
+  content: "";
+}
+.t-divert-manual > summary::before {
+  content: "";
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--t-ink-soft, #64748b);
+  border-bottom: 1.5px solid var(--t-ink-soft, #64748b);
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+  margin-top: -1px;
 }
 .t-divert-manual[open] > summary {
   margin-bottom: 4px;
+}
+.t-divert-manual[open] > summary::before {
+  transform: rotate(45deg);
+  margin-top: -3px;
 }
 .t-divert-manual-number {
   display: flex;
