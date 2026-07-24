@@ -5,6 +5,7 @@ import { setTradieSession, tradieApi } from "../../api/tradie";
 import { blobToDataUrl, prepareGreetingUpload, preferredRecorderMime } from "../../lib/wav";
 import { supportMailto, SUPPORT_EMAIL } from "../../lib/supportMail";
 import { DivertManualGuide } from "./DivertManualGuide";
+import { PayNowExplainer } from "./PayNowExplainer";
 import { StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
@@ -257,6 +258,14 @@ export default function TradieSettingsPage() {
               <dd>{me.data?.stripeConnectOnboarded ? "Enabled" : "Not set up"}</dd>
             </div>
           </dl>
+          {!me.data?.stripeConnectOnboarded ? (
+            <PayNowExplainer compact />
+          ) : (
+            <p className="muted-text" style={{ margin: "0 0 10px", fontSize: 13.5 }}>
+              Customers can pay deposits by card on quotes and invoices. Money goes to your Stripe
+              payouts bank account.
+            </p>
+          )}
           <div className="tradie-actions">
             {me.data?.billingRequired ? (
               <button className="primary t-btn--block" onClick={() => checkout.mutate()} disabled={checkout.isPending}>
@@ -286,10 +295,10 @@ export default function TradieSettingsPage() {
               disabled={connect.isPending}
             >
               {connect.isPending
-                ? "Opening…"
+                ? "Opening Stripe…"
                 : me.data?.stripeConnectOnboarded
                   ? "Refresh payment setup"
-                  : "Enable Pay Now (Stripe Connect)"}
+                  : "Enable Pay Now with Stripe"}
             </button>
             {connectMsg && <p className="muted-text">{connectMsg}</p>}
           </div>

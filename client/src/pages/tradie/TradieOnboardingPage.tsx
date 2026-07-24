@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../../api/tradie";
 import { DivertManualGuide } from "./DivertManualGuide";
+import { PayNowExplainer } from "./PayNowExplainer";
 
 const STEPS = [
   "Welcome",
@@ -617,6 +618,9 @@ export default function TradieOnboardingPage() {
             </p>
 
             <h3 className="t-onboard-subhead">Bank transfer (invoices)</h3>
+            <p className="muted-text" style={{ marginTop: 0 }}>
+              Printed on invoices so customers can pay by bank transfer. Separate from card Pay Now below.
+            </p>
             <div className="form">
               <label>
                 Account name
@@ -695,9 +699,7 @@ export default function TradieOnboardingPage() {
             </button>
 
             <h3 className="t-onboard-subhead">Card deposits (Pay Now)</h3>
-            <p className="muted-text" style={{ marginTop: 0 }}>
-              Lets customers pay a deposit on quotes/invoices by card. Takes a couple of minutes with Stripe.
-            </p>
+            {!d.stripeConnectOnboarded ? <PayNowExplainer /> : null}
             {connectMsg && (
               <p
                 className={
@@ -714,7 +716,7 @@ export default function TradieOnboardingPage() {
             )}
             {d.stripeConnectOnboarded && !connectMsg && (
               <p className="t-onboard-ok" style={{ marginTop: 0 }}>
-                Pay Now is enabled.
+                Pay Now is enabled — customers can pay deposits by card on quotes and invoices.
               </p>
             )}
             <button
@@ -730,7 +732,7 @@ export default function TradieOnboardingPage() {
                 ? "Opening Stripe…"
                 : d.stripeConnectOnboarded
                   ? "Pay Now enabled"
-                  : "Enable Pay Now"}
+                  : "Enable Pay Now with Stripe"}
             </button>
 
             <button
