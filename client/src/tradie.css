@@ -265,6 +265,41 @@ a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38,
   color: var(--t-accent-ink);
   background: var(--t-accent-soft);
 }
+.t-avatar--lg {
+  width: 52px;
+  height: 52px;
+  font-size: 16px;
+}
+.t-customer-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--t-hairline);
+}
+.t-customer-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.t-customer-stats strong {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.t-customer-section {
+  margin-top: 22px;
+}
+.t-customer-section .t-card label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--t-ink-soft);
+}
+.t-customer-section textarea {
+  margin-top: 6px;
+  width: 100%;
+}
 
 /* ---------- empty state ---------- */
 .t-empty {

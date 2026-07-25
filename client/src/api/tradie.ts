@@ -504,6 +504,7 @@ export const tradieApi = {
     tRequest<
       {
         phone: string;
+        phoneKey: string;
         name: string;
         jobCount: number;
         lastJobAt: string;
@@ -511,6 +512,18 @@ export const tradieApi = {
         latestQuote: { id: string; status: string; totalPence: number } | null;
       }[]
     >("/customers"),
+
+  customer: (phoneKey: string) =>
+    tRequest<CustomerProfile>(`/customers/${encodeURIComponent(phoneKey)}`),
+
+  updateCustomer: (
+    phoneKey: string,
+    body: { notes?: string; plantNotes?: string; name?: string }
+  ) =>
+    tRequest<{ ok: boolean; notes: string; plantNotes: string; name: string | null }>(
+      `/customers/${encodeURIComponent(phoneKey)}`,
+      { method: "PATCH", body: JSON.stringify(body) }
+    ),
 
   priceBook: () => tRequest<PriceBookItem[]>(`/price-book`),
 
@@ -617,6 +630,55 @@ export interface PriceBookItem {
   vatRate: number;
   isCallout: boolean;
   active: boolean;
+}
+
+export interface CustomerProfile {
+  phoneKey: string;
+  phone: string;
+  name: string;
+  postcode: string | null;
+  notes: string;
+  plantNotes: string;
+  jobCount: number;
+  totals: { paidPence: number; openPence: number };
+  jobs: {
+    id: string;
+    name: string;
+    message: string | null;
+    postcode: string | null;
+    status: string;
+    source: string;
+    createdAt: string;
+    latestQuote: { id: string; status: string; totalPence: number } | null;
+  }[];
+  invoices: {
+    id: string;
+    status: string;
+    totalPence: number;
+    amountDuePence: number;
+    reference: string | null;
+    paidAt: string | null;
+    createdAt: string;
+    enquiryId: string | null;
+  }[];
+  appointments: {
+    id: string;
+    title: string;
+    startsAt: string;
+    endsAt: string;
+    status: string;
+    address: string | null;
+    enquiryId: string | null;
+  }[];
+  certificates: {
+    id: string;
+    kind: string;
+    status: string;
+    siteAddress: string | null;
+    serviceDueAt: string | null;
+    createdAt: string;
+    enquiryId: string | null;
+  }[];
 }
 
 export function formatGbp(pence: number): string {

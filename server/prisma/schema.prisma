@@ -239,10 +239,31 @@ model Client {
   otpChallenges    OtpChallenge[]
   appointments     Appointment[]
   certificates     Certificate[]
+  customerContacts CustomerContact[]
 
   @@index([status])
   @@index([destPhone])
   @@index([twilioNumber])
+}
+
+/// Durable CRM notes for a household/customer, keyed by normalised phone digits.
+model CustomerContact {
+  id           String   @id @default(cuid())
+  clientId     String
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// Last 10 digits of UK mobile — stable match key across +44 / 07 formats
+  phoneKey     String
+  phone        String
+  name         String?
+  /// Freeform: access codes, preferences, history
+  notes        String?
+  /// Kit on site: combi model, cylinder, consumer unit, etc.
+  plantNotes   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([clientId, phoneKey])
+  @@index([clientId, updatedAt])
 }
 
 enum TwilioPoolStatus {

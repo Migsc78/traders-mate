@@ -213,6 +213,16 @@ export default function TradieJobPage() {
                 <span className="t-pill t-pill--slate">~{enquiry.distanceMiles} mi</span>
               )}
             </p>
+            {enquiry.phone ? (
+              <p style={{ margin: "8px 0 0" }}>
+                <Link
+                  className="linkish"
+                  to={`/t/customers/${encodeURIComponent(enquiry.phone.replace(/\D/g, "").slice(-10))}`}
+                >
+                  View customer record
+                </Link>
+              </p>
+            ) : null}
           </div>
         </div>
         {enquiry.message && <blockquote className="t-quote-msg">{enquiry.message}</blockquote>}

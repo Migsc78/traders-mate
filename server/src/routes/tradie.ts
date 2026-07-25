@@ -1296,6 +1296,10 @@ tradieRouter.get("/jobs/:enquiryId/messages", requireClient, async (req, res, ne
 });
 
 // ---- Customers (distinct contacts from enquiries) ----
+function customerPhoneKey(phone: string): string {
+  return phone.replace(/\D/g, "").slice(-10);
+}
+
 tradieRouter.get("/customers", requireClient, async (req, res, next) => {
   try {
     const enquiries = await prisma.enquiry.findMany({
@@ -1316,6 +1320,7 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
       string,
       {
         phone: string;
+        phoneKey: string;
         name: string;
         jobCount: number;
         lastJobAt: Date;
@@ -1325,11 +1330,12 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
     >();
 
     for (const e of enquiries) {
-      const key = e.phone.replace(/\D/g, "").slice(-10) || e.phone;
+      const key = customerPhoneKey(e.phone) || e.phone;
       const existing = byPhone.get(key);
       if (!existing) {
         byPhone.set(key, {
           phone: e.phone,
+          phoneKey: key,
           name: e.name,
           jobCount: 1,
           lastJobAt: e.createdAt,
@@ -1342,6 +1348,218 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
     }
 
     res.json(Array.from(byPhone.values()).sort((a, b) => b.lastJobAt.getTime() - a.lastJobAt.getTime()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /customers/:phoneKey — CRM profile assembled from jobs + notes for this phone */
+tradieRouter.get("/customers/:phoneKey", requireClient, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const phoneKey = String(req.params.phoneKey || "").replace(/\D/g, "").slice(-10);
+    if (phoneKey.length < 8) throw new ApiError(400, "bad_phone", "Invalid customer phone");
+
+    const enquiries = await prisma.enquiry.findMany({
+      where: { clientId: cid },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: {
+        quotes: {
+          where: { status: { not: "DELETED" } },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+          select: { id: true, status: true, totalPence: true, createdAt: true },
+        },
+        invoices: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            status: true,
+            totalPence: true,
+            amountDuePence: true,
+            reference: true,
+            paidAt: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    const jobs = enquiries.filter((e) => customerPhoneKey(e.phone) === phoneKey);
+    if (!jobs.length) {
+      // Still allow opening a contact that only has notes / certs / diary
+      const contactOnly = await prisma.customerContact.findUnique({
+        where: { clientId_phoneKey: { clientId: cid, phoneKey } },
+      });
+      if (!contactOnly) throw new ApiError(404, "not_found", "Customer not found");
+    }
+
+    const latest = jobs[0];
+    const phones = [...new Set(jobs.map((j) => j.phone))];
+    const names = jobs.map((j) => j.name).filter(Boolean);
+    const postcodes = jobs.map((j) => j.postcode).filter(Boolean) as string[];
+
+    const [contact, invoices, appointments, certificates] = await Promise.all([
+      prisma.customerContact.findUnique({
+        where: { clientId_phoneKey: { clientId: cid, phoneKey } },
+      }),
+      prisma.invoice.findMany({
+        where: {
+          clientId: cid,
+          OR: [
+            { enquiryId: { in: jobs.map((j) => j.id) } },
+            ...(phones.length
+              ? phones.map((p) => ({ customerPhone: { contains: phoneKey.slice(-8) } }))
+              : []),
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        select: {
+          id: true,
+          status: true,
+          totalPence: true,
+          amountDuePence: true,
+          reference: true,
+          paidAt: true,
+          createdAt: true,
+          enquiryId: true,
+        },
+      }),
+      prisma.appointment.findMany({
+        where: {
+          clientId: cid,
+          OR: [
+            { enquiryId: { in: jobs.map((j) => j.id) } },
+            { customerPhone: { contains: phoneKey.slice(-8) } },
+          ],
+        },
+        orderBy: { startsAt: "desc" },
+        take: 30,
+        select: {
+          id: true,
+          title: true,
+          startsAt: true,
+          endsAt: true,
+          status: true,
+          address: true,
+          enquiryId: true,
+        },
+      }),
+      prisma.certificate.findMany({
+        where: {
+          clientId: cid,
+          OR: [
+            { enquiryId: { in: jobs.map((j) => j.id) } },
+            { customerPhone: { contains: phoneKey.slice(-8) } },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        select: {
+          id: true,
+          kind: true,
+          status: true,
+          siteAddress: true,
+          serviceDueAt: true,
+          createdAt: true,
+          enquiryId: true,
+        },
+      }),
+    ]);
+
+    // Deduplicate invoices that matched both enquiry + phone
+    const invById = new Map(invoices.map((i) => [i.id, i]));
+    const uniqueInvoices = Array.from(invById.values());
+
+    const paidPence = uniqueInvoices
+      .filter((i) => i.status === "PAID" || i.paidAt)
+      .reduce((s, i) => s + i.totalPence, 0);
+    const openPence = uniqueInvoices
+      .filter((i) => i.status !== "PAID" && i.status !== "VOID" && i.status !== "DRAFT")
+      .reduce((s, i) => s + (i.amountDuePence || i.totalPence), 0);
+
+    res.json({
+      phoneKey,
+      phone: contact?.phone || latest?.phone || phones[0] || phoneKey,
+      name: contact?.name || latest?.name || names[0] || "Customer",
+      postcode: postcodes[0] || null,
+      notes: contact?.notes || "",
+      plantNotes: contact?.plantNotes || "",
+      jobCount: jobs.length,
+      totals: { paidPence, openPence },
+      jobs: jobs.map((j) => ({
+        id: j.id,
+        name: j.name,
+        message: j.message,
+        postcode: j.postcode,
+        status: j.status,
+        source: j.source,
+        createdAt: j.createdAt,
+        latestQuote: j.quotes[0] || null,
+      })),
+      invoices: uniqueInvoices,
+      appointments,
+      certificates,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** PATCH /customers/:phoneKey — save CRM notes / plant details */
+tradieRouter.patch("/customers/:phoneKey", requireClient, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const phoneKey = String(req.params.phoneKey || "").replace(/\D/g, "").slice(-10);
+    if (phoneKey.length < 8) throw new ApiError(400, "bad_phone", "Invalid customer phone");
+
+    const body = z
+      .object({
+        notes: z.string().max(8000).optional(),
+        plantNotes: z.string().max(4000).optional(),
+        name: z.string().max(120).optional(),
+      })
+      .parse(req.body ?? {});
+
+    const allPhones = await prisma.enquiry.findMany({
+      where: { clientId: cid },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: { phone: true, name: true },
+    });
+    const matched = allPhones.find((e) => customerPhoneKey(e.phone) === phoneKey);
+
+    const phone = matched?.phone || `+44${phoneKey.replace(/^0/, "")}`;
+    const name = body.name?.trim() || matched?.name || null;
+
+    const updated = await prisma.customerContact.upsert({
+      where: { clientId_phoneKey: { clientId: cid, phoneKey } },
+      create: {
+        clientId: cid,
+        phoneKey,
+        phone,
+        name,
+        notes: body.notes ?? null,
+        plantNotes: body.plantNotes ?? null,
+      },
+      update: {
+        ...(body.notes !== undefined ? { notes: body.notes || null } : {}),
+        ...(body.plantNotes !== undefined ? { plantNotes: body.plantNotes || null } : {}),
+        ...(body.name !== undefined ? { name: body.name.trim() || null } : {}),
+        phone,
+      },
+    });
+
+    res.json({
+      ok: true,
+      phoneKey: updated.phoneKey,
+      notes: updated.notes || "",
+      plantNotes: updated.plantNotes || "",
+      name: updated.name,
+    });
   } catch (err) {
     next(err);
   }
