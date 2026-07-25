@@ -109,7 +109,9 @@ export default function TradieShell() {
         !onOnboarding && (
         <p className="t-banner">
           Finish call divert so missed calls are rescued.{" "}
-          <NavLink to="/t/onboarding">Continue setup</NavLink>
+          <NavLink to={me.data.onboardingRequired ? "/t/onboarding" : "/t/settings#divert"}>
+            {me.data.onboardingRequired ? "Continue setup" : "Set up divert"}
+          </NavLink>
         </p>
       )}
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { setTradieSession, tradieApi } from "../../api/tradie";
 import { blobToDataUrl, prepareGreetingUpload, preferredRecorderMime } from "../../lib/wav";
 import { supportMailto, SUPPORT_EMAIL } from "../../lib/supportMail";
@@ -10,6 +10,7 @@ import { StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
   const qc = useQueryClient();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
   const fileRef = useRef<HTMLInputElement>(null);
@@ -58,6 +59,16 @@ export default function TradieSettingsPage() {
     setGoogleReviewUrl(me.data.googleReviewUrl || "");
     setDefaultDepositPercent(me.data.defaultDepositPercent || 0);
   }, [me.data]);
+
+  useEffect(() => {
+    if (location.hash !== "#divert") return;
+    const el = document.getElementById("divert");
+    if (!el) return;
+    const t = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [location.hash, me.data?.twilioNumber]);
 
   const twilioStatus = useQuery({
     queryKey: ["tradie-twilio-status"],
@@ -118,6 +129,14 @@ export default function TradieSettingsPage() {
       );
     },
     onError: (e: Error) => setTwilioMsg(e.message),
+  });
+
+  const confirmDivert = useMutation({
+    mutationFn: () => tradieApi.onboardingConfirmDivert(),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tradie-me"] });
+      void qc.invalidateQueries({ queryKey: ["tradie-onboarding"] });
+    },
   });
 
   const uploadGreeting = useMutation({
@@ -441,7 +460,7 @@ export default function TradieSettingsPage() {
         </div>
       </div>
 
-      <div className="t-settings-group">
+      <div className="t-settings-group" id="divert">
         <p className="t-section-label">Missed-call rescue</p>
         <div className="t-card">
           <p className="muted-text" style={{ margin: "0 0 12px" }}>
@@ -520,6 +539,21 @@ export default function TradieSettingsPage() {
                 Wrong number or want it off? Dial <code>##002#</code> to cancel all conditional divert.
               </p>
               <DivertManualGuide twilioNumber={me.data.twilioNumber} />
+              {!me.data.onboardingDivertConfirmedAt ? (
+                <button
+                  type="button"
+                  className="t-btn--block"
+                  style={{ marginTop: 12 }}
+                  disabled={confirmDivert.isPending}
+                  onClick={() => confirmDivert.mutate()}
+                >
+                  {confirmDivert.isPending ? "Saving…" : "I've set divert"}
+                </button>
+              ) : (
+                <p className="muted-text" style={{ marginTop: 12 }}>
+                  Divert marked as set — you can still change codes anytime.
+                </p>
+              )}
             </>
           )}
 

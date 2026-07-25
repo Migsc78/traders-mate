@@ -113,8 +113,21 @@ export default function TradieOnboardingPage() {
   }, [onboarding.data]);
 
   useEffect(() => {
-    if (onboarding.data?.completed) navigate("/t", { replace: true });
-  }, [onboarding.data?.completed, navigate]);
+    // Completed wizard used to redirect here instantly — so "Continue setup" felt broken.
+    // Still allow resume when divert was never confirmed.
+    if (onboarding.data?.completed && onboarding.data.divertConfirmed) {
+      navigate("/t", { replace: true });
+    }
+  }, [onboarding.data?.completed, onboarding.data?.divertConfirmed, navigate]);
+
+  useEffect(() => {
+    if (!onboarding.data?.completed || onboarding.data.divertConfirmed) return;
+    if (onboarding.data.step === 2) return;
+    // Jump back to divert when setup was finished without confirming codes.
+    void tradieApi.onboardingStep({ step: 2 }).then(() => {
+      void qc.invalidateQueries({ queryKey: ["tradie-onboarding"] });
+    });
+  }, [onboarding.data?.completed, onboarding.data?.divertConfirmed, onboarding.data?.step, qc]);
 
   // When a test call arrives on step 3, keep UI fresh (poll already running)
   useEffect(() => {
