@@ -1,45 +1,10 @@
 /**
- * Apply CustomerContact table (idempotent).
- * Usage: node --env-file=.env scripts/migrate-customer-contact.mjs
+ * One-off: mark CustomerContact migration applied after out-of-band create.
+ * Prefer: npx prisma migrate resolve --applied 20260725150000_customer_contact
+ *
+ * Do not re-run schema DDL against prod — Prisma migrations own the schema.
  */
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-await prisma.$executeRawUnsafe(`
-CREATE TABLE IF NOT EXISTS "CustomerContact" (
-  "id" TEXT NOT NULL,
-  "clientId" TEXT NOT NULL,
-  "phoneKey" TEXT NOT NULL,
-  "phone" TEXT NOT NULL,
-  "name" TEXT,
-  "notes" TEXT,
-  "plantNotes" TEXT,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL,
-  CONSTRAINT "CustomerContact_pkey" PRIMARY KEY ("id")
+console.error(
+  "Deprecated. Use: npx prisma migrate resolve --applied 20260725150000_customer_contact"
 );
-`);
-
-await prisma.$executeRawUnsafe(`
-CREATE UNIQUE INDEX IF NOT EXISTS "CustomerContact_clientId_phoneKey_key"
-ON "CustomerContact"("clientId", "phoneKey");
-`);
-
-await prisma.$executeRawUnsafe(`
-CREATE INDEX IF NOT EXISTS "CustomerContact_clientId_updatedAt_idx"
-ON "CustomerContact"("clientId", "updatedAt");
-`);
-
-await prisma.$executeRawUnsafe(`
-DO $$ BEGIN
-  ALTER TABLE "CustomerContact"
-    ADD CONSTRAINT "CustomerContact_clientId_fkey"
-    FOREIGN KEY ("clientId") REFERENCES "Client"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-`);
-
-console.log("CustomerContact ready");
-await prisma.$disconnect();
+process.exit(1);

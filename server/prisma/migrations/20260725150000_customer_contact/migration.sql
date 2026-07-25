@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS "CustomerContact" (
 CREATE UNIQUE INDEX IF NOT EXISTS "CustomerContact_clientId_phoneKey_key" ON "CustomerContact"("clientId", "phoneKey");
 CREATE INDEX IF NOT EXISTS "CustomerContact_clientId_updatedAt_idx" ON "CustomerContact"("clientId", "updatedAt");
 
-ALTER TABLE "CustomerContact"
-  ADD CONSTRAINT "CustomerContact_clientId_fkey"
-  FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CustomerContact"
+    ADD CONSTRAINT "CustomerContact_clientId_fkey"
+    FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
