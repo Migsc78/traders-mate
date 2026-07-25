@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["TEAMID.uk.co.tradiesmate.app"],
+        "paths": ["/t", "/t/*"]
+      }
+    ]
+  }
+}

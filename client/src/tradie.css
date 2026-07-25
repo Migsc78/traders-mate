@@ -68,6 +68,31 @@ body:has(.tradie-shell) {
   min-height: 100dvh;
 }
 
+/* Capacitor shell only — browsers keep existing padding */
+html.native-app .tradie-shell--app {
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+  padding-bottom: calc(108px + env(safe-area-inset-bottom));
+}
+
+html.native-app .tradie-shell--app.tradie-shell--detail {
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+html.native-app .t-appbar {
+  margin-top: 0;
+}
+
+html.native-app .tradie-bottom-nav {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+html.native-app .t-gate {
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
 .tradie-shell h1,
 .tradie-shell h2,
 .tradie-shell h3 {

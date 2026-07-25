@@ -3,6 +3,20 @@
   "buildCommand": "npm run build --prefix client",
   "outputDirectory": "client/dist",
   "framework": null,
+  "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
+      ]
+    },
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/q/:path*",
@@ -17,7 +31,7 @@
       "destination": "https://traders-mate-production.up.railway.app/cert/:path*"
     },
     {
-      "source": "/((?!api/|assets/|robots\\.txt|sitemap\\.xml|llms\\.txt|og-image\\.png|favicon\\.svg|icons/).*)",
+      "source": "/((?!api/|assets/|\\.well-known/|robots\\.txt|sitemap\\.xml|llms\\.txt|og-image\\.png|favicon\\.svg|icons/).*)",
       "destination": "/index.html"
     }
   ]
