@@ -1,5 +1,7 @@
 # Capacitor shell (tradie app only)
 
+**Manual ship steps (Play + TestFlight):** [native-ship-guide.md](./native-ship-guide.md)
+
 The native apps are a thin WebView over production `https://tradiesmate.co.uk/t`. Desktop and mobile browsers are unchanged — native behaviour is gated on `Capacitor.isNativePlatform()`.
 
 ## App identity
