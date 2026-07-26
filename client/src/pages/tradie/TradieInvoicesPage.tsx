@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatGbp, tradieApi, type InvoiceDto } from "../../api/tradie";
+import { openExternalUrl } from "../../lib/openExternalUrl";
 import { EmptyState, StatusPill } from "./ui";
 
 export default function TradieInvoicesPage() {
@@ -47,9 +48,13 @@ export default function TradieInvoicesPage() {
 
               <div className="t-invoice-actions">
                 {inv.publicUrl && (
-                  <a className="t-btn" href={inv.publicUrl} target="_blank" rel="noreferrer">
+                  <button
+                    type="button"
+                    className="t-btn"
+                    onClick={() => void openExternalUrl(inv.publicUrl!)}
+                  >
                     View
-                  </a>
+                  </button>
                 )}
                 {(inv.status === "DRAFT" || inv.status === "SENT" || inv.status === "OVERDUE") && (
                   <button onClick={() => send.mutate(inv.id)} disabled={send.isPending}>
