@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatGbp, tradieApi, type InvoiceDto } from "../../api/tradie";
 import { openExternalUrl } from "../../lib/openExternalUrl";
@@ -5,6 +6,7 @@ import { EmptyState, StatusPill } from "./ui";
 
 export default function TradieInvoicesPage() {
   const qc = useQueryClient();
+  const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
   const invoices = useQuery({ queryKey: ["tradie-invoices"], queryFn: () => tradieApi.invoices() });
 
   const send = useMutation({
@@ -16,6 +18,20 @@ export default function TradieInvoicesPage() {
     mutationFn: (id: string) => tradieApi.markInvoicePaid(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tradie-invoices"] }),
   });
+
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [preview]);
 
   return (
     <div>
@@ -51,7 +67,12 @@ export default function TradieInvoicesPage() {
                   <button
                     type="button"
                     className="t-btn"
-                    onClick={() => void openExternalUrl(inv.publicUrl!)}
+                    onClick={() =>
+                      setPreview({
+                        url: inv.publicUrl!,
+                        title: inv.customerName || inv.reference || "Invoice",
+                      })
+                    }
                   >
                     View
                   </button>
@@ -74,6 +95,26 @@ export default function TradieInvoicesPage() {
 
       {invoices.data?.length === 0 && (
         <EmptyState title="No invoices yet" hint="Accept a quote, then create the invoice in one tap." />
+      )}
+
+      {preview && (
+        <div className="t-doc-viewer" role="dialog" aria-modal="true" aria-label="Invoice preview">
+          <div className="t-doc-viewer-bar">
+            <button type="button" className="t-appbar-back" onClick={() => setPreview(null)}>
+              <span aria-hidden="true">‹</span>
+              <span>Invoices</span>
+            </button>
+            <p className="t-doc-viewer-title">{preview.title}</p>
+            <button
+              type="button"
+              className="t-btn t-doc-viewer-ext"
+              onClick={() => void openExternalUrl(preview.url).catch(() => undefined)}
+            >
+              Open
+            </button>
+          </div>
+          <iframe className="t-doc-viewer-frame" title="Invoice" src={preview.url} />
+        </div>
       )}
     </div>
   );

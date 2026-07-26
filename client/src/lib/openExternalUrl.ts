@@ -3,14 +3,32 @@ import { isNativeApp } from "./nativeApp";
 
 /**
  * Open a customer-facing / external URL without trapping the Capacitor WebView.
- * Native: system in-app browser with a close control.
+ * Native: Capacitor Browser (closeable). Falls back if the plugin isn't synced yet.
  * Browser: normal new tab.
  */
 export async function openExternalUrl(url: string): Promise<void> {
   if (!url) return;
+
+  const absolute = absolutize(url);
+
   if (isNativeApp()) {
-    await Browser.open({ url });
-    return;
+    try {
+      await Browser.open({ url: absolute });
+      return;
+    } catch {
+      // Plugin missing until `cap sync` / rebuild — fall through.
+    }
   }
-  window.open(url, "_blank", "noopener,noreferrer");
+
+  const opened = window.open(absolute, "_blank", "noopener,noreferrer");
+  if (!opened && isNativeApp()) {
+    // Last resort: stay in-app by returning false so callers can show a viewer.
+    throw new Error("Could not open link");
+  }
+}
+
+function absolutize(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `${window.location.origin}${url}`;
+  return url;
 }
