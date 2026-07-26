@@ -274,10 +274,16 @@ Wait until it finishes with no errors. This builds the website and copies config
 
 ## Step D2 — Build the Play upload file (AAB)
 
+You must be **inside** the `android` folder (not `client`). Also set Java for this PowerShell window (Android Studio’s JDK):
+
 ```powershell
 cd "C:\Users\miguel\Desktop\Traders Mate\traders-mate-app\client\android"
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
 .\gradlew.bat bundleRelease
 ```
+
+If you see `JAVA_HOME is not set`, you skipped the two `$env:` lines — paste all four lines together.
 
 First run can take a long time. Success looks like:
 
@@ -287,7 +293,10 @@ Your upload file is here:
 
 `C:\Users\miguel\Desktop\Traders Mate\traders-mate-app\client\android\app\build\outputs\bundle\release\app-release.aab`
 
-If it fails because of signing, re-check `keystore.properties` passwords and that `upload-keystore.jks` is in the `android` folder.
+If it fails because of signing:
+- Re-check `keystore.properties` passwords
+- Confirm `upload-keystore.jks` is in `client\android\` (same folder as `keystore.properties`, not inside `app\`)
+- Confirm `storeFile=upload-keystore.jks` (path is relative to the `android` folder)
 
 ## Step D3 (optional but recommended) — Run the app once on a phone/emulator
 

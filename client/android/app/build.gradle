@@ -22,7 +22,8 @@ android {
         keystoreProps.load(new FileInputStream(keystorePropsFile))
         signingConfigs {
             release {
-                storeFile file(keystoreProps["storeFile"])
+                // Paths in keystore.properties are relative to the android/ root
+                storeFile rootProject.file(keystoreProps["storeFile"])
                 storePassword keystoreProps["storePassword"]
                 keyAlias keystoreProps["keyAlias"]
                 keyPassword keystoreProps["keyPassword"]

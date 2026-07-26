@@ -182,10 +182,6 @@ export default function TradieAuthPage() {
           </form>
         </details>
       </div>
-
-      <p className="t-gate-alt">
-        New here? Trials open soon — <Link to="/">learn more</Link>
-      </p>
     </div>
   );
 }
