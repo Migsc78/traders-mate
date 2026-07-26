@@ -19,7 +19,11 @@ export default function TradieQuotesPage() {
       <ul className="t-list">
         {(quotes.data || []).map((q: { id: string; status: string; totalPence: number; sentAt: string | null; enquiry: { id: string; name: string } | null }) => (
           <li key={q.id}>
-            <Link className="t-row" to={q.enquiry ? `/t/jobs/${q.enquiry.id}` : "/t"}>
+            <Link
+              className="t-row"
+              to={q.enquiry ? `/t/jobs/${q.enquiry.id}` : "/t"}
+              state={q.enquiry ? { from: "/t/quotes", fromLabel: "Quotes" } : undefined}
+            >
               <div className="t-row-main">
                 <div className="t-row-top">
                   <strong>{q.enquiry?.name || "Quote"}</strong>

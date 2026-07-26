@@ -104,7 +104,11 @@ export default function TradieCustomerPage() {
         </div>
         <div className="tradie-actions" style={{ marginTop: 14 }}>
           {latestJobId ? (
-            <Link className="primary t-btn--block" to={`/t/jobs/${latestJobId}`}>
+            <Link
+              className="primary t-btn--block"
+              to={`/t/jobs/${latestJobId}`}
+              state={{ from: `/t/customers/${encodeURIComponent(phoneKey)}`, fromLabel: "Customer" }}
+            >
               Open latest job
             </Link>
           ) : null}
@@ -154,7 +158,11 @@ export default function TradieCustomerPage() {
           <ul className="t-list">
             {c.jobs.map((j) => (
               <li key={j.id}>
-                <Link className="t-row" to={`/t/jobs/${j.id}`}>
+                <Link
+                  className="t-row"
+                  to={`/t/jobs/${j.id}`}
+                  state={{ from: `/t/customers/${encodeURIComponent(phoneKey)}`, fromLabel: "Customer" }}
+                >
                   <div className="t-row-main">
                     <div className="t-row-top">
                       <strong>{j.message?.trim() || "Enquiry"}</strong>

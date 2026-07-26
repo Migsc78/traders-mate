@@ -69,6 +69,21 @@ export default function TradieShell() {
   const moreActive = MORE_TABS.some((t) => location.pathname.startsWith(t.to));
   const onJobDetail = location.pathname.startsWith("/t/jobs/");
   const onOnboarding = location.pathname.startsWith("/t/onboarding");
+  const jobBack =
+    onJobDetail &&
+    location.state &&
+    typeof location.state === "object" &&
+    "from" in location.state &&
+    typeof (location.state as { from?: unknown }).from === "string" &&
+    String((location.state as { from: string }).from).startsWith("/t")
+      ? {
+          to: (location.state as { from: string }).from,
+          label:
+            typeof (location.state as { fromLabel?: unknown }).fromLabel === "string"
+              ? (location.state as { fromLabel: string }).fromLabel
+              : "Back",
+        }
+      : { to: "/t", label: "Jobs" };
 
   // Paid but setup incomplete → send to wizard (except settings / rates / billing return)
   if (
@@ -85,15 +100,25 @@ export default function TradieShell() {
     <div className={`tradie-shell tradie-shell--app${onJobDetail ? " tradie-shell--detail" : ""}`}>
       <header className={`t-appbar${onJobDetail ? " t-appbar--detail" : ""}`}>
         {onJobDetail ? (
-          <NavLink to="/t" className="t-appbar-back" aria-label="Back to jobs">
+          <NavLink
+            to={jobBack.to}
+            className="t-appbar-back"
+            aria-label={`Back to ${jobBack.label}`}
+          >
             <IconBackChevron />
-            <span>Jobs</span>
+            <span>{jobBack.label}</span>
           </NavLink>
         ) : (
           <div className="t-brand-mark">{initialsOf(businessName)}</div>
         )}
         <div className="t-appbar-text">
-          <h1>{onJobDetail ? "Job" : businessName.replace(/\[SEED\]\s*/i, "")}</h1>
+          <h1>
+            {onJobDetail
+              ? jobBack.to === "/t/quotes"
+                ? "Quote"
+                : "Job"
+              : businessName.replace(/\[SEED\]\s*/i, "")}
+          </h1>
           <p className="t-appbar-sub">
             {onJobDetail ? "Quote & message customer" : subtitle}
             {!onJobDetail && me.data?.status === "TRIAL" && <StatusPill status="TRIAL" />}
