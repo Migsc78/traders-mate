@@ -326,18 +326,32 @@ That opens Android Studio on the project; then use Run ▶ as above.
 
 Do this in Chrome on Windows. You need a Google account and the **£25** Play developer registration if not already paid.
 
-## Step E1 — Open Play Console and create the app
+## Step E0 — Create a Play developer account (first time only)
 
-1. Go to [https://play.google.com/console](https://play.google.com/console)
-2. Sign in.
-3. Click **Create app** (or **All apps** → Create app).
-4. Fill in:
+If Play asks **“choose an account type”**:
+
+| Choice | When to use |
+|--------|-------------|
+| **An organisation** | Best for TradiesMate if you have (or will have) a business — Ltd, sole trader, etc. Looks more professional; some app categories require this later. You’ll verify the organisation (docs / D-U-N-S depending on type). |
+| **Yourself** | Faster if you’re shipping as an individual with no company yet. You can still earn money and invite people. Fine for Internal testing. |
+
+**Recommendation:** If TradiesMate is a real business (even sole trader), pick **An organisation** → organisation type that matches you (e.g. **Sole proprietorship** or **Corporation / Ltd**). If you don’t have business details ready and just want to test tonight, pick **Yourself** → **Get started**.
+
+Important: the Google account you’re signed in as (`migs.london@gmail.com` or whichever) **owns** the developer account forever — switch accounts first if you want a different owner.
+
+Then pay the one-time registration fee when asked and complete identity verification.
+
+## Step E1 — Create the app
+
+1. After the developer account is active, go to [https://play.google.com/console](https://play.google.com/console)
+2. Click **Create app** (or **All apps** → Create app).
+3. Fill in:
    - App name: `TradiesMate`
    - Default language: English (United Kingdom) if available, else English
    - App or game: **App**
    - Free or paid: **Free**
-5. Tick the declarations / accept.
-6. Click **Create app**.
+4. Tick the declarations / accept.
+5. Click **Create app**.
 
 You land on the app **Dashboard**. There will be a checklist of unfinished tasks. Work through them until Internal testing is allowed.
 

@@ -195,10 +195,6 @@ export default function TradieJobPage() {
 
   return (
     <div className="t-job-page">
-      <Link className="t-back" to="/t">
-        ← Jobs
-      </Link>
-
       <div className="t-card t-contact-card">
         <div className="t-contact-head">
           <span className="t-avatar">{initialsOf(enquiry.name)}</span>

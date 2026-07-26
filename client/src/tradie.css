@@ -123,6 +123,51 @@ html.native-app .t-gate {
   gap: 14px;
   margin: 4px 0 22px;
 }
+
+.t-appbar--detail {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 0 16px;
+  padding: 8px 0 12px;
+  background: linear-gradient(
+    180deg,
+    var(--t-paper) 70%,
+    rgba(245, 243, 238, 0)
+  );
+}
+
+html.native-app .t-appbar--detail {
+  top: env(safe-area-inset-top);
+}
+
+.t-appbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  min-height: 46px;
+  min-width: 46px;
+  padding: 0 12px 0 6px;
+  margin: 0;
+  border-radius: 14px;
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-accent-ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--t-shadow);
+}
+
+.t-appbar-back:active {
+  transform: scale(0.97);
+}
+
+.t-appbar-back svg {
+  display: block;
+  flex: none;
+}
 .t-brand-mark {
   width: 46px;
   height: 46px;

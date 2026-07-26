@@ -83,13 +83,20 @@ export default function TradieShell() {
 
   return (
     <div className={`tradie-shell tradie-shell--app${onJobDetail ? " tradie-shell--detail" : ""}`}>
-      <header className="t-appbar">
-        <div className="t-brand-mark">{initialsOf(businessName)}</div>
+      <header className={`t-appbar${onJobDetail ? " t-appbar--detail" : ""}`}>
+        {onJobDetail ? (
+          <NavLink to="/t" className="t-appbar-back" aria-label="Back to jobs">
+            <IconBackChevron />
+            <span>Jobs</span>
+          </NavLink>
+        ) : (
+          <div className="t-brand-mark">{initialsOf(businessName)}</div>
+        )}
         <div className="t-appbar-text">
-          <h1>{businessName.replace(/\[SEED\]\s*/i, "")}</h1>
+          <h1>{onJobDetail ? "Job" : businessName.replace(/\[SEED\]\s*/i, "")}</h1>
           <p className="t-appbar-sub">
-            {subtitle}
-            {me.data?.status === "TRIAL" && <StatusPill status="TRIAL" />}
+            {onJobDetail ? "Quote & message customer" : subtitle}
+            {!onJobDetail && me.data?.status === "TRIAL" && <StatusPill status="TRIAL" />}
           </p>
         </div>
       </header>
@@ -200,6 +207,24 @@ export default function TradieShell() {
         </div>
       )}
     </div>
+  );
+}
+
+function IconBackChevron({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
   );
 }
 
