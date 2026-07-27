@@ -13,10 +13,12 @@ const EXT: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
   "image/heic": "heic",
+  "application/pdf": "pdf",
 };
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB per photo
 export const MAX_AUDIO_BYTES = 15 * 1024 * 1024; // 15 MB voice notes
+export const MAX_CERT_FILE_BYTES = 12 * 1024 * 1024; // 12 MB cert photo/PDF
 
 const AUDIO_EXT: Record<string, string> = {
   "audio/webm": "webm",
@@ -38,7 +40,7 @@ export interface StoredFile {
  */
 export async function storeImage(contentType: string, data: Buffer): Promise<StoredFile> {
   const ext = EXT[contentType.toLowerCase()];
-  if (!ext) throw new Error("Unsupported image type");
+  if (!ext || ext === "pdf") throw new Error("Unsupported image type");
   if (data.length > MAX_UPLOAD_BYTES) throw new Error("Image too large");
 
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
@@ -46,6 +48,20 @@ export async function storeImage(contentType: string, data: Buffer): Promise<Sto
   const full = path.join(UPLOADS_DIR, name);
   await fs.writeFile(full, data);
   return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/${name}`, path: full };
+}
+
+/** Photo or PDF of a real safety/compliance certificate. */
+export async function storeCertFile(contentType: string, data: Buffer): Promise<StoredFile> {
+  const mime = contentType.toLowerCase().split(";")[0]!.trim();
+  const ext = EXT[mime];
+  if (!ext) throw new Error("Unsupported file type — use a photo (JPEG/PNG/WebP) or PDF");
+  if (data.length > MAX_CERT_FILE_BYTES) throw new Error("File too large (max 12 MB)");
+
+  await fs.mkdir(path.join(UPLOADS_DIR, "certs"), { recursive: true });
+  const name = `${Date.now()}-${randomBytes(5).toString("hex")}.${ext}`;
+  const full = path.join(UPLOADS_DIR, "certs", name);
+  await fs.writeFile(full, data);
+  return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/certs/${name}`, path: full };
 }
 
 export async function storeAudio(contentType: string, data: Buffer): Promise<StoredFile> {

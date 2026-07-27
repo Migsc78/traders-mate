@@ -240,21 +240,21 @@ export default function TradieCustomerPage() {
       </section>
 
       <section className="t-customer-section">
-        <h3 className="t-section-label">Certificates</h3>
+        <h3 className="t-section-label">Certs &amp; paperwork</h3>
         {c.certificates.length === 0 ? (
-          <p className="muted-text">No certificates yet.</p>
+          <p className="muted-text">No files filed yet.</p>
         ) : (
           <ul className="t-list">
             {c.certificates.map((cert) => (
               <li key={cert.id}>
                 <Link
                   className="t-row"
-                  to={cert.enquiryId ? `/t/certificates?enquiry=${cert.enquiryId}` : "/t/certificates"}
+                  to={`/t/certificates?id=${cert.id}`}
                 >
                   <div className="t-row-main">
                     <div className="t-row-top">
                       <strong>{cert.kind.replace(/_/g, " ")}</strong>
-                      <StatusPill status={cert.status} />
+                      <StatusPill status={cert.status === "FILED" || cert.status === "SIGNED" ? "FILED" : cert.status} />
                     </div>
                     <span className="t-row-sub">
                       {fmtDate(cert.createdAt)}

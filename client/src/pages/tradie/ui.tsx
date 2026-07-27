@@ -97,6 +97,8 @@ const PILL_TONES: Record<string, string> = {
   DELETED: "grey",
   HELD: "amber",
   TRIAL: "amber",
+  FILED: "green",
+  SIGNED: "blue",
 };
 
 export function StatusPill({ status }: { status: string }) {

@@ -424,12 +424,17 @@ export const tradieApi = {
   certificates: () => tRequest<CertificateDto[]>("/certificates"),
 
   createCertificate: (body: {
-    kind: "GAS_SAFETY" | "MINOR_WORKS" | "EICR";
+    kind: "GAS_SAFETY" | "MINOR_WORKS" | "EICR" | "OTHER";
     enquiryId?: string | null;
     siteAddress?: string | null;
     customerName?: string | null;
     customerPhone?: string | null;
-    formData?: Record<string, unknown>;
+    customerEmail?: string | null;
+    issuedAt?: string | null;
+    schemeRef?: string | null;
+    notes?: string | null;
+    serviceDueAt?: string | null;
+    file: { contentType: string; dataBase64: string };
   }) => tRequest<CertificateDto>("/certificates", { method: "POST", body: JSON.stringify(body) }),
 
   getCertificate: (id: string) => tRequest<CertificateDto>(`/certificates/${id}`),
@@ -437,18 +442,18 @@ export const tradieApi = {
   updateCertificate: (
     id: string,
     body: {
+      kind?: "GAS_SAFETY" | "MINOR_WORKS" | "EICR" | "OTHER";
       siteAddress?: string | null;
       customerName?: string | null;
       customerPhone?: string | null;
-      formData?: Record<string, unknown>;
+      customerEmail?: string | null;
+      issuedAt?: string | null;
+      schemeRef?: string | null;
+      notes?: string | null;
+      serviceDueAt?: string | null;
+      file?: { contentType: string; dataBase64: string } | null;
     }
   ) => tRequest<CertificateDto>(`/certificates/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-
-  signCertificate: (id: string, signatureDataUrl: string) =>
-    tRequest<CertificateDto>(`/certificates/${id}/sign`, {
-      method: "POST",
-      body: JSON.stringify({ signatureDataUrl }),
-    }),
 
   sendCertificate: (id: string) =>
     tRequest<CertificateDto>(`/certificates/${id}/send`, { method: "POST", body: "{}" }),
@@ -597,9 +602,12 @@ export interface CertificateDto {
   customerName: string | null;
   customerPhone: string | null;
   formData: Record<string, unknown>;
+  issuedAt: string | null;
+  schemeRef: string | null;
   signatureDataUrl: string | null;
   signedAt: string | null;
   pdfUrl: string | null;
+  fileContentType: string | null;
   publicToken: string;
   serviceDueAt: string | null;
   createdAt: string;

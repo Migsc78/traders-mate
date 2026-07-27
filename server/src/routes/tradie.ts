@@ -1780,7 +1780,7 @@ tradieRouter.patch("/appointments/:id", requireClient, async (req, res, next) =>
   }
 });
 
-// ---- Certificates ----
+// ---- Certificates (file store + expiry reminders) ----
 tradieRouter.get("/certificates", requireClient, async (req, res, next) => {
   try {
     const rows = await prisma.certificate.findMany({
@@ -1799,17 +1799,37 @@ tradieRouter.post("/certificates", requireClient, requireActiveAccount, async (r
     const { createCertificate } = await import("../services/certs/certificates.js");
     const body = z
       .object({
-        kind: z.enum(["GAS_SAFETY", "MINOR_WORKS", "EICR"]),
+        kind: z.enum(["GAS_SAFETY", "MINOR_WORKS", "EICR", "OTHER"]),
         enquiryId: z.string().nullable().optional(),
         siteAddress: z.string().max(240).nullable().optional(),
         customerName: z.string().max(120).nullable().optional(),
         customerPhone: z.string().max(40).nullable().optional(),
-        formData: z.record(z.unknown()).optional(),
+        customerEmail: z.string().max(160).nullable().optional(),
+        issuedAt: z.string().datetime().nullable().optional(),
+        schemeRef: z.string().max(80).nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
+        serviceDueAt: z.string().datetime().nullable().optional(),
+        file: z
+          .object({
+            contentType: z.string().min(3).max(80),
+            dataBase64: z.string().min(20),
+          })
+          .optional(),
       })
       .parse(req.body ?? {});
     const row = await createCertificate({
       clientId: clientId(req),
-      ...body,
+      kind: body.kind,
+      enquiryId: body.enquiryId,
+      siteAddress: body.siteAddress,
+      customerName: body.customerName,
+      customerPhone: body.customerPhone,
+      customerEmail: body.customerEmail,
+      schemeRef: body.schemeRef,
+      notes: body.notes,
+      issuedAt: body.issuedAt ? new Date(body.issuedAt) : null,
+      serviceDueAt: body.serviceDueAt ? new Date(body.serviceDueAt) : null,
+      file: body.file,
     });
     res.json(row);
   } catch (err) {
@@ -1834,14 +1854,37 @@ tradieRouter.patch("/certificates/:id", requireClient, async (req, res, next) =>
     const { updateCertificate } = await import("../services/certs/certificates.js");
     const body = z
       .object({
+        kind: z.enum(["GAS_SAFETY", "MINOR_WORKS", "EICR", "OTHER"]).optional(),
         siteAddress: z.string().max(240).nullable().optional(),
         customerName: z.string().max(120).nullable().optional(),
         customerPhone: z.string().max(40).nullable().optional(),
         customerEmail: z.string().max(160).nullable().optional(),
-        formData: z.record(z.unknown()).optional(),
+        issuedAt: z.string().datetime().nullable().optional(),
+        schemeRef: z.string().max(80).nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
+        serviceDueAt: z.string().datetime().nullable().optional(),
+        file: z
+          .object({
+            contentType: z.string().min(3).max(80),
+            dataBase64: z.string().min(20),
+          })
+          .nullable()
+          .optional(),
       })
       .parse(req.body ?? {});
-    const row = await updateCertificate(clientId(req), req.params.id, body);
+    const row = await updateCertificate(clientId(req), req.params.id, {
+      kind: body.kind,
+      siteAddress: body.siteAddress,
+      customerName: body.customerName,
+      customerPhone: body.customerPhone,
+      customerEmail: body.customerEmail,
+      schemeRef: body.schemeRef,
+      notes: body.notes,
+      issuedAt: body.issuedAt === undefined ? undefined : body.issuedAt ? new Date(body.issuedAt) : null,
+      serviceDueAt:
+        body.serviceDueAt === undefined ? undefined : body.serviceDueAt ? new Date(body.serviceDueAt) : null,
+      file: body.file,
+    });
     res.json(row);
   } catch (err) {
     next(err);

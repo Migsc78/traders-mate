@@ -124,7 +124,7 @@ export async function tickFollowUps(limit = 30): Promise<{ sent: number; expired
           await prisma.followUp.update({ where: { id: fu.id }, data: { status: "SKIPPED" } });
           continue;
         }
-        const body = `${c.client.businessName}: your annual service / safety check is due soon. Reply YES to book a visit.`;
+        const body = `${c.client.businessName}: a safety / service check is due soon for your property. Reply YES to book a visit.`;
         const results = await sendMessage({ to: c.customerPhone, channel: "SMS", body });
         await logMessage({
           clientId: c.clientId,

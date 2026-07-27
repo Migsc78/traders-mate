@@ -317,7 +317,7 @@ export default function LandingPage() {
                   <p>
                     Customer gets an SMS link to accept or decline. Auto-reminders chase. Raise a
                     bank-transfer invoice or take a card deposit with Pay Now — then book the job in
-                    your diary and issue certificates when the work&apos;s done.
+                    your diary and file certificates with expiry reminders when the work&apos;s done.
                   </p>
                 </div>
               </li>
@@ -354,7 +354,7 @@ export default function LandingPage() {
               </li>
               <li>
                 <strong>Certificates</strong>
-                <span>Fill, sign, and send common trade certs from the same job — no separate paperwork app.</span>
+                <span>Photo or PDF of the real cert, stored on the job, with due-date reminders and a share link.</span>
               </li>
             </ul>
           </div>
@@ -395,7 +395,7 @@ export default function LandingPage() {
                 <p>
                   Software for UK tradespeople. You get a dedicated UK number to divert missed calls
                   to, SMS job qualification, van-friendly quotes from your rates, payment chase, Pay
-                  Now card deposits, a job diary, and certificates — in one place.
+                  Now card deposits, a job diary, and cert file storage — in one place.
                 </p>
               </details>
               <details className="lp-faq-item">

@@ -143,48 +143,7 @@ export type CertPdfInput = {
   signedAt?: Date | null;
 };
 
-export async function renderCertificatePdf(input: CertPdfInput): Promise<{ url: string }> {
-  await fs.mkdir(path.join(UPLOADS_DIR, "pdfs"), { recursive: true });
-  const filename = `cert-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.pdf`;
-  const fullPath = path.join(UPLOADS_DIR, "pdfs", filename);
-
-  const doc = new PDFDocument({ margin: 48, size: "A4" });
-  const chunks: Buffer[] = [];
-  doc.on("data", (c: Buffer) => chunks.push(c));
-  const done = new Promise<Buffer>((resolve, reject) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-  });
-
-  doc.fontSize(18).text(input.kindLabel);
-  doc.fontSize(12).fillColor("#64748b").text(input.businessName);
-  doc.moveDown();
-  doc.fillColor("#0f172a");
-  if (input.customerName) doc.text(`Customer: ${input.customerName}`);
-  if (input.siteAddress) doc.text(`Site: ${input.siteAddress}`);
-  if (input.signedAt) doc.text(`Signed: ${input.signedAt.toLocaleString("en-GB")}`);
-  doc.moveDown();
-  doc.fontSize(11);
-  for (const [k, v] of Object.entries(input.formData || {})) {
-    if (v == null || v === "") continue;
-    doc.text(`${k}: ${String(v)}`);
-  }
-
-  if (input.signatureDataUrl?.startsWith("data:image")) {
-    try {
-      const b64 = input.signatureDataUrl.split(",")[1] || "";
-      const img = Buffer.from(b64, "base64");
-      doc.moveDown();
-      doc.text("Signature:");
-      doc.image(img, { fit: [220, 80] });
-    } catch {
-      /* ignore */
-    }
-  }
-
-  doc.end();
-  const buf = await done;
-  await fs.writeFile(fullPath, buf);
-  const base = env.PUBLIC_BASE_URL.replace(/\/$/, "");
-  return { url: `${base}/uploads/pdfs/${filename}` };
+/** @deprecated Certs are uploaded photos/PDFs now — do not generate fake official forms. */
+export async function renderCertificatePdf(_input: CertPdfInput): Promise<{ url: string }> {
+  throw new Error("Certificate PDF generation removed — upload the real certificate file instead");
 }

@@ -690,11 +690,13 @@ enum CertificateKind {
   GAS_SAFETY
   MINOR_WORKS
   EICR
+  OTHER
 }
 
 enum CertificateStatus {
   DRAFT
   SIGNED
+  FILED
   SENT
 }
 
@@ -710,12 +712,19 @@ model Certificate {
   customerName    String?
   customerPhone   String?
   customerEmail   String?
-  /// Form field values as JSON
+  /// Optional notes / legacy form fields
   formData        Json              @default("{}")
+  /// Date the real certificate was issued / work done
+  issuedAt        DateTime?
+  /// Gas Safe / scheme / engineer reference (free text)
+  schemeRef       String?
   signatureDataUrl String?
   signedAt        DateTime?
+  /// Uploaded photo or PDF of the real certificate (also used for legacy generated PDFs)
   pdfUrl          String?
+  fileContentType String?
   publicToken     String            @unique
+  /// Reminder date (typically ~11 months / expiry)
   serviceDueAt    DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt

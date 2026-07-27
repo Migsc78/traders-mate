@@ -413,7 +413,7 @@ export default function TradieJobPage() {
             Book in diary →
           </Link>
           <Link className="t-btn--block" to={`/t/certificates?enquiryId=${enquiryId}`}>
-            New certificate →
+            File certificate →
           </Link>
         </div>
       </section>
