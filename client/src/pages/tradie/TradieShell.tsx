@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getTradieSession, setTradieSession, tradieApi } from "../../api/tradie";
+import { getTradieSession, setTradieSession, tradieApi, TradieApiError } from "../../api/tradie";
 import { supportMailto } from "../../lib/supportMail";
 import {
   IconCustomers,
@@ -58,14 +58,51 @@ export default function TradieShell() {
     };
   }, [moreOpen]);
 
+  // Only drop the session on a real auth failure — not network / 5xx blips.
+  useEffect(() => {
+    if (!me.isError) return;
+    if (me.error instanceof TradieApiError && me.error.status === 401) {
+      setTradieSession(null);
+    }
+  }, [me.isError, me.error]);
+
   if (!session) return <Navigate to="/t/auth" replace />;
+
+  const unauthorized =
+    me.isError && me.error instanceof TradieApiError && me.error.status === 401;
+  if (unauthorized) return <Navigate to="/t/auth" replace />;
+
   if (me.isError) {
-    setTradieSession(null);
-    return <Navigate to="/t/auth" replace />;
+    return (
+      <div className="tradie-shell tradie-shell--app t-gate">
+        <div className="t-gate-brand">
+          <div className="t-brand-mark">TM</div>
+          <h1>Couldn&apos;t load your account</h1>
+          <p>Check your connection and try again. You&apos;re still signed in.</p>
+        </div>
+        <div className="t-gate-card">
+          <p className="error">{me.error instanceof Error ? me.error.message : "Something went wrong"}</p>
+          <button type="button" className="primary t-btn--block" onClick={() => void me.refetch()}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
-  const businessName = me.data?.businessName || "TradiesMate";
-  const subtitle = [me.data?.tradeTitle, me.data?.town].filter(Boolean).join(" · ") || "Quoting & jobs";
+  if (me.isLoading || !me.data) {
+    return (
+      <div className="tradie-shell tradie-shell--app t-gate">
+        <div className="t-gate-brand">
+          <div className="t-brand-mark">TM</div>
+          <h1>Loading…</h1>
+        </div>
+      </div>
+    );
+  }
+
+  const businessName = me.data.businessName || "TradiesMate";
+  const subtitle = [me.data.tradeTitle, me.data.town].filter(Boolean).join(" · ") || "Quoting & jobs";
   const moreActive = MORE_TABS.some((t) => location.pathname.startsWith(t.to));
   const onJobDetail = location.pathname.startsWith("/t/jobs/");
   const onOnboarding = location.pathname.startsWith("/t/onboarding");
@@ -87,7 +124,7 @@ export default function TradieShell() {
 
   // Paid but setup incomplete → send to wizard (except settings / rates / billing return)
   if (
-    me.data?.onboardingRequired &&
+    me.data.onboardingRequired &&
     me.data.accountActive &&
     !onOnboarding &&
     !location.pathname.startsWith("/t/settings") &&

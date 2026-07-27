@@ -8,7 +8,7 @@ import { ApiError } from "../middleware/error.js";
 import { createAndSendOtp, verifyOtp } from "../services/auth/otp.js";
 import { sendMessage, toE164UK } from "../services/messaging/sender.js";
 import { ensurePriceBook } from "../services/quotes/priceBook.js";
-import { appPublicUrl, newSessionToken, hashToken } from "../services/quotes/magicAuth.js";
+import { appPublicUrl, createClientSession, hashToken } from "../services/quotes/magicAuth.js";
 import { notifyEarlyAccessRequest, sendEmail } from "../services/email/send.js";
 
 export const signupRouter = Router();
@@ -58,16 +58,7 @@ function newInviteToken(): string {
 }
 
 async function createSession(clientId: string) {
-  const sessionToken = newSessionToken();
-  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-  await prisma.clientSession.create({
-    data: {
-      clientId,
-      tokenHash: hashToken(`session:${sessionToken}`),
-      expiresAt,
-    },
-  });
-  return { sessionToken, expiresAt };
+  return createClientSession(clientId);
 }
 
 async function loadValidInvite(rawToken: string | undefined | null) {

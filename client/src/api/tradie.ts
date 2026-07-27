@@ -2,6 +2,15 @@ import { apiUrl } from "./base";
 
 const SESSION_KEY = "tm_tradie_session";
 
+export class TradieApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "TradieApiError";
+    this.status = status;
+  }
+}
+
 export function getTradieSession(): string | null {
   return localStorage.getItem(SESSION_KEY);
 }
@@ -29,7 +38,7 @@ async function tRequest<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* ignore */
     }
-    throw new Error(message);
+    throw new TradieApiError(res.status, message);
   }
   return res.json() as Promise<T>;
 }

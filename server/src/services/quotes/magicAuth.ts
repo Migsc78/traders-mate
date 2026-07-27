@@ -2,9 +2,17 @@ import { createHash, randomBytes } from "node:crypto";
 import { env } from "../../env.js";
 import { prisma } from "../../db.js";
 
-const SESSION_DAYS = 14;
+/** Long-lived tradie login session (web + native). Magic/OTP links stay short-lived. */
+export const SESSION_DAYS = 90;
+/** When remaining lifetime drops below this, extend back to a full SESSION_DAYS. */
+const SLIDE_IF_REMAINING_MS = 45 * 24 * 60 * 60 * 1000;
 const MAGIC_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const REDEMPTION_GRACE_MS = 5 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function sessionExpiryFromNow(): Date {
+  return new Date(Date.now() + SESSION_DAYS * DAY_MS);
+}
 
 /** Replay-safe cache for duplicate consume requests (e.g. React StrictMode double-mount). */
 const recentRedemptions = new Map<string, { sessionToken: string; clientId: string; at: number }>();
@@ -78,7 +86,7 @@ export async function consumeMagicToken(rawToken: string): Promise<{ sessionToke
   }
 
   const sessionToken = newSessionToken();
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const expiresAt = sessionExpiryFromNow();
   const redeemed = await prisma.$transaction(async (tx) => {
     const deleted = await tx.clientSession.deleteMany({ where: { id: row.id, tokenHash: magicHash } });
     if (deleted.count === 0) return false;
@@ -99,10 +107,10 @@ export async function consumeMagicToken(rawToken: string): Promise<{ sessionToke
   return result;
 }
 
-/** Create a long-lived browser session token for a client. */
+/** Create a long-lived browser/app session token for a client. */
 export async function createClientSession(clientId: string): Promise<{ sessionToken: string; expiresAt: Date }> {
   const sessionToken = newSessionToken();
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const expiresAt = sessionExpiryFromNow();
   await prisma.clientSession.create({
     data: {
       clientId,
@@ -122,9 +130,16 @@ export async function resolveSession(sessionToken: string | null | undefined): P
     if (row) await prisma.clientSession.delete({ where: { id: row.id } }).catch(() => undefined);
     return null;
   }
+
+  const remainingMs = row.expiresAt.getTime() - Date.now();
+  const data: { lastSeenAt: Date; expiresAt?: Date } = { lastSeenAt: new Date() };
+  // Sliding window: active tradies stay signed in without another SMS.
+  if (remainingMs < SLIDE_IF_REMAINING_MS) {
+    data.expiresAt = sessionExpiryFromNow();
+  }
   await prisma.clientSession.update({
     where: { id: row.id },
-    data: { lastSeenAt: new Date() },
+    data,
   });
   return { clientId: row.clientId };
 }
