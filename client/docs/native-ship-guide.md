@@ -346,14 +346,17 @@ Then pay the one-time registration fee when asked and complete identity verifica
 1. After the developer account is active, go to [https://play.google.com/console](https://play.google.com/console)
 2. Click **Create app** (or **All apps** → Create app).
 3. Fill in:
-   - App name: `TradiesMate`
-   - Default language: English (United Kingdom) if available, else English
-   - App or game: **App**
-   - Free or paid: **Free**
-4. Tick the declarations / accept.
+   - **App name:** `TradiesMate`
+   - **Package name:** `uk.co.tradiesmate.app`  
+     Then click **Check availability**. It must be free.  
+     **Do not invent a different package** — it must match the AAB and App Links.
+   - **Default language:** English (United Kingdom) – en-GB
+   - **App or game:** **App**
+   - **Free or paid:** **Free**
+4. Tick all three declarations (Developer Programme Policies, Play App Signing, US export laws).
 5. Click **Create app**.
 
-You land on the app **Dashboard**. There will be a checklist of unfinished tasks. Work through them until Internal testing is allowed.
+You land on the app **Dashboard**. There will be a checklist of unfinished tasks. Work through E2–E7 below. You can start **Internal testing** (E8) in parallel for a private test — Play may still ask you to finish some declarations before a public track.
 
 ## Step E2 — Privacy policy
 
@@ -420,31 +423,109 @@ Category: **Business**
 Contact email: your support email  
 Save.
 
-## Step E8 — Internal testing release (upload the AAB)
+## Step E8 — Internal testing (where you are now)
 
-1. Left menu → **Testing** → **Internal testing**.
-2. Click **Create new release** (or **Create release**).
-3. Under App bundles, click **Upload** and choose:
+Open the app in Play Console → left sidebar **Test and release** → **Testing** → **Internal testing**.
 
-   `C:\Users\miguel\Desktop\Traders Mate\traders-mate-app\client\android\app\build\outputs\bundle\release\app-release.aab`
+You should see a 3-step strip at the top:
 
-4. Wait for upload + processing.
-5. Release name: e.g. `1.0 (1)`
-6. Release notes: `First internal build of TradiesMate tradie app.`
-7. **Next** / **Save** → **Review release** → **Start rollout to Internal testing**.
+1. **Select testers** ← you are here (Testers tab)
+2. **Create a new release**
+3. **Preview and confirm the release** (locked until a release exists)
 
-## Step E9 — Add yourself as a tester
+Do **testers first**, then upload the AAB. Order matters because the join link only appears after a release is published.
 
-1. Still under **Internal testing**, open the **Testers** tab.
-2. Create an email list (e.g. `TradiesMate internal`).
-3. Add your Gmail address (must be the Google account on the Android phone).
-4. Save.
-5. Copy the **opt-in / join** link shown on that page.
-6. On your Android phone, open that link in Chrome while signed into the same Google account.
-7. Accept becoming a tester.
-8. Tap the link to view the app in Play Store → **Install**.
+---
 
-First availability can take **5–60 minutes**. If Install is missing, wait and refresh.
+### E8a — Create a tester email list (Testers tab)
+
+1. Stay on **Internal testing** → tab **Testers** (not Releases).
+2. Under the empty testers area, click **Create email list**.
+3. In the dialog / form:
+   - **List name:** `TradiesMate internal`
+   - **Email addresses:** add the Google account(s) that will install the app.  
+     Use the **exact Gmail / Google account signed into Play Store on the phone**.  
+     Example: `you@gmail.com`  
+     One address per line if you add several.
+4. Click **Save** / **Create** (wording varies).
+5. Back on the Testers page, make sure that list is **selected / checked** for this Internal testing track.
+6. Click the blue **Save** button at the bottom of the page (it becomes enabled after you select a list).
+
+You should now see your list attached. The “Copy link” button stays grey until you publish a release — that is normal.
+
+---
+
+### E8b — Create a new release and upload the AAB
+
+1. Still on **Internal testing**, click the blue **Create new release** button (top right).  
+   Or advance the stepper to **Create a new release**.
+2. **Play App Signing** (first upload only):  
+   Google will offer to use **Play App Signing**. Accept / continue.  
+   Your local `upload-keystore.jks` is the **upload** key; Google holds the **app signing** key. That is correct and expected.
+3. Under **App bundles** (or **App bundles and APKs**):
+   - Click **Upload**
+   - Browse to this file on your PC:
+
+     `C:\Users\miguel\Desktop\Traders Mate\traders-mate-app\client\android\app\build\outputs\bundle\release\app-release.aab`
+
+   - Wait until upload finishes and Play shows the bundle (version code / version name). Processing can take a few minutes.
+4. If Play shows errors (signing, package name, version code):
+   - Package must be `uk.co.tradiesmate.app`
+   - Bundle must be a **release** AAB signed with your upload keystore
+   - Fix and rebuild with `.\gradlew.bat bundleRelease` in `client\android`, then upload again
+5. **Release name** (optional but clear): `1.0 (1)` or leave Play’s default.
+6. **Release notes** → English (United Kingdom), for example:
+
+   ```
+   First internal build of TradiesMate. Tradie shell: jobs, quotes, customers, certs file store.
+   ```
+
+7. Click **Next** (bottom right).
+
+---
+
+### E8c — Preview and confirm
+
+1. You land on **Preview and confirm the release**.
+2. Read any warnings. For internal testing, some store-listing warnings are OK to proceed; **errors** must be fixed.
+3. Click **Save and publish** / **Start rollout to Internal testing** (exact label varies).
+4. Confirm if a dialog asks “Start rollout?”.
+
+Status should move to something like **Available to internal testers** or **Rolling out**. First availability often takes **5–60 minutes**.
+
+---
+
+### E8d — Copy the join link and install on your phone
+
+1. Go back to **Internal testing** → **Testers** tab.
+2. Under **How testers join your test**, the join / opt-in link should now appear.
+3. Click **Copy link**.
+4. On your **Android phone**:
+   - Open **Chrome**
+   - Sign into the **same Google account** you put on the email list
+   - Paste the link and open it
+5. Tap **Accept** / **Become a tester** (wording varies).
+6. Tap the button to open the app on Google Play.
+7. Tap **Install**.
+
+If Install is missing: wait, pull to refresh the Play listing, or open the join link again later. Internal builds are not searchable on the public Play Store — only via this link.
+
+---
+
+## Step E9 — If “Create new release” is blocked
+
+Play sometimes blocks the first release until a few declarations are done. From the app **Dashboard** checklist, complete at least:
+
+| Item | What to enter |
+|------|----------------|
+| Privacy policy | `https://tradiesmate.co.uk/` |
+| App access | Restricted / login required — OTP via UK mobile on Auth |
+| Ads | No ads |
+| Target audience | 18+ / not for children |
+| Content rating | Complete questionnaire → apply rating |
+| Data safety | See Step E6 |
+
+Then return to **Internal testing** and continue from **E8b**.
 
 ---
 

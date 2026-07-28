@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "uk.co.tradiesmate.app",
       "sha256_cert_fingerprints": [
-        "73:7C:F5:BF:4B:70:66:85:A1:E2:B9:BB:C8:09:27:0F:17:F2:76:ED:1B:D3:4F:22:05:90:39:A2:FF:18:9C:E6"
+        "73:7C:F5:BF:4B:70:66:85:A1:E2:B9:BB:C8:09:27:0F:17:F2:76:ED:1B:D3:4F:22:05:90:39:A2:FF:18:9C:E6",
+        "B0:22:7E:99:06:2C:90:BA:1C:35:9A:19:44:B8:40:CC:86:87:30:17:55:77:3C:22:5D:19:CB:88:03:74:38:E2"
       ]
     }
   }
