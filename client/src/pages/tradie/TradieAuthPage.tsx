@@ -169,15 +169,14 @@ export default function TradieAuthPage() {
               <input
                 value={routeKey}
                 onChange={(e) => setRouteKey(e.target.value)}
-                placeholder="seed_tm_demo_plumbing"
+                placeholder="your-business-key"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
               />
             </label>
             <button className="t-btn--block" type="submit" disabled={sending || !routeKey.trim()}>
-              {sending
-                ? "Signing in…"
-                : routeKey.trim().startsWith("seed_tm_")
-                  ? "Sign in (seed — no SMS)"
-                  : "Text me a login link"}
+              {sending ? "Signing in…" : "Text me a login link"}
             </button>
           </form>
         </details>
