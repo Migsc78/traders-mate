@@ -1,6 +1,6 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTradieSession, setTradieSession, tradieApi, TradieApiError } from "../../api/tradie";
 import { supportMailto } from "../../lib/supportMail";
 import {
@@ -28,9 +28,67 @@ const MORE_TABS = [
   { to: "/t/settings", label: "Settings", Icon: IconSettings },
 ] as const;
 
+type DetailChrome = {
+  backTo: string;
+  backLabel: string;
+  title: string;
+  subtitle: string;
+};
+
+function resolveDetailChrome(pathname: string, state: unknown): DetailChrome | null {
+  if (pathname === "/t/jobs/new") {
+    return {
+      backTo: "/t",
+      backLabel: "Jobs",
+      title: "Add job",
+      subtitle: "New or existing customer",
+    };
+  }
+  if (pathname.startsWith("/t/jobs/")) {
+    const fromState =
+      state &&
+      typeof state === "object" &&
+      "from" in state &&
+      typeof (state as { from?: unknown }).from === "string" &&
+      String((state as { from: string }).from).startsWith("/t")
+        ? {
+            backTo: (state as { from: string }).from,
+            backLabel:
+              typeof (state as { fromLabel?: unknown }).fromLabel === "string"
+                ? String((state as { fromLabel?: unknown }).fromLabel)
+                : "Back",
+          }
+        : { backTo: "/t", backLabel: "Jobs" };
+    const fromQuotes = fromState.backTo === "/t/quotes";
+    return {
+      ...fromState,
+      title: fromQuotes ? "Quote" : "Job",
+      subtitle: "Quote & message customer",
+    };
+  }
+  if (pathname === "/t/customers/new") {
+    return {
+      backTo: "/t/customers",
+      backLabel: "Customers",
+      title: "Add customer",
+      subtitle: "Save a contact",
+    };
+  }
+  if (pathname.startsWith("/t/customers/")) {
+    return {
+      backTo: "/t/customers",
+      backLabel: "Customers",
+      title: "Customer",
+      subtitle: "Jobs, notes & plant",
+    };
+  }
+  return null;
+}
+
 export default function TradieShell() {
   const session = getTradieSession();
   const location = useLocation();
+  const qc = useQueryClient();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
   const me = useQuery({
@@ -38,6 +96,24 @@ export default function TradieShell() {
     queryFn: () => tradieApi.me(),
     enabled: !!session,
     retry: false,
+  });
+
+  const detail = useMemo(
+    () => resolveDetailChrome(location.pathname, location.state),
+    [location.pathname, location.state]
+  );
+  const onDetail = !!detail;
+  const onOnboarding = location.pathname.startsWith("/t/onboarding");
+
+  const confirmDivert = useMutation({
+    mutationFn: () => tradieApi.onboardingConfirmDivert(),
+    onSuccess: () => {
+      qc.setQueryData(["tradie-me"], (prev: Record<string, unknown> | undefined) =>
+        prev ? { ...prev, onboardingDivertConfirmedAt: new Date().toISOString() } : prev
+      );
+      void qc.invalidateQueries({ queryKey: ["tradie-me"] });
+      void qc.invalidateQueries({ queryKey: ["tradie-onboarding"] });
+    },
   });
 
   useEffect(() => {
@@ -104,23 +180,6 @@ export default function TradieShell() {
   const businessName = me.data.businessName || "TradiesMate";
   const subtitle = [me.data.tradeTitle, me.data.town].filter(Boolean).join(" · ") || "Quoting & jobs";
   const moreActive = MORE_TABS.some((t) => location.pathname.startsWith(t.to));
-  const onJobDetail = location.pathname.startsWith("/t/jobs/");
-  const onOnboarding = location.pathname.startsWith("/t/onboarding");
-  const jobBack =
-    onJobDetail &&
-    location.state &&
-    typeof location.state === "object" &&
-    "from" in location.state &&
-    typeof (location.state as { from?: unknown }).from === "string" &&
-    String((location.state as { from: string }).from).startsWith("/t")
-      ? {
-          to: (location.state as { from: string }).from,
-          label:
-            typeof (location.state as { fromLabel?: unknown }).fromLabel === "string"
-              ? (location.state as { fromLabel: string }).fromLabel
-              : "Back",
-        }
-      : { to: "/t", label: "Jobs" };
 
   // Paid but setup incomplete → send to wizard (except settings / rates / billing return)
   if (
@@ -134,31 +193,29 @@ export default function TradieShell() {
   }
 
   return (
-    <div className={`tradie-shell tradie-shell--app${onJobDetail ? " tradie-shell--detail" : ""}`}>
-      <header className={`t-appbar${onJobDetail ? " t-appbar--detail" : ""}`}>
-        {onJobDetail ? (
+    <div className={`tradie-shell tradie-shell--app${onDetail ? " tradie-shell--detail" : ""}`}>
+      <header className={`t-appbar${onDetail ? " t-appbar--detail" : ""}`}>
+        {detail ? (
           <NavLink
-            to={jobBack.to}
+            to={detail.backTo}
             className="t-appbar-back"
-            aria-label={`Back to ${jobBack.label}`}
+            aria-label={`Back to ${detail.backLabel}`}
           >
             <IconBackChevron />
-            <span>{jobBack.label}</span>
+            <span>{detail.backLabel}</span>
           </NavLink>
         ) : (
           <div className="t-brand-mark">{initialsOf(businessName)}</div>
         )}
         <div className="t-appbar-text">
           <h1>
-            {onJobDetail
-              ? jobBack.to === "/t/quotes"
-                ? "Quote"
-                : "Job"
+            {detail
+              ? detail.title
               : businessName.replace(/\[SEED\]\s*/i, "")}
           </h1>
           <p className="t-appbar-sub">
-            {onJobDetail ? "Quote & message customer" : subtitle}
-            {!onJobDetail && me.data?.status === "TRIAL" && <StatusPill status="TRIAL" />}
+            {detail ? detail.subtitle : subtitle}
+            {!detail && me.data?.status === "TRIAL" && <StatusPill status="TRIAL" />}
           </p>
         </div>
       </header>
@@ -181,6 +238,15 @@ export default function TradieShell() {
           <NavLink to={me.data.onboardingRequired ? "/t/onboarding" : "/t/settings#divert"}>
             {me.data.onboardingRequired ? "Continue setup" : "Set up divert"}
           </NavLink>
+          {" · "}
+          <button
+            type="button"
+            className="t-banner-action"
+            disabled={confirmDivert.isPending}
+            onClick={() => confirmDivert.mutate()}
+          >
+            {confirmDivert.isPending ? "Saving…" : "I've done this"}
+          </button>
         </p>
       )}
 
@@ -201,7 +267,7 @@ export default function TradieShell() {
         <Outlet context={{ me: me.data }} />
       </div>
 
-      {!onJobDetail && !onOnboarding && (
+      {!onDetail && !onOnboarding && (
         <nav className="tradie-bottom-nav" aria-label="Tradie navigation">
           {PRIMARY_TABS.map(({ to, label, Icon, ...rest }) => (
             <NavLink

@@ -134,6 +134,9 @@ export default function TradieSettingsPage() {
   const confirmDivert = useMutation({
     mutationFn: () => tradieApi.onboardingConfirmDivert(),
     onSuccess: () => {
+      qc.setQueryData(["tradie-me"], (prev: Record<string, unknown> | undefined) =>
+        prev ? { ...prev, onboardingDivertConfirmedAt: new Date().toISOString() } : prev
+      );
       void qc.invalidateQueries({ queryKey: ["tradie-me"] });
       void qc.invalidateQueries({ queryKey: ["tradie-onboarding"] });
     },

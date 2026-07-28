@@ -48,9 +48,6 @@ export default function TradieCustomerPage() {
   if (profile.isLoading) {
     return (
       <div>
-        <Link to="/t/customers" className="t-back">
-          ← Customers
-        </Link>
         <p className="muted-text">Loading customer…</p>
       </div>
     );
@@ -59,9 +56,6 @@ export default function TradieCustomerPage() {
   if (profile.isError || !profile.data) {
     return (
       <div>
-        <Link to="/t/customers" className="t-back">
-          ← Customers
-        </Link>
         <p className="error">{(profile.error as Error)?.message || "Customer not found"}</p>
       </div>
     );
@@ -72,10 +66,6 @@ export default function TradieCustomerPage() {
 
   return (
     <div>
-      <Link to="/t/customers" className="t-back">
-        ← Customers
-      </Link>
-
       <div className="t-card t-contact-card">
         <div className="t-contact-head">
           <span className="t-avatar t-avatar--lg">{initialsOf(c.name)}</span>

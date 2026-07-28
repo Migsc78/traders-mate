@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../../api/tradie";
 
@@ -42,15 +42,6 @@ export default function TradieNewCustomerPage() {
 
   return (
     <div>
-      <Link to="/t/customers" className="t-back">
-        ← Customers
-      </Link>
-
-      <header className="t-page-head">
-        <h2>Add customer</h2>
-        <p>Save a contact now — add a job when you&apos;re ready</p>
-      </header>
-
       <div className="t-card form">
         <label>
           Name

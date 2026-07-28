@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../../api/tradie";
 import { EmptyState, initialsOf } from "./ui";
@@ -123,21 +123,6 @@ export default function TradieNewJobPage() {
 
   return (
     <div>
-      <Link to="/t" className="t-back">
-        ← Jobs
-      </Link>
-
-      <header className="t-page-head">
-        <h2>Add job</h2>
-        <p>
-          {step === "choice"
-            ? "New walk-up, WhatsApp lead, or another job for someone you already know"
-            : step === "existing"
-              ? "Pick a customer, then add what they need"
-              : "Then you can draft a quote on the job"}
-        </p>
-      </header>
-
       {step === "choice" && (
         <div className="t-choice-stack">
           <button type="button" className="t-choice-card" onClick={startNew}>
@@ -199,15 +184,7 @@ export default function TradieNewJobPage() {
             <button type="button" className="linkish" onClick={() => setStep("choice")}>
               ← Back
             </button>
-          ) : prefillKey ? (
-            <button
-              type="button"
-              className="linkish"
-              onClick={() => navigate(`/t/customers/${encodeURIComponent(prefillKey)}`)}
-            >
-              ← Customer
-            </button>
-          ) : (
+          ) : prefillKey ? null : (
             <button type="button" className="linkish" onClick={() => setStep("existing")}>
               ← Customers
             </button>
