@@ -12,9 +12,14 @@ export default function TradieCustomersPage() {
 
   return (
     <div>
-      <header className="t-page-head">
-        <h2>Customers</h2>
-        <p>People who&apos;ve enquired — open a record for history, notes, and plant details</p>
+      <header className="t-page-head t-page-head--row">
+        <div>
+          <h2>Customers</h2>
+          <p>Your book — from missed calls or contacts you add</p>
+        </div>
+        <Link className="t-add-btn" to="/t/customers/new" aria-label="Add customer">
+          +
+        </Link>
       </header>
 
       {customers.isLoading && <p className="muted-text">Loading…</p>}
@@ -27,7 +32,7 @@ export default function TradieCustomersPage() {
             phoneKey?: string;
             name: string;
             jobCount: number;
-            lastEnquiryId: string;
+            lastEnquiryId: string | null;
             latestQuote: { id: string; status: string; totalPence: number } | null;
           }) => {
           const key = phoneKeyOf(c.phone, c.phoneKey);
@@ -56,7 +61,15 @@ export default function TradieCustomersPage() {
       </ul>
 
       {customers.data?.length === 0 && (
-        <EmptyState title="No customers yet" hint="Every enquiry that comes in shows up here automatically." />
+        <>
+          <EmptyState
+            title="No customers yet"
+            hint="Add a contact, or wait for the first missed-call enquiry."
+          />
+          <Link className="primary t-btn--block" to="/t/customers/new" style={{ marginTop: 12 }}>
+            Add a customer
+          </Link>
+        </>
       )}
     </div>
   );

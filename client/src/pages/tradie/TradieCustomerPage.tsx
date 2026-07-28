@@ -102,10 +102,13 @@ export default function TradieCustomerPage() {
             <strong>{formatGbp(c.totals.openPence)}</strong>
           </div>
         </div>
-        <div className="tradie-actions" style={{ marginTop: 14 }}>
+        <div className="tradie-actions t-customer-actions" style={{ marginTop: 14 }}>
+          <Link className="primary t-btn--block" to={`/t/jobs/new?phoneKey=${encodeURIComponent(phoneKey)}`}>
+            New job
+          </Link>
           {latestJobId ? (
             <Link
-              className="primary t-btn--block"
+              className="t-btn t-btn--block"
               to={`/t/jobs/${latestJobId}`}
               state={{ from: `/t/customers/${encodeURIComponent(phoneKey)}`, fromLabel: "Customer" }}
             >
@@ -153,7 +156,7 @@ export default function TradieCustomerPage() {
       <section className="t-customer-section">
         <h3 className="t-section-label">Jobs</h3>
         {c.jobs.length === 0 ? (
-          <EmptyState title="No jobs yet" hint="Enquiries from this number will show here." />
+          <EmptyState title="No jobs yet" hint="Tap New job above to start one for this customer." />
         ) : (
           <ul className="t-list">
             {c.jobs.map((j) => (

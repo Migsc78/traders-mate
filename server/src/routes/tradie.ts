@@ -839,6 +839,10 @@ tradieRouter.post("/onboarding/complete", requireClient, async (req, res, next) 
 });
 
 // ---- Jobs (enquiries) ----
+function customerPhoneKey(phone: string): string {
+  return phone.replace(/\D/g, "").slice(-10);
+}
+
 tradieRouter.get("/jobs", requireClient, async (req, res, next) => {
   try {
     const cid = clientId(req);
@@ -869,6 +873,72 @@ tradieRouter.get("/jobs", requireClient, async (req, res, next) => {
         latestQuote: e.quotes[0] || null,
       }))
     );
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /jobs — tradie-created job (walk-up / WhatsApp / returning customer) */
+tradieRouter.post("/jobs", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const body = z
+      .object({
+        name: z.string().trim().min(1).max(120),
+        phone: z.string().trim().min(7).max(40),
+        message: z.string().trim().max(2000).nullable().optional(),
+        postcode: z.string().trim().max(16).nullable().optional(),
+      })
+      .parse(req.body ?? {});
+
+    const phone = toE164UK(body.phone);
+    const phoneKey = customerPhoneKey(phone);
+    if (phoneKey.length < 8) throw new ApiError(400, "bad_phone", "Enter a valid UK mobile or landline");
+
+    const rawPc = body.postcode?.trim() || extractPostcode(body.message || "") || null;
+    const postcode = rawPc ? normalizePostcode(rawPc) || rawPc.toUpperCase() : null;
+
+    const enquiry = await prisma.enquiry.create({
+      data: {
+        clientId: cid,
+        name: body.name.trim(),
+        phone,
+        message: body.message?.trim() || null,
+        postcode,
+        source: "manual",
+        status: "ROUTED",
+        deliveredAt: new Date(),
+        deliveryInfo: "Created manually in TradiesMate",
+      },
+    });
+
+    await prisma.customerContact.upsert({
+      where: { clientId_phoneKey: { clientId: cid, phoneKey } },
+      create: {
+        clientId: cid,
+        phoneKey,
+        phone,
+        name: body.name.trim(),
+      },
+      update: {
+        phone,
+        name: body.name.trim(),
+      },
+    });
+
+    res.json({
+      id: enquiry.id,
+      name: enquiry.name,
+      phone: enquiry.phone,
+      message: enquiry.message,
+      postcode: enquiry.postcode,
+      distanceMiles: enquiry.distanceMiles,
+      photoUrls: enquiry.photoUrls,
+      status: enquiry.status,
+      source: enquiry.source,
+      createdAt: enquiry.createdAt,
+      latestQuote: null,
+    });
   } catch (err) {
     next(err);
   }
@@ -1295,26 +1365,30 @@ tradieRouter.get("/jobs/:enquiryId/messages", requireClient, async (req, res, ne
   }
 });
 
-// ---- Customers (distinct contacts from enquiries) ----
-function customerPhoneKey(phone: string): string {
-  return phone.replace(/\D/g, "").slice(-10);
-}
-
+// ---- Customers (enquiries + manual contacts) ----
 tradieRouter.get("/customers", requireClient, async (req, res, next) => {
   try {
-    const enquiries = await prisma.enquiry.findMany({
-      where: { clientId: clientId(req) },
-      orderBy: { createdAt: "desc" },
-      take: 300,
-      include: {
-        quotes: {
-          where: { status: { not: "DELETED" } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { id: true, status: true, totalPence: true },
+    const cid = clientId(req);
+    const [enquiries, contacts] = await Promise.all([
+      prisma.enquiry.findMany({
+        where: { clientId: cid },
+        orderBy: { createdAt: "desc" },
+        take: 300,
+        include: {
+          quotes: {
+            where: { status: { not: "DELETED" } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { id: true, status: true, totalPence: true },
+          },
         },
-      },
-    });
+      }),
+      prisma.customerContact.findMany({
+        where: { clientId: cid },
+        orderBy: { updatedAt: "desc" },
+        take: 300,
+      }),
+    ]);
 
     const byPhone = new Map<
       string,
@@ -1324,7 +1398,7 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
         name: string;
         jobCount: number;
         lastJobAt: Date;
-        lastEnquiryId: string;
+        lastEnquiryId: string | null;
         latestQuote: { id: string; status: string; totalPence: number } | null;
       }
     >();
@@ -1347,7 +1421,69 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
       }
     }
 
+    for (const c of contacts) {
+      const existing = byPhone.get(c.phoneKey);
+      if (!existing) {
+        byPhone.set(c.phoneKey, {
+          phone: c.phone,
+          phoneKey: c.phoneKey,
+          name: c.name || "Customer",
+          jobCount: 0,
+          lastJobAt: c.updatedAt,
+          lastEnquiryId: null,
+          latestQuote: null,
+        });
+      } else if (c.name?.trim()) {
+        existing.name = c.name.trim();
+        existing.phone = c.phone || existing.phone;
+      }
+    }
+
     res.json(Array.from(byPhone.values()).sort((a, b) => b.lastJobAt.getTime() - a.lastJobAt.getTime()));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /customers — add a contact without a job yet */
+tradieRouter.post("/customers", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const body = z
+      .object({
+        name: z.string().trim().min(1).max(120),
+        phone: z.string().trim().min(7).max(40),
+        notes: z.string().trim().max(8000).nullable().optional(),
+      })
+      .parse(req.body ?? {});
+
+    const phone = toE164UK(body.phone);
+    const phoneKey = customerPhoneKey(phone);
+    if (phoneKey.length < 8) throw new ApiError(400, "bad_phone", "Enter a valid UK mobile or landline");
+
+    const updated = await prisma.customerContact.upsert({
+      where: { clientId_phoneKey: { clientId: cid, phoneKey } },
+      create: {
+        clientId: cid,
+        phoneKey,
+        phone,
+        name: body.name.trim(),
+        notes: body.notes?.trim() || null,
+      },
+      update: {
+        phone,
+        name: body.name.trim(),
+        ...(body.notes !== undefined ? { notes: body.notes?.trim() || null } : {}),
+      },
+    });
+
+    res.json({
+      phoneKey: updated.phoneKey,
+      phone: updated.phone,
+      name: updated.name || body.name.trim(),
+      notes: updated.notes || "",
+      jobCount: 0,
+    });
   } catch (err) {
     next(err);
   }

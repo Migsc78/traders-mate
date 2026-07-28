@@ -13,11 +13,13 @@ import TradieSignupPage from "./pages/tradie/TradieSignupPage";
 import TradieShell from "./pages/tradie/TradieShell";
 import TradieJobsPage from "./pages/tradie/TradieJobsPage";
 import TradieJobPage from "./pages/tradie/TradieJobPage";
+import TradieNewJobPage from "./pages/tradie/TradieNewJobPage";
 import TradiePriceBookPage from "./pages/tradie/TradiePriceBookPage";
 import TradieQuotesPage from "./pages/tradie/TradieQuotesPage";
 import TradieInvoicesPage from "./pages/tradie/TradieInvoicesPage";
 import TradieCustomersPage from "./pages/tradie/TradieCustomersPage";
 import TradieCustomerPage from "./pages/tradie/TradieCustomerPage";
+import TradieNewCustomerPage from "./pages/tradie/TradieNewCustomerPage";
 import TradieSettingsPage from "./pages/tradie/TradieSettingsPage";
 import TradieDiaryPage from "./pages/tradie/TradieDiaryPage";
 import TradieCertificatesPage from "./pages/tradie/TradieCertificatesPage";
@@ -63,11 +65,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="quotes" element={<TradieQuotesPage />} />
             <Route path="invoices" element={<TradieInvoicesPage />} />
             <Route path="customers" element={<TradieCustomersPage />} />
+            <Route path="customers/new" element={<TradieNewCustomerPage />} />
             <Route path="customers/:phoneKey" element={<TradieCustomerPage />} />
             <Route path="price-book" element={<TradiePriceBookPage />} />
             <Route path="diary" element={<TradieDiaryPage />} />
             <Route path="certificates" element={<TradieCertificatesPage />} />
             <Route path="settings" element={<TradieSettingsPage />} />
+            <Route path="jobs/new" element={<TradieNewJobPage />} />
             <Route path="jobs/:enquiryId" element={<TradieJobPage />} />
           </Route>
           <Route path="/" element={<LandingPage />} />

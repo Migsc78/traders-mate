@@ -12,9 +12,14 @@ export default function TradieJobsPage() {
 
   return (
     <div>
-      <header className="t-page-head">
-        <h2>Jobs</h2>
-        <p>New enquiries — tap one to quote it</p>
+      <header className="t-page-head t-page-head--row">
+        <div>
+          <h2>Jobs</h2>
+          <p>Missed calls land here — or add a job yourself</p>
+        </div>
+        <Link className="t-add-btn" to="/t/jobs/new" aria-label="Add job">
+          +
+        </Link>
       </header>
 
       {me.data && !me.data.caps.claude && (
@@ -61,8 +66,14 @@ export default function TradieJobsPage() {
       {jobs.data?.length === 0 && (
         <EmptyState
           title="No jobs yet"
-          hint={`Share your intake link, enable missed-call divert, or forward email to ${me.data?.inboundEmail || "your inbound address"}.`}
+          hint="Tap + to add a walk-up or existing customer, or let missed-call divert fill this list."
         />
+      )}
+
+      {jobs.data?.length === 0 && (
+        <Link className="primary t-btn--block" to="/t/jobs/new" style={{ marginTop: 12 }}>
+          Add a job
+        </Link>
       )}
     </div>
   );

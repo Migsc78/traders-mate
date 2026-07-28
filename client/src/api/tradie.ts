@@ -353,6 +353,24 @@ export const tradieApi = {
       }[]
     >("/jobs"),
 
+  createJob: (body: {
+    name: string;
+    phone: string;
+    message?: string | null;
+    postcode?: string | null;
+  }) =>
+    tRequest<{
+      id: string;
+      name: string;
+      phone: string;
+      message: string | null;
+      postcode: string | null;
+      status: string;
+      source?: string;
+      createdAt: string;
+      latestQuote: null;
+    }>("/jobs", { method: "POST", body: JSON.stringify(body) }),
+
   job: (id: string) => tRequest<Record<string, unknown>>(`/jobs/${id}`),
 
   jobMessages: (enquiryId: string) =>
@@ -522,10 +540,19 @@ export const tradieApi = {
         name: string;
         jobCount: number;
         lastJobAt: string;
-        lastEnquiryId: string;
+        lastEnquiryId: string | null;
         latestQuote: { id: string; status: string; totalPence: number } | null;
       }[]
     >("/customers"),
+
+  createCustomer: (body: { name: string; phone: string; notes?: string | null }) =>
+    tRequest<{
+      phoneKey: string;
+      phone: string;
+      name: string;
+      notes: string;
+      jobCount: number;
+    }>("/customers", { method: "POST", body: JSON.stringify(body) }),
 
   customer: (phoneKey: string) =>
     tRequest<CustomerProfile>(`/customers/${encodeURIComponent(phoneKey)}`),
