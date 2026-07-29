@@ -847,7 +847,7 @@ tradieRouter.get("/jobs", requireClient, async (req, res, next) => {
   try {
     const cid = clientId(req);
     const enquiries = await prisma.enquiry.findMany({
-      where: { clientId: cid },
+      where: { clientId: cid, pipeline: "JOB" },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
@@ -869,10 +869,63 @@ tradieRouter.get("/jobs", requireClient, async (req, res, next) => {
         distanceMiles: e.distanceMiles,
         photoUrls: e.photoUrls,
         status: e.status,
+        pipeline: e.pipeline,
+        triage: e.triage,
+        summary: e.summary,
+        source: e.source,
         createdAt: e.createdAt,
         latestQuote: e.quotes[0] || null,
       }))
     );
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.get("/inbox", requireClient, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const enquiries = await prisma.enquiry.findMany({
+      where: { clientId: cid, pipeline: "INBOX" },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+      include: {
+        missedCalls: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, conversation: true, status: true, createdAt: true },
+        },
+      },
+    });
+    const needsYou = enquiries.filter((e) => e.triage !== "SPAM").length;
+    const caughtSpam = enquiries.filter((e) => e.triage === "SPAM").length;
+    res.json({
+      needsYouCount: needsYou,
+      caughtSpamCount: caughtSpam,
+      items: enquiries.map((e) => {
+        const missed = e.missedCalls[0];
+        const convo = Array.isArray(missed?.conversation) ? missed.conversation : [];
+        const snippet = (convo as { role?: string; text?: string }[])
+          .filter((t) => t.role === "user" && t.text)
+          .map((t) => String(t.text))
+          .slice(-2)
+          .join(" · ")
+          .slice(0, 220);
+        return {
+          id: e.id,
+          name: e.name,
+          phone: e.phone,
+          message: e.message,
+          postcode: e.postcode,
+          distanceMiles: e.distanceMiles,
+          source: e.source,
+          triage: e.triage,
+          summary: e.summary || e.message,
+          conversationSnippet: snippet || null,
+          createdAt: e.createdAt,
+        };
+      }),
+    });
   } catch (err) {
     next(err);
   }
@@ -907,8 +960,12 @@ tradieRouter.post("/jobs", requireClient, requireActiveAccount, async (req, res,
         postcode,
         source: "manual",
         status: "ROUTED",
+        pipeline: "JOB",
+        triage: "LIKELY_JOB",
+        summary: body.message?.trim()?.slice(0, 160) || "Manual job",
         deliveredAt: new Date(),
         deliveryInfo: "Created manually in TradiesMate",
+        promotedAt: new Date(),
       },
     });
 
@@ -935,9 +992,78 @@ tradieRouter.post("/jobs", requireClient, requireActiveAccount, async (req, res,
       distanceMiles: enquiry.distanceMiles,
       photoUrls: enquiry.photoUrls,
       status: enquiry.status,
+      pipeline: enquiry.pipeline,
+      triage: enquiry.triage,
       source: enquiry.source,
       createdAt: enquiry.createdAt,
       latestQuote: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/jobs/:enquiryId/promote", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: cid },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Not found");
+    const updated = await prisma.enquiry.update({
+      where: { id: enquiry.id },
+      data: {
+        pipeline: "JOB",
+        promotedAt: enquiry.promotedAt || new Date(),
+        killedAt: null,
+        triage: enquiry.triage === "SPAM" ? "LIKELY_JOB" : enquiry.triage,
+      },
+    });
+    res.json({
+      id: updated.id,
+      pipeline: updated.pipeline,
+      triage: updated.triage,
+      promotedAt: updated.promotedAt,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/jobs/:enquiryId/kill", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const body = z.object({ reason: z.enum(["dead", "spam"]) }).parse(req.body ?? {});
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: cid },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Not found");
+
+    const updated = await prisma.enquiry.update({
+      where: { id: enquiry.id },
+      data: {
+        pipeline: "KILLED",
+        killedAt: new Date(),
+        triage: body.reason === "spam" ? "SPAM" : enquiry.triage,
+        summary:
+          body.reason === "spam"
+            ? enquiry.summary || "Marked spam by tradie"
+            : enquiry.summary || "Marked not interested",
+      },
+    });
+
+    if (body.reason === "spam") {
+      await prisma.missedCall.updateMany({
+        where: { enquiryId: enquiry.id, clientId: cid },
+        data: { status: "SPAM" },
+      });
+    }
+
+    res.json({
+      id: updated.id,
+      pipeline: updated.pipeline,
+      triage: updated.triage,
+      killedAt: updated.killedAt,
     });
   } catch (err) {
     next(err);

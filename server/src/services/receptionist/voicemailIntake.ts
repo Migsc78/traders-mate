@@ -12,12 +12,19 @@ import { createMagicLogin, appPublicUrl } from "../quotes/magicAuth.js";
 import { distanceMilesBetween, normalizePostcode } from "../geo/postcode.js";
 import { downloadTwilioRecording } from "../twilio/numbers.js";
 import { transcribeWithWhisper } from "../quotes/whisper.js";
+import {
+  heuristicTriageFromText,
+  mergeModelTriage,
+  type EnquiryTriageTag,
+} from "./triage.js";
 
 type Extracted = {
   name: string;
   message: string;
   postcode: string | null;
   spam: boolean;
+  triage: EnquiryTriageTag;
+  summary: string;
 };
 
 type ConvoTurn = { role: string; text: string; at: string; source?: string };
@@ -110,9 +117,42 @@ export async function processVoicemailRecording(opts: {
   ];
 
   if (extracted.spam) {
+    const summary = extracted.summary || "Suspected spam / telesales";
+    const enquiry = await prisma.enquiry.create({
+      data: {
+        clientId: missed.client.id,
+        name: extracted.name || "Caller",
+        phone: missed.callerPhone,
+        message: extracted.message || summary,
+        source: "missed_call_voicemail",
+        status: missed.client.status === "ACTIVE" || missed.client.status === "TRIAL" ? "ROUTED" : "HELD",
+        pipeline: "INBOX",
+        triage: "SPAM",
+        summary,
+        deliveredAt: new Date(),
+        deliveryInfo: "Auto-tagged spam from voicemail",
+      },
+    });
     await prisma.missedCall.update({
       where: { id: missed.id },
-      data: { status: "SPAM", conversation: convo },
+      data: { status: "SPAM", enquiryId: enquiry.id, conversation: convo },
+    });
+    const { url } = await createMagicLogin(missed.client.id);
+    const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}?from=inbox`;
+    const notifyTo = toE164UK(missed.client.destPhone) || missed.client.destPhone;
+    const notifySms = `Caught in Inbox (spam): ${missed.callerPhone}. ${summary.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
+    await sendMessage({
+      to: notifyTo,
+      channel: missed.client.destChannel,
+      body: notifySms,
+    });
+    await logMessage({
+      clientId: missed.client.id,
+      enquiryId: enquiry.id,
+      direction: "OUTBOUND",
+      channel: "SYSTEM",
+      toAddr: notifyTo,
+      body: `Caught in Inbox (spam): ${missed.callerPhone}. ${summary.slice(0, 200)}`,
     });
     return { ok: true, reason: "spam" };
   }
@@ -133,6 +173,9 @@ export async function processVoicemailRecording(opts: {
       distanceMiles,
       source: "missed_call_voicemail",
       status: missed.client.status === "ACTIVE" || missed.client.status === "TRIAL" ? "ROUTED" : "HELD",
+      pipeline: "INBOX",
+      triage: extracted.triage === "SPAM" ? "UNKNOWN" : extracted.triage,
+      summary: extracted.summary || (extracted.message || transcript).slice(0, 160),
       deliveredAt: new Date(),
     },
   });
@@ -143,10 +186,10 @@ export async function processVoicemailRecording(opts: {
   });
 
   const { url } = await createMagicLogin(missed.client.id);
-  const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}`;
+  const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}?from=inbox`;
   const distBit = distanceMiles != null ? ` · ~${distanceMiles} mi` : "";
-  const msg = extracted.message || transcript;
-  const notifySms = `New job from voicemail: ${extracted.name || "Caller"}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${msg.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
+  const msg = extracted.summary || extracted.message || transcript;
+  const notifySms = `New in Inbox (voicemail): ${extracted.name || "Caller"}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${msg.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
   const notifyTo = toE164UK(missed.client.destPhone) || missed.client.destPhone;
   const notifyResults = await sendMessage({
     to: notifyTo,
@@ -164,7 +207,7 @@ export async function processVoicemailRecording(opts: {
     direction: "OUTBOUND",
     channel: "SMS",
     toAddr: notifyTo,
-    body: `New job from voicemail: ${extracted.name || "Caller"}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${msg.slice(0, 200)}`,
+    body: `New in Inbox (voicemail): ${extracted.name || "Caller"}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${msg.slice(0, 200)}`,
     status: notifyOk ? "sent" : notifyErr || "failed",
     twilioSid: notifyResults.find((r) => r.id)?.id,
   });
@@ -247,9 +290,10 @@ async function extractJobFromTranscript(opts: {
   const key = getClaudeApiKey();
   const prompt = `You are a UK trade receptionist for ${opts.businessName} (${opts.tradeTitle}).
 Extract a job enquiry from this caller voicemail transcript.
-Filter obvious spam/sales (PPI, solar cold calls, etc).
+Filter obvious spam/telesales (PPI, life insurance, pensions, solar, marketing agencies, business listings, lead-gen).
+If it looks like price-shopping only, triage as QUOTE_SHOPPER.
 Return ONLY JSON:
-{"name":"string or Caller","message":"short job summary","postcode":"UK postcode or null","spam":boolean}
+{"name":"string or Caller","message":"short job summary","postcode":"UK postcode or null","spam":boolean,"triage":"LIKELY_JOB|QUOTE_SHOPPER|SPAM|UNKNOWN","summary":"one-line summary"}
 
 Transcript:
 ${opts.transcript}`;
@@ -277,12 +321,23 @@ ${opts.transcript}`;
       message?: string | null;
       postcode?: string | null;
       spam?: boolean;
+      triage?: string | null;
+      summary?: string | null;
     };
+    const triage = mergeModelTriage({
+      spam: parsed.spam,
+      triage: parsed.triage,
+      summary: parsed.summary,
+      message: parsed.message,
+      transcript: opts.transcript,
+    });
     return {
       name: (parsed.name || "Caller").trim() || "Caller",
       message: (parsed.message || opts.transcript).trim().slice(0, 500),
       postcode: parsed.postcode || null,
-      spam: !!parsed.spam,
+      spam: triage.spam,
+      triage: triage.triage,
+      summary: triage.summary,
     };
   } catch {
     return fallback;
@@ -290,15 +345,14 @@ ${opts.transcript}`;
 }
 
 function heuristicExtract(transcript: string): Extracted {
-  const spamRe = /\b(ppi|solar panel|guaranteed|investment opportunity|marketing agency)\b/i;
-  if (spamRe.test(transcript)) {
-    return { name: "Caller", message: transcript.slice(0, 500), postcode: null, spam: true };
-  }
+  const triage = heuristicTriageFromText(transcript);
   const postcodeMatch = transcript.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i);
   return {
     name: "Caller",
     message: transcript.trim().slice(0, 500) || "Voicemail (no transcript)",
     postcode: postcodeMatch ? postcodeMatch[1].toUpperCase() : null,
-    spam: false,
+    spam: triage.spam,
+    triage: triage.triage,
+    summary: triage.summary,
   };
 }

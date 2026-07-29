@@ -5,8 +5,25 @@ import { logMessage } from "../messaging/log.js";
 import { createMagicLogin, appPublicUrl } from "../quotes/magicAuth.js";
 import { distanceMilesBetween, normalizePostcode } from "../geo/postcode.js";
 import { findClientByTwilioNumber } from "../twilio/findClientByNumber.js";
+import {
+  conversationSummaryText,
+  heuristicTriageFromText,
+  mergeModelTriage,
+  type EnquiryTriageTag,
+} from "./triage.js";
 
 type ConvoTurn = { role: "assistant" | "user"; text: string; at: string };
+
+type QualifyResult = {
+  assistantReply: string | null;
+  ready: boolean;
+  spam: boolean;
+  name?: string;
+  message?: string;
+  postcode?: string | null;
+  triage: EnquiryTriageTag;
+  summary: string;
+};
 
 export async function handleMissedCallInboundSms(opts: {
   from: string;
@@ -77,9 +94,37 @@ export async function handleMissedCallInboundSms(opts: {
   }
 
   if (result.spam) {
+    const summary = result.summary || conversationSummaryText(convo) || "Suspected spam / telesales";
+    const enquiry = await prisma.enquiry.create({
+      data: {
+        clientId: client.id,
+        name: result.name || "Caller",
+        phone: from,
+        message: result.message || summary,
+        source: "missed_call",
+        status: client.status === "ACTIVE" || client.status === "TRIAL" ? "ROUTED" : "HELD",
+        pipeline: "INBOX",
+        triage: "SPAM",
+        summary,
+        deliveredAt: new Date(),
+        deliveryInfo: "Auto-tagged spam from missed-call SMS qualify",
+      },
+    });
     await prisma.missedCall.update({
       where: { id: missed.id },
-      data: { status: "SPAM", conversation: convo },
+      data: { status: "SPAM", enquiryId: enquiry.id, conversation: convo },
+    });
+    const { url } = await createMagicLogin(client.id);
+    const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}?from=inbox`;
+    const notifySms = `Caught in Inbox (spam): ${from}. ${summary.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
+    await sendMessage({ to: client.destPhone, channel: client.destChannel, body: notifySms });
+    await logMessage({
+      clientId: client.id,
+      enquiryId: enquiry.id,
+      direction: "OUTBOUND",
+      channel: "SYSTEM",
+      toAddr: client.destPhone,
+      body: `Caught in Inbox (spam): ${from}. ${summary.slice(0, 200)}`,
     });
     return { handled: true };
   }
@@ -99,6 +144,9 @@ export async function handleMissedCallInboundSms(opts: {
         distanceMiles,
         source: "missed_call",
         status: client.status === "ACTIVE" || client.status === "TRIAL" ? "ROUTED" : "HELD",
+        pipeline: "INBOX",
+        triage: result.triage === "SPAM" ? "UNKNOWN" : result.triage,
+        summary: result.summary || result.message.slice(0, 160),
         deliveredAt: new Date(),
       },
     });
@@ -108,21 +156,19 @@ export async function handleMissedCallInboundSms(opts: {
       data: { status: "CONVERTED", enquiryId: enquiry.id, conversation: convo },
     });
 
-    // SMS to tradie can include a deep link — do NOT attach the magic login URL to the job message thread.
     const { url } = await createMagicLogin(client.id);
-    const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}`;
+    const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}?from=inbox`;
     const distBit = distanceMiles != null ? ` · ~${distanceMiles} mi` : "";
-    const notifySms = `New job from missed call: ${result.name}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${result.message.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
+    const notifySms = `New in Inbox: ${result.name}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${result.summary || result.message.slice(0, 120)}\n\nOpen: ${deep}\nLogin: ${url}`;
     await sendMessage({ to: client.destPhone, channel: client.destChannel, body: notifySms });
 
-    // Clean timeline entry for the job (no login tokens / deep links)
     await logMessage({
       clientId: client.id,
       enquiryId: enquiry.id,
       direction: "OUTBOUND",
       channel: "SYSTEM",
       toAddr: client.destPhone,
-      body: `New job from missed call: ${result.name}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${result.message.slice(0, 200)}`,
+      body: `New in Inbox: ${result.name}${jobPostcode ? ` (${jobPostcode}${distBit})` : ""}. ${(result.summary || result.message).slice(0, 200)}`,
     });
 
     return { handled: true };
@@ -139,14 +185,7 @@ async function qualifyConversation(opts: {
   businessName: string;
   tradeTitle: string;
   conversation: ConvoTurn[];
-}): Promise<{
-  assistantReply: string | null;
-  ready: boolean;
-  spam: boolean;
-  name?: string;
-  message?: string;
-  postcode?: string | null;
-}> {
+}): Promise<QualifyResult> {
   const fallback = heuristicQualify(opts.conversation);
   if (!claudeConfigured()) return fallback;
 
@@ -154,9 +193,10 @@ async function qualifyConversation(opts: {
   const transcript = opts.conversation.map((t) => `${t.role}: ${t.text}`).join("\n");
   const prompt = `You are a UK trade receptionist for ${opts.businessName} (${opts.tradeTitle}).
 Qualify the caller via SMS. Goal: get job description, postcode, and a name if possible.
-Filter obvious spam/sales (PPI, solar cold calls, etc).
+Filter obvious spam/telesales (PPI, life insurance, pensions, solar, marketing agencies, business listings, lead-gen).
+If it looks like price-shopping only, triage as QUOTE_SHOPPER.
 Return ONLY JSON:
-{"assistantReply":"string or null if done","ready":boolean,"spam":boolean,"name":"string|null","message":"job summary|null","postcode":"string|null"}
+{"assistantReply":"string or null if done","ready":boolean,"spam":boolean,"triage":"LIKELY_JOB|QUOTE_SHOPPER|SPAM|UNKNOWN","summary":"one-line summary","name":"string|null","message":"job summary|null","postcode":"string|null"}
 
 Conversation so far:
 ${transcript}`;
@@ -183,36 +223,48 @@ ${transcript}`;
       assistantReply?: string | null;
       ready?: boolean;
       spam?: boolean;
+      triage?: string | null;
+      summary?: string | null;
       name?: string | null;
       message?: string | null;
       postcode?: string | null;
     };
+    const triage = mergeModelTriage({
+      spam: parsed.spam,
+      triage: parsed.triage,
+      summary: parsed.summary,
+      message: parsed.message,
+      transcript: conversationSummaryText(opts.conversation),
+    });
     return {
       assistantReply: parsed.assistantReply ?? null,
-      ready: !!parsed.ready,
-      spam: !!parsed.spam,
+      ready: !!parsed.ready && !triage.spam,
+      spam: triage.spam,
       name: parsed.name || undefined,
       message: parsed.message || undefined,
       postcode: parsed.postcode || null,
+      triage: triage.triage,
+      summary: triage.summary,
     };
   } catch {
     return fallback;
   }
 }
 
-function heuristicQualify(conversation: ConvoTurn[]): {
-  assistantReply: string | null;
-  ready: boolean;
-  spam: boolean;
-  name?: string;
-  message?: string;
-  postcode?: string | null;
-} {
+function heuristicQualify(conversation: ConvoTurn[]): QualifyResult {
   const userTexts = conversation.filter((c) => c.role === "user").map((c) => c.text);
   const joined = userTexts.join(" ");
-  const spamRe = /\b(ppi|solar panel|guaranteed|investment opportunity|marketing agency)\b/i;
-  if (spamRe.test(joined)) {
-    return { assistantReply: null, ready: false, spam: true };
+  const triage = heuristicTriageFromText(joined);
+  if (triage.spam) {
+    return {
+      assistantReply: null,
+      ready: false,
+      spam: true,
+      triage: "SPAM",
+      summary: triage.summary,
+      name: "Caller",
+      message: triage.summary,
+    };
   }
 
   const postcodeMatch = joined.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i);
@@ -224,6 +276,8 @@ function heuristicQualify(conversation: ConvoTurn[]): {
       assistantReply: "Thanks — what's the job and what's your postcode? (And your name if you don't mind.)",
       ready: false,
       spam: false,
+      triage: "UNKNOWN",
+      summary: triage.summary,
     };
   }
 
@@ -235,6 +289,8 @@ function heuristicQualify(conversation: ConvoTurn[]): {
       name: "Caller",
       message: joined.slice(0, 500),
       postcode: postcodeMatch ? postcodeMatch[1].toUpperCase() : null,
+      triage: triage.triage,
+      summary: triage.summary,
     };
   }
 
@@ -242,5 +298,7 @@ function heuristicQualify(conversation: ConvoTurn[]): {
     assistantReply: "Thanks — could you share a bit more about the work needed and your postcode?",
     ready: false,
     spam: false,
+    triage: "UNKNOWN",
+    summary: triage.summary,
   };
 }

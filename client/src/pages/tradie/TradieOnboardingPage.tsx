@@ -459,7 +459,7 @@ export default function TradieOnboardingPage() {
         {step === 4 && (
           <>
             <p>
-              When a missed call turns into a job, we text <strong>you</strong> here — not the customer.
+              When a missed call lands in Inbox, we text <strong>you</strong> here — not the customer.
             </p>
             <label>
               Mobile for job alerts

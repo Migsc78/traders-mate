@@ -479,7 +479,7 @@ export default function TradieSettingsPage() {
               placeholder="+447700900123"
             />
             <span className="muted-text" style={{ fontWeight: 400 }}>
-              New jobs from missed calls / voicemail are texted here.
+              New inbox items from missed calls / voicemail are texted here.
             </span>
           </label>
           <label>

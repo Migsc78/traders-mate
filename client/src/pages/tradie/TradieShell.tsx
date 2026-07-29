@@ -6,6 +6,7 @@ import { supportMailto } from "../../lib/supportMail";
 import {
   IconCustomers,
   IconInvoices,
+  IconInbox,
   IconJobs,
   IconQuotes,
   IconRates,
@@ -16,6 +17,7 @@ import {
 
 const PRIMARY_TABS = [
   { to: "/t/diary", label: "Diary", Icon: IconDiary },
+  { to: "/t/inbox", label: "Inbox", Icon: IconInbox },
   { to: "/t", label: "Jobs", end: true, Icon: IconJobs },
   { to: "/t/quotes", label: "Quotes", Icon: IconQuotes },
   { to: "/t/customers", label: "Customers", Icon: IconCustomers },
@@ -35,7 +37,7 @@ type DetailChrome = {
   subtitle: string;
 };
 
-function resolveDetailChrome(pathname: string, state: unknown): DetailChrome | null {
+function resolveDetailChrome(pathname: string, state: unknown, search = ""): DetailChrome | null {
   if (pathname === "/t/jobs/new") {
     return {
       backTo: "/t",
@@ -45,6 +47,8 @@ function resolveDetailChrome(pathname: string, state: unknown): DetailChrome | n
     };
   }
   if (pathname.startsWith("/t/jobs/")) {
+    const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+    const fromInboxQuery = params.get("from") === "inbox";
     const fromState =
       state &&
       typeof state === "object" &&
@@ -58,12 +62,15 @@ function resolveDetailChrome(pathname: string, state: unknown): DetailChrome | n
                 ? String((state as { fromLabel?: unknown }).fromLabel)
                 : "Back",
           }
-        : { backTo: "/t", backLabel: "Jobs" };
+        : fromInboxQuery
+          ? { backTo: "/t/inbox", backLabel: "Inbox" }
+          : { backTo: "/t", backLabel: "Jobs" };
     const fromQuotes = fromState.backTo === "/t/quotes";
+    const fromInbox = fromState.backTo === "/t/inbox";
     return {
       ...fromState,
-      title: fromQuotes ? "Quote" : "Job",
-      subtitle: "Quote & message customer",
+      title: fromQuotes ? "Quote" : fromInbox ? "Inbox item" : "Job",
+      subtitle: fromInbox ? "Call back, quote, or make a job" : "Quote & message customer",
     };
   }
   if (pathname === "/t/customers/new") {
@@ -107,11 +114,19 @@ export default function TradieShell() {
   });
 
   const detail = useMemo(
-    () => resolveDetailChrome(location.pathname, location.state),
-    [location.pathname, location.state]
+    () => resolveDetailChrome(location.pathname, location.state, location.search),
+    [location.pathname, location.state, location.search]
   );
   const onDetail = !!detail;
   const onOnboarding = location.pathname.startsWith("/t/onboarding");
+
+  const inbox = useQuery({
+    queryKey: ["tradie-inbox"],
+    queryFn: () => tradieApi.inbox(),
+    enabled: !!session,
+    retry: false,
+  });
+  const inboxBadge = inbox.data?.needsYouCount ?? 0;
 
   const confirmDivert = useMutation({
     mutationFn: () => tradieApi.onboardingConfirmDivert(),
@@ -285,7 +300,10 @@ export default function TradieShell() {
               className={({ isActive }) => (isActive ? "active" : undefined)}
             >
               <span className="t-nav-icon" aria-hidden="true">
-                <Icon size={23} />
+                <Icon size={22} />
+                {to === "/t/inbox" && inboxBadge > 0 && (
+                  <span className="t-nav-badge">{inboxBadge > 9 ? "9+" : inboxBadge}</span>
+                )}
               </span>
               <span>{label}</span>
             </NavLink>
@@ -299,7 +317,7 @@ export default function TradieShell() {
             onClick={() => setMoreOpen((v) => !v)}
           >
             <span className="t-nav-icon" aria-hidden="true">
-              <IconMore size={23} />
+              <IconMore size={22} />
             </span>
             <span>More</span>
           </button>

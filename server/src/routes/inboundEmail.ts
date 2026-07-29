@@ -78,8 +78,8 @@ inboundEmailRouter.post("/", async (req, res, next) => {
     });
 
     const { url } = await createMagicLogin(client.id);
-    const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}`;
-    const notify = `New email enquiry from ${fromName || fromEmail}.\n\nOpen: ${deep}\nLogin: ${url}`;
+    const deep = `${appPublicUrl()}/t/jobs/${enquiry.id}?from=inbox`;
+    const notify = `New in Inbox (email) from ${fromName || fromEmail}.\n\nOpen: ${deep}\nLogin: ${url}`;
     await sendMessage({ to: client.destPhone, channel: client.destChannel, body: notify });
 
     res.json({ ok: true, enquiryId: enquiry.id });

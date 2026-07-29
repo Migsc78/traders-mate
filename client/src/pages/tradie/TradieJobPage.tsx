@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   formatGbp,
@@ -10,9 +10,23 @@ import {
 } from "../../api/tradie";
 import { IconPhone, StatusPill, initialsOf } from "./ui";
 
+function triageLabel(t: string): string {
+  switch (t) {
+    case "LIKELY_JOB":
+      return "Likely job";
+    case "QUOTE_SHOPPER":
+      return "Quote shopper";
+    case "SPAM":
+      return "Spam";
+    default:
+      return "Needs a look";
+  }
+}
+
 export default function TradieJobPage() {
   const { enquiryId = "" } = useParams();
   const session = getTradieSession();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [notes, setNotes] = useState("");
   const [recording, setRecording] = useState(false);
@@ -26,6 +40,25 @@ export default function TradieJobPage() {
     queryKey: ["tradie-job", enquiryId],
     queryFn: () => tradieApi.job(enquiryId),
     enabled: !!session && !!enquiryId,
+  });
+
+  const promote = useMutation({
+    mutationFn: () => tradieApi.promoteJob(enquiryId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+      void qc.invalidateQueries({ queryKey: ["tradie-inbox"] });
+      void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
+      navigate(`/t/jobs/${enquiryId}`, { replace: true, state: { from: "/t", fromLabel: "Jobs" } });
+    },
+  });
+
+  const kill = useMutation({
+    mutationFn: (reason: "dead" | "spam") => tradieApi.killJob(enquiryId, reason),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tradie-inbox"] });
+      void qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+      navigate("/t/inbox", { replace: true });
+    },
   });
 
   const activeQuote: QuoteDto | null = useMemo(() => {
@@ -134,7 +167,12 @@ export default function TradieJobPage() {
     postcode: string | null;
     distanceMiles: number | null;
     photoUrls: string[];
+    pipeline?: string;
+    triage?: string;
+    summary?: string | null;
   };
+
+  const isInbox = enquiry.pipeline === "INBOX";
 
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -195,6 +233,47 @@ export default function TradieJobPage() {
 
   return (
     <div className="t-job-page">
+      {isInbox && (
+        <div className="t-card t-inbox-banner">
+          <div className="t-row-top" style={{ marginBottom: 6 }}>
+            <strong>Inbox</strong>
+            <span className="t-pill t-pill--orange">{triageLabel(enquiry.triage || "UNKNOWN")}</span>
+          </div>
+          <p className="muted-text" style={{ margin: "0 0 12px" }}>
+            {enquiry.summary || enquiry.message || "Pre-qualified from a missed call."}
+          </p>
+          <div className="tradie-actions">
+            <a className="primary" href={`tel:${enquiry.phone}`}>
+              <IconPhone /> Call back
+            </a>
+            <button
+              type="button"
+              className="t-btn"
+              disabled={promote.isPending || kill.isPending}
+              onClick={() => promote.mutate()}
+            >
+              {promote.isPending ? "Saving…" : "Make job"}
+            </button>
+            <button
+              type="button"
+              className="danger"
+              disabled={promote.isPending || kill.isPending}
+              onClick={() => kill.mutate("spam")}
+            >
+              Spam
+            </button>
+            <button
+              type="button"
+              className="t-btn"
+              disabled={promote.isPending || kill.isPending}
+              onClick={() => kill.mutate("dead")}
+            >
+              Not interested
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="t-card t-contact-card">
         <div className="t-contact-head">
           <span className="t-avatar">{initialsOf(enquiry.name)}</span>

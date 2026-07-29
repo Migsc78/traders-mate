@@ -100,6 +100,21 @@ enum EnquiryStatus {
   FAILED
 }
 
+/// Where the enquiry sits in the tradie workflow
+enum EnquiryPipeline {
+  INBOX
+  JOB
+  KILLED
+}
+
+/// AI / heuristic pre-qualification tag for inbox triage
+enum EnquiryTriage {
+  LIKELY_JOB
+  QUOTE_SHOPPER
+  SPAM
+  UNKNOWN
+}
+
 model Lead {
   id                 String         @id @default(cuid())
   placeId            String         @unique
@@ -287,20 +302,26 @@ model TwilioNumberPool {
 
 // A routed customer enquiry (the actual lead delivered to a client).
 model Enquiry {
-  id           String        @id @default(cuid())
+  id           String          @id @default(cuid())
   clientId     String
-  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name         String
   phone        String
   message      String?
   postcode     String? // customer's job postcode, if given
   distanceMiles Float? // computed distance from client.postcode, if both are known
-  photoUrls    String[]      @default([])
-  source       String        @default("site") // site | widget | hosted | qr
-  status       EnquiryStatus @default(ROUTED)
+  photoUrls    String[]        @default([])
+  source       String          @default("site") // site | widget | hosted | qr | missed_call | manual
+  status       EnquiryStatus   @default(ROUTED)
+  pipeline     EnquiryPipeline @default(INBOX)
+  triage       EnquiryTriage   @default(UNKNOWN)
+  /// Short AI / qualify summary shown in Inbox
+  summary      String?
+  promotedAt   DateTime?
+  killedAt     DateTime?
   deliveredAt  DateTime?
   deliveryInfo String?
-  createdAt    DateTime      @default(now())
+  createdAt    DateTime        @default(now())
 
   quotes       Quote[]
   voiceNotes   VoiceNote[]
@@ -312,6 +333,7 @@ model Enquiry {
 
   @@index([clientId, createdAt])
   @@index([clientId, phone])
+  @@index([clientId, pipeline, createdAt])
 }
 
 enum QuoteStatus {

@@ -348,10 +348,45 @@ export const tradieApi = {
         distanceMiles: number | null;
         photoUrls: string[];
         status: string;
+        pipeline?: string;
+        triage?: string;
+        summary?: string | null;
+        source?: string;
         createdAt: string;
         latestQuote: { id: string; status: string; totalPence: number } | null;
       }[]
     >("/jobs"),
+
+  inbox: () =>
+    tRequest<{
+      needsYouCount: number;
+      caughtSpamCount: number;
+      items: {
+        id: string;
+        name: string;
+        phone: string;
+        message: string | null;
+        postcode: string | null;
+        distanceMiles: number | null;
+        source: string;
+        triage: "LIKELY_JOB" | "QUOTE_SHOPPER" | "SPAM" | "UNKNOWN";
+        summary: string | null;
+        conversationSnippet: string | null;
+        createdAt: string;
+      }[];
+    }>("/inbox"),
+
+  promoteJob: (enquiryId: string) =>
+    tRequest<{ id: string; pipeline: string; triage: string; promotedAt: string | null }>(
+      `/jobs/${enquiryId}/promote`,
+      { method: "POST", body: "{}" }
+    ),
+
+  killJob: (enquiryId: string, reason: "dead" | "spam") =>
+    tRequest<{ id: string; pipeline: string; triage: string; killedAt: string | null }>(
+      `/jobs/${enquiryId}/kill`,
+      { method: "POST", body: JSON.stringify({ reason }) }
+    ),
 
   createJob: (body: {
     name: string;
@@ -366,6 +401,8 @@ export const tradieApi = {
       message: string | null;
       postcode: string | null;
       status: string;
+      pipeline?: string;
+      triage?: string;
       source?: string;
       createdAt: string;
       latestQuote: null;
