@@ -409,7 +409,7 @@ export default function TradieJobPage() {
           {sendSms.isError && <p className="error">{(sendSms.error as Error).message}</p>}
         </div>
         <div className="tradie-actions" style={{ marginTop: 12 }}>
-          <Link className="t-btn--block" to={`/t/diary?enquiryId=${enquiryId}`}>
+          <Link className="t-btn--block" to={`/t/diary/new?enquiryId=${enquiryId}`}>
             Book in diary →
           </Link>
           <Link className="t-btn--block" to={`/t/certificates?enquiryId=${enquiryId}`}>

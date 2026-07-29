@@ -74,6 +74,14 @@ function resolveDetailChrome(pathname: string, state: unknown): DetailChrome | n
       subtitle: "Save a contact",
     };
   }
+  if (pathname === "/t/diary/new") {
+    return {
+      backTo: "/t/diary",
+      backLabel: "Diary",
+      title: "New booking",
+      subtitle: "Book a visit and confirm by SMS",
+    };
+  }
   if (pathname.startsWith("/t/customers/")) {
     return {
       backTo: "/t/customers",

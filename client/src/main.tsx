@@ -22,6 +22,7 @@ import TradieCustomerPage from "./pages/tradie/TradieCustomerPage";
 import TradieNewCustomerPage from "./pages/tradie/TradieNewCustomerPage";
 import TradieSettingsPage from "./pages/tradie/TradieSettingsPage";
 import TradieDiaryPage from "./pages/tradie/TradieDiaryPage";
+import TradieNewBookingPage from "./pages/tradie/TradieNewBookingPage";
 import TradieCertificatesPage from "./pages/tradie/TradieCertificatesPage";
 import TradieOnboardingPage from "./pages/tradie/TradieOnboardingPage";
 import LandingPage from "./pages/LandingPage";
@@ -69,6 +70,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="customers/:phoneKey" element={<TradieCustomerPage />} />
             <Route path="price-book" element={<TradiePriceBookPage />} />
             <Route path="diary" element={<TradieDiaryPage />} />
+            <Route path="diary/new" element={<TradieNewBookingPage />} />
             <Route path="certificates" element={<TradieCertificatesPage />} />
             <Route path="settings" element={<TradieSettingsPage />} />
             <Route path="jobs/new" element={<TradieNewJobPage />} />
