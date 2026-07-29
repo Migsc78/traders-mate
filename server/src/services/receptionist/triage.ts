@@ -59,7 +59,7 @@ export function mergeModelTriage(opts: {
   message?: string | null;
   transcript?: string;
 }): TriageFields {
-  const baseText = (opts.summary && String(opts.summary)) || opts.message || opts.transcript || "";
+  const baseText = String(opts.summary || opts.message || opts.transcript || "").trim();
   if (opts.spam || normalizeTriage(opts.triage) === "SPAM" || detectSpamText(baseText)) {
     return heuristicTriageFromText(baseText, { forceSpam: true });
   }
