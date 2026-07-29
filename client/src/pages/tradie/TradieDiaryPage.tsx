@@ -158,7 +158,29 @@ export default function TradieDiaryPage() {
                   </Link>
                 )}
                 {a.status !== "CANCELLED" && (
-                  <button type="button" className="danger" onClick={() => cancel.mutate(a.id)}>
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => {
+                      const when = new Date(a.startsAt).toLocaleString("en-GB", {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                      const label = a.customerName || a.title;
+                      if (
+                        !window.confirm(
+                          `Cancel this booking?\n\n${label} · ${when}\n\nThe customer won’t get an automatic cancel SMS from this.`
+                        )
+                      ) {
+                        return;
+                      }
+                      cancel.mutate(a.id);
+                    }}
+                    disabled={cancel.isPending}
+                  >
                     Cancel
                   </button>
                 )}
