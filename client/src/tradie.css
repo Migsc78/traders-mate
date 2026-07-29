@@ -84,10 +84,6 @@ html.native-app .t-appbar {
   margin-top: 0;
 }
 
-html.native-app .tradie-bottom-nav {
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
-}
-
 html.native-app .t-gate {
   padding-top: max(24px, env(safe-area-inset-top));
   padding-bottom: max(24px, env(safe-area-inset-bottom));
@@ -314,6 +310,10 @@ button.t-add-btn {
 }
 .t-diary-day { margin-top: 14px; }
 .t-diary-appt { margin-bottom: 10px; }
+.t-directions-addr {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
 .t-choice-stack {
   display: flex;
   flex-direction: column;
@@ -839,11 +839,11 @@ a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38,
   display: flex;
   justify-content: space-around;
   gap: 0;
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(18px) saturate(1.6);
-  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px) saturate(1.5);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
   border-top: 1px solid var(--t-hairline);
-  padding: 8px 6px calc(10px + env(safe-area-inset-bottom));
+  padding: 6px 4px calc(8px + env(safe-area-inset-bottom));
   z-index: 40;
 }
 .tradie-bottom-nav a,
@@ -853,14 +853,15 @@ a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 48px;
-  font-size: 10.5px;
-  font-weight: 600;
+  gap: 2px;
+  min-height: 50px;
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 650;
   letter-spacing: 0.01em;
-  color: var(--t-ink-faint);
+  color: #8a837a;
   text-decoration: none;
-  padding: 6px 2px 4px;
+  padding: 5px 2px 4px;
   border-radius: 12px;
   border: 0;
   background: transparent;
@@ -868,15 +869,43 @@ a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38,
   cursor: pointer;
   transition: color 0.15s ease, transform 0.1s ease;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .tradie-bottom-nav a:active,
-.tradie-bottom-nav button:active { transform: scale(0.92); }
+.tradie-bottom-nav button:active {
+  transform: scale(0.94);
+}
+.tradie-bottom-nav .t-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 26px;
+  border-radius: 8px;
+}
 .tradie-bottom-nav a svg,
-.tradie-bottom-nav button svg { display: block; }
+.tradie-bottom-nav button svg {
+  display: block;
+}
 .tradie-bottom-nav a.active,
-.tradie-bottom-nav button.active { color: var(--t-accent-ink); background: none; }
+.tradie-bottom-nav button.active {
+  color: var(--t-accent-ink);
+  background: transparent;
+  font-weight: 750;
+}
+.tradie-bottom-nav a.active .t-nav-icon,
+.tradie-bottom-nav button.active .t-nav-icon {
+  background: transparent;
+  box-shadow: none;
+}
 .tradie-bottom-nav a.active svg,
-.tradie-bottom-nav button.active svg { color: var(--t-accent); }
+.tradie-bottom-nav button.active svg {
+  color: var(--t-accent);
+}
+
+html.native-app .tradie-bottom-nav {
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
 
 .tradie-shell--detail {
   padding-bottom: max(24px, env(safe-area-inset-bottom));

@@ -15,14 +15,14 @@ import {
 } from "./ui";
 
 const PRIMARY_TABS = [
+  { to: "/t/diary", label: "Diary", Icon: IconDiary },
   { to: "/t", label: "Jobs", end: true, Icon: IconJobs },
   { to: "/t/quotes", label: "Quotes", Icon: IconQuotes },
-  { to: "/t/invoices", label: "Invoices", Icon: IconInvoices },
-  { to: "/t/diary", label: "Diary", Icon: IconDiary },
+  { to: "/t/customers", label: "Customers", Icon: IconCustomers },
 ] as const;
 
 const MORE_TABS = [
-  { to: "/t/customers", label: "Customers", Icon: IconCustomers },
+  { to: "/t/invoices", label: "Invoices", Icon: IconInvoices },
   { to: "/t/certificates", label: "Certs", Icon: IconCerts },
   { to: "/t/price-book", label: "Rates", Icon: IconRates },
   { to: "/t/settings", label: "Settings", Icon: IconSettings },
@@ -79,7 +79,7 @@ function resolveDetailChrome(pathname: string, state: unknown): DetailChrome | n
       backTo: "/t/diary",
       backLabel: "Diary",
       title: "New booking",
-      subtitle: "Book a visit and confirm by SMS",
+      subtitle: "Who, where, and when",
     };
   }
   if (pathname.startsWith("/t/customers/")) {
@@ -284,7 +284,9 @@ export default function TradieShell() {
               end={"end" in rest ? (rest as { end: boolean }).end : false}
               className={({ isActive }) => (isActive ? "active" : undefined)}
             >
-              <Icon />
+              <span className="t-nav-icon" aria-hidden="true">
+                <Icon size={23} />
+              </span>
               <span>{label}</span>
             </NavLink>
           ))}
@@ -296,7 +298,9 @@ export default function TradieShell() {
             aria-controls={moreId}
             onClick={() => setMoreOpen((v) => !v)}
           >
-            <IconMore />
+            <span className="t-nav-icon" aria-hidden="true">
+              <IconMore size={23} />
+            </span>
             <span>More</span>
           </button>
         </nav>

@@ -1844,15 +1844,15 @@ tradieRouter.post("/appointments", requireClient, requireActiveAccount, async (r
       .parse(req.body ?? {});
 
     let customerName = body.customerName || null;
-    let customerPhone = body.customerPhone || null;
-    let address = body.address || null;
+    let customerPhone = body.customerPhone ? toE164UK(body.customerPhone) : null;
+    let address = body.address?.trim() || null;
     if (body.enquiryId) {
       const enq = await prisma.enquiry.findFirst({
         where: { id: body.enquiryId, clientId: clientId(req) },
       });
       if (enq) {
         customerName = customerName || enq.name;
-        customerPhone = customerPhone || enq.phone;
+        customerPhone = customerPhone || toE164UK(enq.phone);
         address = address || enq.postcode || null;
       }
     }

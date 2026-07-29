@@ -60,7 +60,7 @@ export default function TradieAuthPage() {
         {error && <p className="error">{error}</p>}
         {getTradieSession() && (
           <p>
-            Already signed in. <Link to="/t">Open jobs →</Link>
+            Already signed in. <Link to="/t/diary">Open app →</Link>
           </p>
         )}
 
@@ -106,7 +106,7 @@ export default function TradieAuthPage() {
               try {
                 const r = await tradieApi.loginVerify({ phone: phone.trim(), code: code.trim() });
                 setTradieSession(r.sessionToken);
-                navigate("/t");
+                navigate("/t/diary");
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Invalid code");
               } finally {
@@ -152,7 +152,7 @@ export default function TradieAuthPage() {
                 if (key.startsWith("seed_tm_")) {
                   const r = await tradieApi.seedLogin(key);
                   setTradieSession(r.sessionToken);
-                  navigate("/t");
+                  navigate("/t/diary");
                   return;
                 }
                 await tradieApi.requestMagic({ routeKey: key });

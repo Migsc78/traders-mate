@@ -1,9 +1,39 @@
 import { prisma } from "../../db.js";
 import { ApiError } from "../../middleware/error.js";
-import { sendMessage } from "../messaging/sender.js";
+import { sendMessage, toE164UK } from "../messaging/sender.js";
 import { logMessage } from "../messaging/log.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+function customerPhoneKey(phone: string): string {
+  return phone.replace(/\D/g, "").slice(-10);
+}
+
+async function upsertContactFromBooking(opts: {
+  clientId: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+}) {
+  const raw = opts.customerPhone?.trim();
+  if (!raw) return;
+  const phone = toE164UK(raw);
+  const phoneKey = customerPhoneKey(phone);
+  if (phoneKey.length < 8) return;
+  const name = opts.customerName?.trim() || null;
+  await prisma.customerContact.upsert({
+    where: { clientId_phoneKey: { clientId: opts.clientId, phoneKey } },
+    create: {
+      clientId: opts.clientId,
+      phoneKey,
+      phone,
+      name,
+    },
+    update: {
+      phone,
+      ...(name ? { name } : {}),
+    },
+  });
+}
 
 export async function listAppointments(clientId: string, from: Date, to: Date) {
   return prisma.appointment.findMany({
@@ -63,6 +93,12 @@ export async function createAppointment(opts: {
       customerPhone: opts.customerPhone || null,
       status: "SCHEDULED",
     },
+  });
+
+  await upsertContactFromBooking({
+    clientId: opts.clientId,
+    customerName: opts.customerName,
+    customerPhone: opts.customerPhone,
   });
 
   const client = await prisma.client.findUnique({ where: { id: opts.clientId } });

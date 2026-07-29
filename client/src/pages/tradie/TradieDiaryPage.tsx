@@ -20,12 +20,22 @@ function isSameWeek(a: Date, b: Date) {
   return Math.abs(startOfDay(a).getTime() - startOfDay(b).getTime()) < 12 * 3600000;
 }
 
+function mapsLinks(address: string) {
+  const q = encodeURIComponent(address.trim());
+  return {
+    google: `https://www.google.com/maps/dir/?api=1&destination=${q}`,
+    apple: `https://maps.apple.com/?daddr=${q}`,
+    waze: `https://waze.com/ul?q=${q}&navigate=yes`,
+  };
+}
+
 export default function TradieDiaryPage() {
   const session = getTradieSession();
   const qc = useQueryClient();
   const [params] = useSearchParams();
   const enquiryId = params.get("enquiryId");
   const [day, setDay] = useState(() => startOfDay(new Date()));
+  const [directionsFor, setDirectionsFor] = useState<AppointmentDto | null>(null);
 
   const from = day.toISOString();
   const to = new Date(day.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -66,6 +76,8 @@ export default function TradieDiaryPage() {
   }
 
   if (!session) return null;
+
+  const dirLinks = directionsFor?.address ? mapsLinks(directionsFor.address) : null;
 
   return (
     <div>
@@ -135,6 +147,11 @@ export default function TradieDiaryPage() {
                     On my way
                   </button>
                 )}
+                {a.address && (
+                  <button type="button" className="t-btn" onClick={() => setDirectionsFor(a)}>
+                    Directions
+                  </button>
+                )}
                 {a.enquiryId && (
                   <Link className="t-btn" to={`/t/jobs/${a.enquiryId}`}>
                     Open job
@@ -158,6 +175,40 @@ export default function TradieDiaryPage() {
             New booking
           </Link>
         </>
+      )}
+
+      {directionsFor && dirLinks && (
+        <div
+          className="t-more-root"
+          role="presentation"
+          onClick={() => setDirectionsFor(null)}
+        >
+          <div
+            className="t-more-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Directions"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="t-more-handle" aria-hidden="true" />
+            <p className="t-more-title">Directions</p>
+            <p className="muted-text t-directions-addr">{directionsFor.address}</p>
+            <div className="t-more-links">
+              <a href={dirLinks.google} target="_blank" rel="noreferrer" onClick={() => setDirectionsFor(null)}>
+                Google Maps
+              </a>
+              <a href={dirLinks.apple} target="_blank" rel="noreferrer" onClick={() => setDirectionsFor(null)}>
+                Apple Maps
+              </a>
+              <a href={dirLinks.waze} target="_blank" rel="noreferrer" onClick={() => setDirectionsFor(null)}>
+                Waze
+              </a>
+            </div>
+            <button type="button" className="t-btn t-btn--block" style={{ marginTop: 12 }} onClick={() => setDirectionsFor(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

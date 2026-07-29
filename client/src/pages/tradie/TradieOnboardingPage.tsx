@@ -116,7 +116,7 @@ export default function TradieOnboardingPage() {
     // Completed wizard used to redirect here instantly — so "Continue setup" felt broken.
     // Still allow resume when divert was never confirmed.
     if (onboarding.data?.completed && onboarding.data.divertConfirmed) {
-      navigate("/t", { replace: true });
+      navigate("/t/diary", { replace: true });
     }
   }, [onboarding.data?.completed, onboarding.data?.divertConfirmed, navigate]);
 
@@ -280,7 +280,7 @@ export default function TradieOnboardingPage() {
     },
     onSuccess: async () => {
       await refresh();
-      navigate("/t", { replace: true });
+      navigate("/t/diary", { replace: true });
     },
     onError: (e: Error) => setBankMsg(e.message),
   });
