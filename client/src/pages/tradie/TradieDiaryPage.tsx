@@ -36,6 +36,7 @@ export default function TradieDiaryPage() {
   const enquiryId = params.get("enquiryId");
   const [day, setDay] = useState(() => startOfDay(new Date()));
   const [directionsFor, setDirectionsFor] = useState<AppointmentDto | null>(null);
+  const [cancelFor, setCancelFor] = useState<AppointmentDto | null>(null);
 
   const from = day.toISOString();
   const to = new Date(day.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -54,7 +55,10 @@ export default function TradieDiaryPage() {
 
   const cancel = useMutation({
     mutationFn: (id: string) => tradieApi.patchAppointment(id, { status: "CANCELLED" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tradie-appointments"] }),
+    onSuccess: () => {
+      setCancelFor(null);
+      qc.invalidateQueries({ queryKey: ["tradie-appointments"] });
+    },
   });
 
   const grouped = useMemo(() => {
@@ -161,24 +165,7 @@ export default function TradieDiaryPage() {
                   <button
                     type="button"
                     className="danger"
-                    onClick={() => {
-                      const when = new Date(a.startsAt).toLocaleString("en-GB", {
-                        weekday: "short",
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
-                      const label = a.customerName || a.title;
-                      if (
-                        !window.confirm(
-                          `Cancel this booking?\n\n${label} · ${when}\n\nThe customer won’t get an automatic cancel SMS from this.`
-                        )
-                      ) {
-                        return;
-                      }
-                      cancel.mutate(a.id);
-                    }}
+                    onClick={() => setCancelFor(a)}
                     disabled={cancel.isPending}
                   >
                     Cancel
@@ -229,6 +216,56 @@ export default function TradieDiaryPage() {
             <button type="button" className="t-btn t-btn--block" style={{ marginTop: 12 }} onClick={() => setDirectionsFor(null)}>
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {cancelFor && (
+        <div
+          className="t-more-root"
+          role="presentation"
+          onClick={() => !cancel.isPending && setCancelFor(null)}
+        >
+          <div
+            className="t-more-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cancel booking"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="t-more-handle" aria-hidden="true" />
+            <p className="t-more-title">Cancel booking?</p>
+            <p className="muted-text" style={{ margin: "0 0 4px" }}>
+              {cancelFor.customerName || cancelFor.title} ·{" "}
+              {new Date(cancelFor.startsAt).toLocaleString("en-GB", {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+            <p className="muted-text" style={{ margin: "0 0 16px" }}>
+              The customer won’t get an automatic cancel SMS from this.
+            </p>
+            <div className="tradie-actions" style={{ flexDirection: "column", gap: 8 }}>
+              <button
+                type="button"
+                className="danger t-btn--block"
+                onClick={() => cancel.mutate(cancelFor.id)}
+                disabled={cancel.isPending}
+              >
+                {cancel.isPending ? "Cancelling…" : "Yes, cancel booking"}
+              </button>
+              <button
+                type="button"
+                className="t-btn t-btn--block"
+                onClick={() => setCancelFor(null)}
+                disabled={cancel.isPending}
+              >
+                Keep booking
+              </button>
+            </div>
           </div>
         </div>
       )}
