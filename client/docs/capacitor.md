@@ -55,9 +55,10 @@ keytool -list -v -keystore android/upload-keystore.jks -alias upload
 
 ### After Apple Developer setup
 
-1. Create App ID `uk.co.tradiesmate.app` with **Associated Domains**.
-2. Replace `TEAMID` in `apple-app-site-association` with your 10-character Team ID.
-3. Redeploy client; confirm `https://tradiesmate.co.uk/.well-known/apple-app-site-association` returns JSON.
+1. Create App ID `uk.co.tradiesmate.app` with **Associated Domains** (see [ios-testflight.md](./ios-testflight.md)).
+2. Replace `TEAMID` in `public/.well-known/apple-app-site-association` with your 10-character Team ID.
+3. Redeploy client; confirm `https://tradiesmate.co.uk/.well-known/apple-app-site-association` returns JSON with that Team ID.
+4. On a Mac: `npm run cap:sync` → `npm run cap:ios` → Archive → TestFlight.
 
 ## Android release (Play Internal)
 

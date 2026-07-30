@@ -1,11 +1,13 @@
 # TradiesMate native apps — click-by-click ship guide
 
-You are shipping the **Android** app first on Windows. iOS comes later on the MacBook.
+You are shipping **Android** on Windows and can prepare **iOS** in parallel now that the Apple Developer account is approved. Archive / TestFlight still needs a Mac + Xcode.
 
-**Where you are now:** Android Studio is installed and you see the **Welcome to Android Studio** screen. Start at **Step A** below. Do not click **New Project**.
+**Where you are now (Android):** Android Studio is installed and you see the **Welcome to Android Studio** screen. Start at **Step A** below. Do not click **New Project**.
+
+**iOS:** Follow [ios-testflight.md](./ios-testflight.md) (Phase 1–2 on Windows, Phase 3 on Mac). Jump: **Part G**.
 
 App ID: `uk.co.tradiesmate.app`  
-Project folder: `C:\Users\miguel\Desktop\Traders Mate\traders-mate-app\client\android`
+Project folder (Android): `C:\Users\miguel\Desktop\Traders Mate\traders-mate-app\client\android`
 
 Related short docs: [capacitor.md](./capacitor.md) · [play-internal.md](./play-internal.md) · [ios-testflight.md](./ios-testflight.md)
 
@@ -556,24 +558,30 @@ If still failing after a day: Play Console → your app → **Setup** → **App 
 
 ---
 
-# PART G — Later: MacBook M4 + TestFlight (skip until Android works)
+# PART G — iOS / TestFlight (parallel with Android)
 
-## G1 — Apple accounts (can do in browser on Windows)
+You can do **G1–G2 on Windows** now that the Apple Developer account is approved.  
+**G3 needs a Mac** (Xcode) for Archive → TestFlight.
 
-1. Enrol [Apple Developer Program](https://developer.apple.com/programs/) if needed (~£79/year).
-2. [developer.apple.com](https://developer.apple.com) → Account → **Identifiers** → **+** → App IDs  
+Full click-path: [ios-testflight.md](./ios-testflight.md)
+
+## G1 — Apple accounts (browser on Windows)
+
+1. [developer.apple.com](https://developer.apple.com) → Account → **Identifiers** → **+** → App IDs  
    - Description: TradiesMate  
    - Bundle ID: `uk.co.tradiesmate.app` (Explicit)  
    - Capabilities: tick **Associated Domains** → Continue → Register  
+2. Note **Team ID** from Membership (10 characters).
 3. [App Store Connect](https://appstoreconnect.apple.com) → **Apps** → **+** → New App  
-   - Same bundle ID, name TradiesMate, UK/English  
-4. Note **Team ID** from Membership (10 characters).
+   - Same bundle ID, name TradiesMate, English (U.K.), SKU `tradiesmate-ios`
 
 ## G2 — Update Universal Links file
 
 Edit `client/public/.well-known/apple-app-site-association`  
-Replace `TEAMID` with your Team ID so it looks like `ABCD123456.uk.co.tradiesmate.app`.  
-Commit, push, wait for Vercel. Confirm the URL shows your Team ID.
+Team ID is set: `P9JA3BHGGH.uk.co.tradiesmate.app`.  
+If you ever rotate teams, update that file, commit, push, wait for Vercel. Confirm:
+
+`https://tradiesmate.co.uk/.well-known/apple-app-site-association`
 
 ## G3 — On the MacBook
 
@@ -624,4 +632,4 @@ npm run cap:ios
 | Keystore done | **Part C** then **Part D** |
 | Have `app-release.aab` | **Part E** |
 | App installed from Play | **Part F** |
-| Ready for iPhone | **Part G** |
+| Ready for iPhone / Apple account approved | **Part G** + [ios-testflight.md](./ios-testflight.md) |

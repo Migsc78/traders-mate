@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appIDs": ["TEAMID.uk.co.tradiesmate.app"],
+        "appIDs": ["P9JA3BHGGH.uk.co.tradiesmate.app"],
         "paths": ["/t", "/t/*"]
       }
     ]
