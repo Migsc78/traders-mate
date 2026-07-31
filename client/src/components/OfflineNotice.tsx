@@ -22,7 +22,7 @@ export function OfflineNotice({ syncedAt, degraded = false }: Props) {
   if (online && !degraded) return null;
 
   return (
-    <p className="t-banner" role="status">
+    <p className="t-banner t-banner--danger" role="status">
       {online ? "Can't reach the server" : "You're offline"} — showing your saved data from{" "}
       {formatSyncedAt(syncedAt)}. Jobs, customers and rates are all readable. Sending and saving
       need signal.

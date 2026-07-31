@@ -177,7 +177,9 @@ export default function TradieDiaryPage() {
         </section>
       ))}
 
-      {!appts.isLoading && (appts.data || []).length === 0 && (
+      {/* Require real data (even stale/cached), not just "not loading" — a failed
+          fetch with no cache must not read as a reassuring "no appointments". */}
+      {appts.data && appts.data.length === 0 && (
         <>
           <EmptyState title="No appointments this week" hint="Tap + to book a site visit or follow-up." />
           <Link className="primary t-btn--block" to="/t/diary/new" style={{ marginTop: 12 }}>

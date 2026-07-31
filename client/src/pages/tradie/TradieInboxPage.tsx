@@ -108,7 +108,9 @@ export default function TradieInboxPage() {
       {inbox.isLoading && <p className="muted-text">Loading inbox…</p>}
       {inbox.isError && <p className="error">{(inbox.error as Error).message}</p>}
 
-      {!inbox.isLoading && needsYou.length === 0 && caught.length === 0 && (
+      {/* Require real data (even stale/cached), not just "no error yet" — otherwise a
+          failed fetch with no cache reads as a reassuring "Inbox is clear". */}
+      {inbox.data && needsYou.length === 0 && caught.length === 0 && (
         <EmptyState
           title="Inbox is clear"
           hint="When a call diverts, we’ll summarise it here with a spam or job guess."

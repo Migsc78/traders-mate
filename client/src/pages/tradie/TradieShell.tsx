@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTradieSession, setTradieSession, tradieApi, TradieApiError } from "../../api/tradie";
 import { supportMailto } from "../../lib/supportMail";
 import { OfflineNotice } from "../../components/OfflineNotice";
+import { useOfflinePrefetch } from "../../lib/useOfflinePrefetch";
 import {
   IconArchive,
   IconCustomers,
@@ -130,6 +131,8 @@ export default function TradieShell() {
     retry: false,
   });
   const inboxBadge = inbox.data?.needsYouCount ?? 0;
+
+  useOfflinePrefetch(!!session && me.isSuccess && !!me.data?.accountActive);
 
   const confirmDivert = useMutation({
     mutationFn: () => tradieApi.onboardingConfirmDivert(),
