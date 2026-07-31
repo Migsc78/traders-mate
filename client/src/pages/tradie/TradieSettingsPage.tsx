@@ -449,14 +449,25 @@ export default function TradieSettingsPage() {
             <label>
               Default deposit on quotes (%)
               <input
-                type="number"
-                min={0}
-                max={100}
-                value={defaultDepositPercent}
-                onChange={(e) => setDefaultDepositPercent(Number(e.target.value) || 0)}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                value={defaultDepositPercent === 0 ? "" : String(defaultDepositPercent)}
+                placeholder="0"
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  if (raw === "") {
+                    setDefaultDepositPercent(0);
+                    return;
+                  }
+                  const n = Math.min(100, Math.max(0, parseInt(raw, 10)));
+                  setDefaultDepositPercent(Number.isFinite(n) ? n : 0);
+                }}
               />
               <span className="muted-text" style={{ fontWeight: 400 }}>
-                0 = off. Requires Pay Now (Stripe Connect) so customers can pay the deposit on accept.
+                0 = off. Whole number 1–100. Requires Pay Now (Stripe Connect) so customers can pay the
+                deposit on accept.
               </span>
             </label>
           </div>

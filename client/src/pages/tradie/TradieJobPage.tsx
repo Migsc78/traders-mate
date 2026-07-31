@@ -401,11 +401,21 @@ export default function TradieJobPage() {
                 <label>
                   Deposit on accept (%)
                   <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={depositPercent}
-                    onChange={(e) => setDepositPercent(Number(e.target.value) || 0)}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="off"
+                    value={depositPercent === 0 ? "" : String(depositPercent)}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "");
+                      if (raw === "") {
+                        setDepositPercent(0);
+                        return;
+                      }
+                      const n = Math.min(100, Math.max(0, parseInt(raw, 10)));
+                      setDepositPercent(Number.isFinite(n) ? n : 0);
+                    }}
                   />
                 </label>
                 <div className="tradie-actions">
