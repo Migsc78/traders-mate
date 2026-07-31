@@ -7,7 +7,15 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icons/*.png", "og-image.png", "robots.txt", "sitemap.xml", "llms.txt"],
+      includeAssets: [
+        "favicon.svg",
+        "icons/*.png",
+        "og-image.png",
+        "robots.txt",
+        "sitemap.xml",
+        "llms.txt",
+        "admin.webmanifest",
+      ],
       manifest: {
         name: "TradiesMate",
         short_name: "TradiesMate",

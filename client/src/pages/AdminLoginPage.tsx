@@ -115,8 +115,8 @@ export default function AdminLoginPage() {
           browser.
         </p>
         <p className="admin-login-note admin-login-a2hs">
-          On iPhone: open this page in Safari, then Share → Add to Home Screen for a fullscreen
-          admin icon.
+          On iPhone: open this page in Safari, then Share → Add to Home Screen (icon opens the
+          admin dashboard). If an old icon still opens the tradie app, delete it and add again.
         </p>
         <p className="admin-login-back">
           <Link to="/">← Back to site</Link>

@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { SeoHead, SEO_DEFAULTS } from "./SeoHead";
+import { applyWebManifestForPath } from "../lib/webManifest";
 
 const LANDING_TITLE = "TradiesMate — Turn missed calls into quoted jobs";
 const SIGNUP_TITLE = "Start your £14 trial — TradiesMate";
@@ -13,6 +15,10 @@ const ADMIN_TITLE = "TradiesMate Admin";
 /** Route-aware SEO: index public pages; noindex app + admin shells. */
 export default function RouteSeo() {
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    applyWebManifestForPath(pathname);
+  }, [pathname]);
 
   if (pathname === "/" || pathname === "") {
     return (
