@@ -168,7 +168,8 @@ export default function LandingPage() {
               <p className="lp-lede">
                 You&apos;re under the sink. The phone rings. By the time your hands are free, that
                 landlord job — or insurance repair — has already gone to the next plumber.
-                TradiesMate texts them back, qualifies the work, and gets the job onto your phone.
+                TradiesMate texts them back, qualifies the work, and puts it in your Inbox so you
+                decide — call back, quote, or kill the spam.
               </p>
               <div className="lp-hero-cta">
                 {heroPrimary}
@@ -231,7 +232,7 @@ export default function LandingPage() {
               <ComicPanel
                 n="04"
                 title="TradiesMate steps in"
-                caption="We text them back, ask what they need and the postcode — then put the job on your phone."
+                caption="We text them back, ask what they need and the postcode — then put a summary in your Inbox."
                 accent
               >
                 <PanelRescued />
@@ -295,8 +296,8 @@ export default function LandingPage() {
                   <h3>Rescue the enquiry</h3>
                   <p>
                     You get a dedicated UK number and divert missed calls to it. TradiesMate texts the
-                    caller back, qualifies the job by SMS (or takes a voicemail), and drops a clean lead
-                    onto your Jobs list.
+                    caller back, qualifies the job by SMS (or takes a voicemail), and drops it into
+                    your Inbox — already tagged if it looks like spam, a tyre-kicker, or a real job.
                   </p>
                 </div>
               </li>
@@ -316,8 +317,9 @@ export default function LandingPage() {
                   <h3>Send, get paid, keep the diary straight</h3>
                   <p>
                     Customer gets an SMS link to accept or decline. Auto-reminders chase. Raise a
-                    bank-transfer invoice or take a card deposit with Pay Now — then book the job in
-                    your diary and file certificates with expiry reminders when the work&apos;s done.
+                    bank-transfer invoice or take a card deposit with Pay Now — then book the visit in
+                    your diary, open directions in Google Maps, Apple Maps or Waze, and file certs with
+                    expiry reminders when the work&apos;s done.
                   </p>
                 </div>
               </li>
@@ -337,8 +339,11 @@ export default function LandingPage() {
                 <span>Dedicated UK number with call divert — missed calls hit us, not your voicemail abyss.</span>
               </li>
               <li>
-                <strong>Missed-call rescue</strong>
-                <span>We text callers back and qualify the job by SMS, or take a voicemail and turn it into a job.</span>
+                <strong>Smart Inbox</strong>
+                <span>
+                  Every rescued call lands with a summary and a guess — likely job, quote shopper, or
+                  spam. Call back, make it a job, or kill it in one tap.
+                </span>
               </li>
               <li>
                 <strong>Voice &amp; notes to quote</strong>
@@ -349,8 +354,11 @@ export default function LandingPage() {
                 <span>SMS accept links, bank-transfer invoices, and optional card deposits via Stripe.</span>
               </li>
               <li>
-                <strong>Diary &amp; reminders</strong>
-                <span>Book jobs on your phone. Quote chase and invoice reminders run while you&apos;re on the tools.</span>
+                <strong>Diary &amp; directions</strong>
+                <span>
+                  Book site visits on your phone. One tap opens Google Maps, Apple Maps or Waze to the
+                  job address.
+                </span>
               </li>
               <li>
                 <strong>Certificates</strong>
@@ -393,16 +401,17 @@ export default function LandingPage() {
               <details className="lp-faq-item">
                 <summary>What is TradiesMate?</summary>
                 <p>
-                  Software for UK tradespeople. You get a dedicated UK number to divert missed calls
-                  to, SMS job qualification, van-friendly quotes from your rates, payment chase, Pay
-                  Now card deposits, a job diary, and cert file storage — in one place.
+                  Software for UK tradespeople. Divert missed calls to a dedicated UK number, triage
+                  them in a smart Inbox, quote from the van with your rates, chase payment, take card
+                  deposits, run a job diary with map directions, and store certs — in one place.
                 </p>
               </details>
               <details className="lp-faq-item">
                 <summary>How does missed-call rescue work?</summary>
                 <p>
                   Divert missed calls to your TradiesMate number. Callers get an SMS to qualify the
-                  job (or leave a voicemail), and a clean lead lands on your Jobs list.
+                  job (or leave a voicemail). We pre-tag spam and tyre-kickers, then put a summary in
+                  your Inbox so you can call back, promote it to a job, or kill it.
                 </p>
               </details>
               <details className="lp-faq-item">
@@ -428,7 +437,7 @@ export default function LandingPage() {
             <h2>Stop losing work while you&apos;re doing the work</h2>
             <p>
               {signupsOpen
-                ? "Start a £14 trial for 14 days. Rescue missed calls, quote from the van, take deposits, keep the diary and certs in one place. Then £49 every 30 days unless you cancel."
+                ? "Start a £14 trial for 14 days. Rescue missed calls into a smart Inbox, quote from the van, take deposits, book the diary with directions, and keep certs in one place. Then £49 every 30 days unless you cancel."
                 : "We’re in private beta while we harden the product. Request early access, or sign in if you’re already on the list."}
             </p>
             <div className="lp-hero-cta">
@@ -457,7 +466,7 @@ export default function LandingPage() {
             </span>
             <div>
               <strong>TradiesMate</strong>
-              <p>Missed-call rescue, quoting, payments, diary and certs for UK trades.</p>
+              <p>Missed-call Inbox, quoting, payments, diary directions and certs for UK trades.</p>
             </div>
           </div>
           <div className="lp-footer-links">
