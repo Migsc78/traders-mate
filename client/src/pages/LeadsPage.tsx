@@ -158,22 +158,39 @@ export default function LeadsPage() {
       {selected.size > 0 && (
         <div className="bulk-actions">
           <span className="bulk-count">{selected.size} selected</span>
-          <button onClick={() => bulkRefresh.mutate()} disabled={bulkRefresh.isPending}>
-            {bulkRefresh.isPending ? "Refreshing…" : "Refresh from Google"}
-          </button>
-          <button onClick={() => bulkScreen.mutate()} disabled={bulkScreen.isPending}>
-            {bulkScreen.isPending ? "Updating…" : "Mark TPS-screened"}
-          </button>
-          <button onClick={() => bulkScrapeEmail.mutate()} disabled={bulkScrapeEmail.isPending}>
-            {bulkScrapeEmail.isPending ? "Scraping emails…" : "Re-scrape emails"}
-          </button>
           <button className="danger" onClick={confirmBulkDelete} disabled={bulkDelete.isPending}>
             {bulkDelete.isPending ? "Deleting…" : "Delete"}
           </button>
-          <button onClick={() => api.exportCsv(selectedIds)}>Export selected</button>
           <button className="linkish" onClick={() => setSelected(new Set())}>
-            Clear selection
+            Clear
           </button>
+          <div className="bulk-secondary desktop-only">
+            <button onClick={() => bulkRefresh.mutate()} disabled={bulkRefresh.isPending}>
+              {bulkRefresh.isPending ? "Refreshing…" : "Refresh from Google"}
+            </button>
+            <button onClick={() => bulkScreen.mutate()} disabled={bulkScreen.isPending}>
+              {bulkScreen.isPending ? "Updating…" : "Mark TPS-screened"}
+            </button>
+            <button onClick={() => bulkScrapeEmail.mutate()} disabled={bulkScrapeEmail.isPending}>
+              {bulkScrapeEmail.isPending ? "Scraping emails…" : "Re-scrape emails"}
+            </button>
+            <button onClick={() => api.exportCsv(selectedIds)}>Export selected</button>
+          </div>
+          <details className="bulk-more mobile-only">
+            <summary>More</summary>
+            <div className="bulk-more-menu">
+              <button onClick={() => bulkRefresh.mutate()} disabled={bulkRefresh.isPending}>
+                {bulkRefresh.isPending ? "Refreshing…" : "Refresh from Google"}
+              </button>
+              <button onClick={() => bulkScreen.mutate()} disabled={bulkScreen.isPending}>
+                {bulkScreen.isPending ? "Updating…" : "Mark TPS-screened"}
+              </button>
+              <button onClick={() => bulkScrapeEmail.mutate()} disabled={bulkScrapeEmail.isPending}>
+                {bulkScrapeEmail.isPending ? "Scraping emails…" : "Re-scrape emails"}
+              </button>
+              <button onClick={() => api.exportCsv(selectedIds)}>Export selected</button>
+            </div>
+          </details>
           {bulkRefresh.isError && !refreshing && (
             <span className="error inline-error">{(bulkRefresh.error as Error).message}</span>
           )}

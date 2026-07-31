@@ -40,6 +40,14 @@ export default function App() {
   }, [pathname]);
 
   useEffect(() => {
+    const prev = document.title;
+    document.title = "Admin · TradiesMate";
+    return () => {
+      document.title = prev;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMenuOpen(false);

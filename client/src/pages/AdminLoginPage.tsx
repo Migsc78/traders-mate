@@ -14,6 +14,10 @@ export default function AdminLoginPage() {
   const [authRequired, setAuthRequired] = useState<boolean | null>(null);
 
   useEffect(() => {
+    document.title = "Admin · TradiesMate";
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -109,6 +113,10 @@ export default function AdminLoginPage() {
         <p className="admin-login-note">
           Set <code>OPERATOR_ADMIN_PASSWORD</code> on the API. Session lasts 14 days on this
           browser.
+        </p>
+        <p className="admin-login-note admin-login-a2hs">
+          On iPhone: open this page in Safari, then Share → Add to Home Screen for a fullscreen
+          admin icon.
         </p>
         <p className="admin-login-back">
           <Link to="/">← Back to site</Link>

@@ -194,7 +194,17 @@ export default function LeadDetailPage() {
       {convert.isError && <p className="error">{(convert.error as Error).message}</p>}
       {deleteLead.isError && <p className="error">{(deleteLead.error as Error).message}</p>}
 
-      <nav className="client-tabs" aria-label="Lead sections">
+      <label className="mobile-tab-select">
+        Section
+        <select value={tab} onChange={(e) => setTab(e.target.value as TabId)} aria-label="Lead section">
+          {TABS.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <nav className="client-tabs client-tabs--desktop" aria-label="Lead sections">
         {TABS.map((t) => (
           <button
             key={t.id}

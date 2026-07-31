@@ -219,21 +219,37 @@ export default function ClientsPage() {
       {selected.size > 0 && (
         <div className="bulk-actions">
           <span className="bulk-count">{selected.size} selected</span>
-          <button onClick={() => bulkInvoice.mutate()} disabled={bulkInvoice.isPending}>
-            {bulkInvoice.isPending ? "Sending…" : "Send invoice"}
-          </button>
-          <button onClick={() => bulkStatus.mutate("ACTIVE")} disabled={bulkStatus.isPending}>
-            Set active
-          </button>
-          <button onClick={() => bulkStatus.mutate("SUSPENDED")} disabled={bulkStatus.isPending}>
-            Suspend
-          </button>
           <button className="danger" onClick={confirmBulkDelete} disabled={bulkDelete.isPending}>
             {bulkDelete.isPending ? "Deleting…" : "Delete"}
           </button>
           <button className="linkish" onClick={() => setSelected(new Set())}>
-            Clear selection
+            Clear
           </button>
+          <div className="bulk-secondary desktop-only">
+            <button onClick={() => bulkInvoice.mutate()} disabled={bulkInvoice.isPending}>
+              {bulkInvoice.isPending ? "Sending…" : "Send invoice"}
+            </button>
+            <button onClick={() => bulkStatus.mutate("ACTIVE")} disabled={bulkStatus.isPending}>
+              Set active
+            </button>
+            <button onClick={() => bulkStatus.mutate("SUSPENDED")} disabled={bulkStatus.isPending}>
+              Suspend
+            </button>
+          </div>
+          <details className="bulk-more mobile-only">
+            <summary>More</summary>
+            <div className="bulk-more-menu">
+              <button onClick={() => bulkInvoice.mutate()} disabled={bulkInvoice.isPending}>
+                {bulkInvoice.isPending ? "Sending…" : "Send invoice"}
+              </button>
+              <button onClick={() => bulkStatus.mutate("ACTIVE")} disabled={bulkStatus.isPending}>
+                Set active
+              </button>
+              <button onClick={() => bulkStatus.mutate("SUSPENDED")} disabled={bulkStatus.isPending}>
+                Suspend
+              </button>
+            </div>
+          </details>
           {(bulkDelete.isError || bulkStatus.isError || bulkInvoice.isError) && (
             <span className="error inline-error">
               {((bulkDelete.error || bulkStatus.error || bulkInvoice.error) as Error).message}
