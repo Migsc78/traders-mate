@@ -53,7 +53,9 @@ export default function TradieCustomerPage() {
     );
   }
 
-  if (profile.isError || !profile.data) {
+  // A stale cached profile still has the address and phone number, which is what
+  // the tradie is standing outside the house trying to read.
+  if (!profile.data) {
     return (
       <div>
         <p className="error">{(profile.error as Error)?.message || "Customer not found"}</p>

@@ -1,7 +1,13 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import {
+  createOfflinePersister,
+  isPersistedQueryKey,
+  OFFLINE_MAX_AGE_MS,
+} from "./lib/offlineCache";
 import App from "./App";
 import SearchPage from "./pages/SearchPage";
 import LeadsPage from "./pages/LeadsPage";
@@ -40,8 +46,31 @@ import "./styles.css";
 import "./tradie.css";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      // Must be >= the persister's maxAge, or restored queries are binned on load.
+      gcTime: OFFLINE_MAX_AGE_MS,
+    },
+  },
 });
+
+/**
+ * Keep the tradie's job/customer/rates data on the device so the app still works
+ * with no signal. Only successful reads of allowlisted keys are written — never
+ * errors, never mutations (nothing is queued for later in this pass), and never
+ * onboarding/billing/Twilio state, which is meaningless without a connection.
+ */
+const persistOptions = {
+  persister: createOfflinePersister(),
+  maxAge: OFFLINE_MAX_AGE_MS,
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query: { state: { status: string }; queryKey: readonly unknown[] }) =>
+      query.state.status === "success" && isPersistedQueryKey(query.queryKey),
+    shouldDehydrateMutation: () => false,
+  },
+};
 
 function RedirectLead() {
   const { leadId } = useParams();
@@ -55,7 +84,7 @@ function RedirectClient() {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <NativeAppBootstrap />
         <RouteSeo />
@@ -104,6 +133,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/clients/:clientId" element={<RedirectClient />} />
         </Routes>
       </BrowserRouter>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   </React.StrictMode>
 );

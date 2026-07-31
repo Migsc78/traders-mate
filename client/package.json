@@ -11,7 +11,9 @@
     "icons": "node scripts/make-icons.mjs",
     "cap:sync": "npm run build && npx cap sync",
     "cap:android": "npx cap open android",
-    "cap:ios": "npx cap open ios"
+    "cap:ios": "npx cap open ios",
+    "release": "node scripts/release.mjs",
+    "release:ios": "node scripts/release.mjs --ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -23,6 +25,7 @@
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
     "@tanstack/react-query": "^5.51.0",
+    "@tanstack/react-query-persist-client": "^5.101.4",
     "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

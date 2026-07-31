@@ -157,7 +157,9 @@ export default function TradieJobPage() {
 
   if (!session) return <Navigate to="/t/auth" replace />;
   if (job.isLoading) return <p>Loading…</p>;
-  if (job.isError) return <p className="error">{(job.error as Error).message}</p>;
+  // With a cached copy we render the job card anyway — the address and contact
+  // number are the whole reason to open this page with no signal.
+  if (job.isError && !job.data) return <p className="error">{(job.error as Error).message}</p>;
 
   const enquiry = job.data as {
     id: string;

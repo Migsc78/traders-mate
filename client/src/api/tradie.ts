@@ -1,4 +1,5 @@
 import { apiUrl } from "./base";
+import { clearOfflineCache } from "../lib/offlineCache";
 
 const SESSION_KEY = "tm_tradie_session";
 
@@ -9,6 +10,11 @@ export class TradieApiError extends Error {
     this.name = "TradieApiError";
     this.status = status;
   }
+
+  /** status 0 — the request never reached the server (no signal, DNS, timeout). */
+  get isOffline(): boolean {
+    return this.status === 0;
+  }
 }
 
 export function getTradieSession(): string | null {
@@ -16,20 +22,32 @@ export function getTradieSession(): string | null {
 }
 
 export function setTradieSession(token: string | null) {
-  if (token) localStorage.setItem(SESSION_KEY, token);
-  else localStorage.removeItem(SESSION_KEY);
+  if (token) {
+    localStorage.setItem(SESSION_KEY, token);
+  } else {
+    localStorage.removeItem(SESSION_KEY);
+    // The offline cache holds customer names, numbers and addresses — it goes with
+    // the session, not least on a shared or handed-down phone.
+    void clearOfflineCache();
+  }
 }
 
 async function tRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getTradieSession();
-  const res = await fetch(apiUrl(`/api/t${path}`), {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers || {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/t${path}`), {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers || {}),
+      },
+    });
+  } catch {
+    // "TypeError: Failed to fetch" means nothing to a tradie in a basement.
+    throw new TradieApiError(0, "No signal — this needs a connection. Try again when you're back in range.");
+  }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {

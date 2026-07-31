@@ -3,6 +3,7 @@ import { NavLink, Outlet, Navigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTradieSession, setTradieSession, tradieApi, TradieApiError } from "../../api/tradie";
 import { supportMailto } from "../../lib/supportMail";
+import { OfflineNotice } from "../../components/OfflineNotice";
 import {
   IconArchive,
   IconCustomers,
@@ -173,7 +174,9 @@ export default function TradieShell() {
     me.isError && me.error instanceof TradieApiError && me.error.status === 401;
   if (unauthorized) return <Navigate to="/t/auth" replace />;
 
-  if (me.isError) {
+  // Only hard-stop when there's nothing cached to show. With saved data we carry on
+  // and let <OfflineNotice /> explain why things look stale.
+  if (me.isError && !me.data) {
     return (
       <div className="tradie-shell tradie-shell--app t-gate">
         <div className="t-gate-brand">
@@ -244,6 +247,8 @@ export default function TradieShell() {
           </p>
         </div>
       </header>
+
+      <OfflineNotice syncedAt={me.dataUpdatedAt} degraded={me.isError && !!me.data} />
 
       {me.data?.billingRequired && (
         <p className="t-banner t-banner--danger">
