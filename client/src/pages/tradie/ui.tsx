@@ -80,6 +80,14 @@ export const IconInbox = ({ size = 34 }: IconProps) => (
   </svg>
 );
 
+export const IconArchive = ({ size = 22 }: IconProps) => (
+  <svg {...svgProps(size)}>
+    <path d="M3 6.5h18v3.5H3z" />
+    <path d="M5 10v9h14v-9" />
+    <path d="M10 13.5h4" />
+  </svg>
+);
+
 const PILL_TONES: Record<string, string> = {
   DRAFT: "slate",
   SENT: "blue",
@@ -95,6 +103,7 @@ const PILL_TONES: Record<string, string> = {
   EXPIRED: "grey",
   VOID: "grey",
   DELETED: "grey",
+  ARCHIVED: "grey",
   HELD: "amber",
   TRIAL: "amber",
   FILED: "green",

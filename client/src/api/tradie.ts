@@ -388,6 +388,12 @@ export const tradieApi = {
       body: "{}",
     }),
 
+  unarchiveJob: (enquiryId: string) =>
+    tRequest<{ id: string; pipeline: string }>(`/jobs/${enquiryId}/unarchive`, {
+      method: "POST",
+      body: "{}",
+    }),
+
   deleteJob: (enquiryId: string) =>
     tRequest<{ ok: boolean; id: string }>(`/jobs/${enquiryId}`, { method: "DELETE" }),
 
@@ -572,6 +578,35 @@ export const tradieApi = {
       method: "POST",
       body: "{}",
     }),
+
+  unarchiveQuote: (id: string) =>
+    tRequest<{ id: string; status: string }>(`/quotes/${id}/unarchive`, {
+      method: "POST",
+      body: "{}",
+    }),
+
+  archived: () =>
+    tRequest<{
+      jobs: {
+        id: string;
+        name: string;
+        phone: string;
+        message: string | null;
+        postcode: string | null;
+        distanceMiles: number | null;
+        createdAt: string;
+        latestQuote: { id: string; status: string; totalPence: number } | null;
+      }[];
+      quotes: {
+        id: string;
+        status: string;
+        statusBeforeArchive: string | null;
+        totalPence: number;
+        sentAt: string | null;
+        createdAt: string;
+        enquiry: { id: string; name: string; phone: string; postcode: string | null } | null;
+      }[];
+    }>("/archived"),
 
   invoices: () => tRequest<InvoiceDto[]>("/invoices"),
 

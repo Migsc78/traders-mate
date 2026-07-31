@@ -1047,6 +1047,23 @@ tradieRouter.post("/jobs/:enquiryId/archive", requireClient, requireActiveAccoun
   }
 });
 
+tradieRouter.post("/jobs/:enquiryId/unarchive", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: cid, pipeline: "ARCHIVED" },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Archived job not found");
+    const updated = await prisma.enquiry.update({
+      where: { id: enquiry.id },
+      data: { pipeline: "JOB", promotedAt: enquiry.promotedAt || new Date() },
+    });
+    res.json({ id: updated.id, pipeline: updated.pipeline });
+  } catch (err) {
+    next(err);
+  }
+});
+
 tradieRouter.delete("/jobs/:enquiryId", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
     const cid = clientId(req);
@@ -1441,9 +1458,83 @@ tradieRouter.post("/quotes/:id/archive", requireClient, requireActiveAccount, as
     await cancelQuoteFollowUps(quote.id);
     const updated = await prisma.quote.update({
       where: { id: quote.id },
-      data: { status: "ARCHIVED" },
+      data: { statusBeforeArchive: quote.status, status: "ARCHIVED" },
     });
     res.json({ id: updated.id, status: updated.status });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/quotes/:id/unarchive", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req), status: "ARCHIVED" },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Archived quote not found");
+    const restore =
+      quote.statusBeforeArchive && quote.statusBeforeArchive !== "ARCHIVED" && quote.statusBeforeArchive !== "DELETED"
+        ? quote.statusBeforeArchive
+        : quote.sentAt
+          ? "SENT"
+          : "DRAFT";
+    const updated = await prisma.quote.update({
+      where: { id: quote.id },
+      data: { status: restore, statusBeforeArchive: null },
+    });
+    res.json({ id: updated.id, status: updated.status });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.get("/archived", requireClient, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const [jobs, quotes] = await Promise.all([
+      prisma.enquiry.findMany({
+        where: { clientId: cid, pipeline: "ARCHIVED" },
+        orderBy: { createdAt: "desc" },
+        take: 80,
+        include: {
+          quotes: {
+            where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { id: true, status: true, totalPence: true },
+          },
+        },
+      }),
+      prisma.quote.findMany({
+        where: { clientId: cid, status: "ARCHIVED" },
+        orderBy: { createdAt: "desc" },
+        take: 80,
+        include: {
+          enquiry: { select: { id: true, name: true, phone: true, postcode: true } },
+        },
+      }),
+    ]);
+    res.json({
+      jobs: jobs.map((e) => ({
+        id: e.id,
+        name: e.name,
+        phone: e.phone,
+        message: e.message,
+        postcode: e.postcode,
+        distanceMiles: e.distanceMiles,
+        createdAt: e.createdAt,
+        latestQuote: e.quotes[0] || null,
+      })),
+      quotes: quotes.map((q) => ({
+        id: q.id,
+        status: q.status,
+        statusBeforeArchive: q.statusBeforeArchive,
+        totalPence: q.totalPence,
+        sentAt: q.sentAt,
+        createdAt: q.createdAt,
+        enquiry: q.enquiry,
+      })),
+    });
   } catch (err) {
     next(err);
   }

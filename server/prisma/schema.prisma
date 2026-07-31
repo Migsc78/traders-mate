@@ -432,6 +432,8 @@ model Quote {
   voiceNoteId     String?
   voiceNote       VoiceNote?  @relation(fields: [voiceNoteId], references: [id], onDelete: SetNull)
   status          QuoteStatus @default(DRAFT)
+  /// Set when status becomes ARCHIVED so we can restore on unarchive
+  statusBeforeArchive QuoteStatus?
   currency        String      @default("GBP")
   vatInclusive    Boolean     @default(true)
   subtotalPence   Int         @default(0)

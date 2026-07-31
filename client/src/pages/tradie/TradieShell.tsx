@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTradieSession, setTradieSession, tradieApi, TradieApiError } from "../../api/tradie";
 import { supportMailto } from "../../lib/supportMail";
 import {
+  IconArchive,
   IconCustomers,
   IconInvoices,
   IconInbox,
@@ -24,6 +25,7 @@ const PRIMARY_TABS = [
 ] as const;
 
 const MORE_TABS = [
+  { to: "/t/archived", label: "Archived", Icon: IconArchive },
   { to: "/t/invoices", label: "Invoices", Icon: IconInvoices },
   { to: "/t/certificates", label: "Certs", Icon: IconCerts },
   { to: "/t/price-book", label: "Rates", Icon: IconRates },
