@@ -123,6 +123,30 @@ function androidVersionOnDisk() {
   };
 }
 
+/* ---------------------------------------------------------------- spm paths */
+
+/**
+ * Undo the Windows path separators `cap sync` writes into Package.swift.
+ *
+ * On Windows it emits `..\..\..\node_modules\@capacitor\app`. That file is only
+ * ever read by Xcode on the Mac, where backslashes aren't path separators — and
+ * worse, Swift reads `\n` and `\a` inside a string literal as escape sequences,
+ * so the build breaks in a way that points nowhere near the real cause. It also
+ * made the two machines fight over this file on every pull.
+ */
+function normaliseSpmPaths() {
+  const pkg = join(CLIENT_DIR, "ios", "App", "CapApp-SPM", "Package.swift");
+  if (!existsSync(pkg)) return;
+  const before = readFileSync(pkg, "utf8");
+  const after = before.replace(/path:\s*"([^"]*)"/g, (whole, p) =>
+    p.includes("\\") ? `path: "${p.replace(/\\/g, "/")}"` : whole
+  );
+  if (after !== before) {
+    writeFileSync(pkg, after);
+    note("Rewrote Windows path separators in Package.swift (Xcode needs forward slashes)");
+  }
+}
+
 /* --------------------------------------------------------------------- java */
 
 /** Gradle needs a JDK. Android Studio ships one; find it so nobody sets JAVA_HOME by hand. */
@@ -189,6 +213,7 @@ run("npm run build", CLIENT_DIR, { VITE_API_BASE: apiBase });
 
 step("Copying the bundle into the native projects");
 run("npx cap sync");
+normaliseSpmPaths();
 
 if (target === "ios") {
   step("Opening Xcode");

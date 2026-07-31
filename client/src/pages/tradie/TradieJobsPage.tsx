@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { formatGbp, tradieApi } from "../../api/tradie";
+import { formatGbp, sendOrQueue, tradieApi } from "../../api/tradie";
 import { EmptyState, QueryError, IconChevron, StatusPill } from "./ui";
 import { SwipeListRow } from "./SwipeListRow";
-import { useOffline } from "../../lib/connectivity";
 
 type JobRow = {
   id: string;
@@ -18,34 +17,59 @@ type JobRow = {
 
 export default function TradieJobsPage() {
   const qc = useQueryClient();
-  const offline = useOffline();
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
   const jobs = useQuery({
     queryKey: ["tradie-jobs"],
     queryFn: () => tradieApi.jobs(),
   });
 
+  /**
+   * Drop the row from the cached list straight away.
+   *
+   * Swipe has to feel the same with or without signal, so the row can't sit there
+   * waiting for a round trip. The cache is what the list renders from and it's
+   * persisted, so this survives a restart too; if the queued write is ultimately
+   * rejected, the next refetch brings the row back rather than losing it quietly.
+   */
+  const dropRow = (id: string) => {
+    qc.setQueryData<JobRow[]>(["tradie-jobs"], (rows) => (rows || []).filter((r) => r.id !== id));
+  };
+
   const archive = useMutation({
-    mutationFn: (id: string) => tradieApi.archiveJob(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
+    mutationFn: (job: JobRow) =>
+      sendOrQueue({
+        label: `Archive job · ${job.name}`,
+        path: `/jobs/${job.id}/archive`,
+        method: "POST",
+        body: {},
+        invalidates: ["tradie-jobs", "tradie-archived"],
+      }),
+    onMutate: (job) => dropRow(job.id),
+    onSuccess: (r) => {
+      if (!r.queued) void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
     },
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => tradieApi.deleteJob(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
+    mutationFn: (job: JobRow) =>
+      sendOrQueue({
+        label: `Delete job · ${job.name}`,
+        path: `/jobs/${job.id}`,
+        method: "DELETE",
+        body: {},
+        invalidates: ["tradie-jobs"],
+      }),
+    onMutate: (job) => dropRow(job.id),
+    onSuccess: (r) => {
+      if (!r.queued) void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
     },
   });
 
-  // Swipe actions hit the server, so offline they'd just fail after the row has
-  // already slid away — locking the swipe is less alarming than an error.
-  const busy = offline || archive.isPending || remove.isPending;
+  const busy = archive.isPending || remove.isPending;
 
   const confirmDelete = (job: JobRow) => {
     if (!window.confirm(`Delete job for ${job.name}? This can’t be undone.`)) return;
-    remove.mutate(job.id);
+    remove.mutate(job);
   };
 
   return (
@@ -73,7 +97,7 @@ export default function TradieJobsPage() {
             key={j.id}
             to={`/t/jobs/${j.id}`}
             busy={busy}
-            onArchive={() => archive.mutate(j.id)}
+            onArchive={() => archive.mutate(j)}
             onDelete={() => confirmDelete(j)}
           >
             <div className="t-row-main">

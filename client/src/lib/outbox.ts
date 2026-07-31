@@ -29,7 +29,7 @@ export type OutboxItem = {
   label: string;
   /** Path under /api/t, e.g. "/jobs/abc/voice". */
   path: string;
-  method: "POST" | "PUT" | "PATCH";
+  method: "POST" | "PUT" | "PATCH" | "DELETE";
   body: unknown;
   /** Query keys to refresh once this lands. */
   invalidates: string[];

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MoneyInput, NumberInput } from "./NumericInput";
 import {
   downloadPriceBookTemplate,
   exportPriceBook,
@@ -193,23 +194,18 @@ export default function PriceBookEditor({
             <div className="pricebook-card-row">
               <label>
                 Price £
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={(r.unitPricePence / 100).toFixed(2)}
-                  onChange={(e) => update(i, { unitPricePence: Math.round(Number(e.target.value) * 100) })}
+                <MoneyInput
+                  pence={r.unitPricePence}
+                  onPence={(unitPricePence) => update(i, { unitPricePence })}
                 />
               </label>
               <label>
                 VAT %
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  max="100"
+                <NumberInput
                   value={r.vatRate}
-                  onChange={(e) => update(i, { vatRate: Number(e.target.value) })}
+                  onValue={(vatRate) => update(i, { vatRate })}
+                  decimals={0}
+                  max={100}
                 />
               </label>
             </div>
@@ -293,22 +289,17 @@ export default function PriceBookEditor({
                   </select>
                 </td>
                 <td>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={(r.unitPricePence / 100).toFixed(2)}
-                    onChange={(e) => update(i, { unitPricePence: Math.round(Number(e.target.value) * 100) })}
+                  <MoneyInput
+                    pence={r.unitPricePence}
+                    onPence={(unitPricePence) => update(i, { unitPricePence })}
                   />
                 </td>
                 <td>
-                  <input
-                    type="number"
-                    step="1"
-                    min="0"
-                    max="100"
+                  <NumberInput
                     value={r.vatRate}
-                    onChange={(e) => update(i, { vatRate: Number(e.target.value) })}
+                    onValue={(vatRate) => update(i, { vatRate })}
+                    decimals={0}
+                    max={100}
                   />
                 </td>
                 <td className="center">

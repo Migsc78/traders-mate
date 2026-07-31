@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatGbp, tradieApi } from "../../api/tradie";
+import { formatGbp, sendOrQueue, tradieApi } from "../../api/tradie";
 import { EmptyState, QueryError, IconChevron, StatusPill } from "./ui";
 import { SwipeListRow } from "./SwipeListRow";
-import { useOffline } from "../../lib/connectivity";
 
 type QuoteRow = {
   id: string;
@@ -14,31 +13,52 @@ type QuoteRow = {
 
 export default function TradieQuotesPage() {
   const qc = useQueryClient();
-  const offline = useOffline();
   const quotes = useQuery({ queryKey: ["tradie-quotes"], queryFn: () => tradieApi.quotes() });
 
+  /** See TradieJobsPage — the row leaves the cached list before the round trip. */
+  const dropRow = (id: string) => {
+    qc.setQueryData<QuoteRow[]>(["tradie-quotes"], (rows) => (rows || []).filter((r) => r.id !== id));
+  };
+
   const archive = useMutation({
-    mutationFn: (id: string) => tradieApi.archiveQuote(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
+    mutationFn: (q: QuoteRow) =>
+      sendOrQueue({
+        label: `Archive quote · ${q.enquiry?.name || "quote"}`,
+        path: `/quotes/${q.id}/archive`,
+        method: "POST",
+        body: {},
+        invalidates: ["tradie-quotes", "tradie-archived"],
+      }),
+    onMutate: (q) => dropRow(q.id),
+    onSuccess: (r) => {
+      if (!r.queued) void qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
     },
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => tradieApi.deleteQuote(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
-      void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
+    mutationFn: (q: QuoteRow) =>
+      sendOrQueue({
+        label: `Delete quote · ${q.enquiry?.name || "quote"}`,
+        path: `/quotes/${q.id}`,
+        method: "DELETE",
+        body: {},
+        invalidates: ["tradie-quotes", "tradie-jobs"],
+      }),
+    onMutate: (q) => dropRow(q.id),
+    onSuccess: (r) => {
+      if (!r.queued) {
+        void qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
+        void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
+      }
     },
   });
 
-  // See TradieJobsPage — swipe actions need the server, so lock them offline.
-  const busy = offline || archive.isPending || remove.isPending;
+  const busy = archive.isPending || remove.isPending;
 
   const confirmDelete = (q: QuoteRow) => {
     const label = q.enquiry?.name || "this quote";
     if (!window.confirm(`Delete quote for ${label}? This can’t be undone.`)) return;
-    remove.mutate(q.id);
+    remove.mutate(q);
   };
 
   return (
@@ -59,7 +79,7 @@ export default function TradieQuotesPage() {
               to={q.enquiry ? `/t/jobs/${q.enquiry.id}` : "/t"}
               linkState={q.enquiry ? { from: "/t/quotes", fromLabel: "Quotes" } : undefined}
               busy={busy}
-              onArchive={() => archive.mutate(q.id)}
+              onArchive={() => archive.mutate(q)}
               onDelete={() => confirmDelete(q)}
             >
               <div className="t-row-main">

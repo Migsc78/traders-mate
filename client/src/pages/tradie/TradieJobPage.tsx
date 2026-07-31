@@ -10,6 +10,7 @@ import {
   type QuoteLineDto,
 } from "../../api/tradie";
 import { IconPhone, NeedsSignal, QueryError, StatusPill, initialsOf } from "./ui";
+import { MoneyInput, NumberInput } from "../../components/NumericInput";
 import { useOffline } from "../../lib/connectivity";
 
 function triageLabel(t: string): string {
@@ -151,10 +152,17 @@ export default function TradieJobPage() {
   });
 
   const remove = useMutation({
-    mutationFn: () => tradieApi.deleteQuote(activeQuote!.id),
-    onSuccess: () => {
+    mutationFn: () =>
+      sendOrQueue({
+        label: `Delete draft · ${who}`,
+        path: `/quotes/${activeQuote!.id}`,
+        method: "DELETE",
+        body: {},
+        invalidates: ["tradie-job", "tradie-quotes", "tradie-jobs"],
+      }),
+    onSuccess: (r) => {
       setDraft(null);
-      qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+      if (!r.queued) qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
     },
   });
 
@@ -399,12 +407,7 @@ export default function TradieJobPage() {
                   <div key={l.id || i} className="tradie-line-block">
                     <div className="tradie-line">
                       <input value={l.label} onChange={(e) => updateLine(i, { label: e.target.value })} />
-                      <input
-                        type="number"
-                        step="0.25"
-                        value={l.qty}
-                        onChange={(e) => updateLine(i, { qty: Number(e.target.value) })}
-                      />
+                      <NumberInput value={l.qty} onValue={(qty) => updateLine(i, { qty })} />
                       <select value={l.unit} onChange={(e) => updateLine(i, { unit: e.target.value })}>
                         {["JOB", "HOUR", "EACH", "DAY", "METRE"].map((u) => (
                           <option key={u} value={u}>
@@ -412,11 +415,9 @@ export default function TradieJobPage() {
                           </option>
                         ))}
                       </select>
-                      <input
-                        type="number"
-                        step="1"
-                        value={(l.unitPricePence / 100).toFixed(2)}
-                        onChange={(e) => updateLine(i, { unitPricePence: Math.round(Number(e.target.value) * 100) })}
+                      <MoneyInput
+                        pence={l.unitPricePence}
+                        onPence={(unitPricePence) => updateLine(i, { unitPricePence })}
                         title="Unit price £"
                       />
                       <button
@@ -470,7 +471,7 @@ export default function TradieJobPage() {
                   </button>
                   <button
                     className="danger"
-                    disabled={offline || remove.isPending}
+                    disabled={remove.isPending}
                     onClick={() => {
                       if (confirm("Delete this draft?")) remove.mutate();
                     }}

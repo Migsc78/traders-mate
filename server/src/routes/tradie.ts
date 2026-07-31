@@ -1031,7 +1031,7 @@ tradieRouter.post("/jobs/:enquiryId/promote", requireClient, requireActiveAccoun
   }
 });
 
-tradieRouter.post("/jobs/:enquiryId/archive", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/jobs/:enquiryId/archive", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const cid = clientId(req);
     const enquiry = await prisma.enquiry.findFirst({
@@ -1046,9 +1046,9 @@ tradieRouter.post("/jobs/:enquiryId/archive", requireClient, requireActiveAccoun
   } catch (err) {
     next(err);
   }
-});
+}));
 
-tradieRouter.post("/jobs/:enquiryId/unarchive", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/jobs/:enquiryId/unarchive", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const cid = clientId(req);
     const enquiry = await prisma.enquiry.findFirst({
@@ -1063,9 +1063,9 @@ tradieRouter.post("/jobs/:enquiryId/unarchive", requireClient, requireActiveAcco
   } catch (err) {
     next(err);
   }
-});
+}));
 
-tradieRouter.delete("/jobs/:enquiryId", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.delete("/jobs/:enquiryId", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const cid = clientId(req);
     const enquiry = await prisma.enquiry.findFirst({
@@ -1077,7 +1077,7 @@ tradieRouter.delete("/jobs/:enquiryId", requireClient, requireActiveAccount, asy
   } catch (err) {
     next(err);
   }
-});
+}));
 
 tradieRouter.post("/jobs/:enquiryId/kill", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
@@ -1431,7 +1431,7 @@ tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, as
   }
 });
 
-tradieRouter.delete("/quotes/:id", requireClient, async (req, res, next) => {
+tradieRouter.delete("/quotes/:id", requireClient, idempotent(async (req, res, next) => {
   try {
     const quote = await prisma.quote.findFirst({
       where: { id: req.params.id, clientId: clientId(req) },
@@ -1444,9 +1444,9 @@ tradieRouter.delete("/quotes/:id", requireClient, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
-tradieRouter.post("/quotes/:id/archive", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/quotes/:id/archive", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const quote = await prisma.quote.findFirst({
       where: {
@@ -1465,9 +1465,9 @@ tradieRouter.post("/quotes/:id/archive", requireClient, requireActiveAccount, as
   } catch (err) {
     next(err);
   }
-});
+}));
 
-tradieRouter.post("/quotes/:id/unarchive", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/quotes/:id/unarchive", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const quote = await prisma.quote.findFirst({
       where: { id: req.params.id, clientId: clientId(req), status: "ARCHIVED" },
@@ -1487,7 +1487,7 @@ tradieRouter.post("/quotes/:id/unarchive", requireClient, requireActiveAccount, 
   } catch (err) {
     next(err);
   }
-});
+}));
 
 tradieRouter.get("/archived", requireClient, async (req, res, next) => {
   try {

@@ -86,7 +86,7 @@ export type QueuedOr<T> = { queued: true } | { queued: false; result: T };
 export async function sendOrQueue<T>(opts: {
   label: string;
   path: string;
-  method: "POST" | "PUT" | "PATCH";
+  method: "POST" | "PUT" | "PATCH" | "DELETE";
   body: unknown;
   invalidates: string[];
 }): Promise<QueuedOr<T>> {
