@@ -852,7 +852,7 @@ tradieRouter.get("/jobs", requireClient, async (req, res, next) => {
       take: 50,
       include: {
         quotes: {
-          where: { status: { not: "DELETED" } },
+          where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
           orderBy: { createdAt: "desc" },
           take: 1,
           select: { id: true, status: true, totalPence: true },
@@ -1107,7 +1107,7 @@ tradieRouter.get("/jobs/:enquiryId", requireClient, async (req, res, next) => {
       where: { id: req.params.enquiryId, clientId: clientId(req) },
       include: {
         quotes: {
-          where: { status: { not: "DELETED" } },
+          where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
           orderBy: { createdAt: "desc" },
           include: { lines: quoteLineInclude },
         },
@@ -1419,10 +1419,31 @@ tradieRouter.delete("/quotes/:id", requireClient, async (req, res, next) => {
       where: { id: req.params.id, clientId: clientId(req) },
     });
     if (!quote) throw new ApiError(404, "not_found", "Quote not found");
-    if (quote.status !== "DRAFT") throw new ApiError(400, "not_draft", "Only drafts can be deleted");
+    if (quote.status === "DELETED") throw new ApiError(404, "not_found", "Quote not found");
     await prisma.quote.update({ where: { id: quote.id }, data: { status: "DELETED" } });
     await cancelQuoteFollowUps(quote.id);
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.post("/quotes/:id/archive", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const quote = await prisma.quote.findFirst({
+      where: {
+        id: req.params.id,
+        clientId: clientId(req),
+        status: { notIn: ["DELETED", "ARCHIVED"] },
+      },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+    await cancelQuoteFollowUps(quote.id);
+    const updated = await prisma.quote.update({
+      where: { id: quote.id },
+      data: { status: "ARCHIVED" },
+    });
+    res.json({ id: updated.id, status: updated.status });
   } catch (err) {
     next(err);
   }
@@ -1432,7 +1453,7 @@ tradieRouter.delete("/quotes/:id", requireClient, async (req, res, next) => {
 tradieRouter.get("/quotes", requireClient, async (req, res, next) => {
   try {
     const quotes = await prisma.quote.findMany({
-      where: { clientId: clientId(req), status: { not: "DELETED" } },
+      where: { clientId: clientId(req), status: { notIn: ["DELETED", "ARCHIVED"] } },
       orderBy: { createdAt: "desc" },
       take: 80,
       include: {
@@ -1533,7 +1554,7 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
         take: 300,
         include: {
           quotes: {
-            where: { status: { not: "DELETED" } },
+            where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
             orderBy: { createdAt: "desc" },
             take: 1,
             select: { id: true, status: true, totalPence: true },
@@ -1659,7 +1680,7 @@ tradieRouter.get("/customers/:phoneKey", requireClient, async (req, res, next) =
       take: 200,
       include: {
         quotes: {
-          where: { status: { not: "DELETED" } },
+          where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
           orderBy: { createdAt: "desc" },
           take: 3,
           select: { id: true, status: true, totalPence: true, createdAt: true },

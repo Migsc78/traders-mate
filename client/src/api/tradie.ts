@@ -567,6 +567,12 @@ export const tradieApi = {
 
   deleteQuote: (id: string) => tRequest<{ ok: boolean }>(`/quotes/${id}`, { method: "DELETE" }),
 
+  archiveQuote: (id: string) =>
+    tRequest<{ id: string; status: string }>(`/quotes/${id}/archive`, {
+      method: "POST",
+      body: "{}",
+    }),
+
   invoices: () => tRequest<InvoiceDto[]>("/invoices"),
 
   invoiceFromQuote: (quoteId: string) =>
