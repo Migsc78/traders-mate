@@ -24,7 +24,8 @@ export default defineConfig({
         theme_color: "#ff5a1f",
         background_color: "#fff7f2",
         display: "standalone",
-        start_url: "/t",
+        // No fixed start_url: iOS Add to Home Screen must keep the page you were on
+        // (/admin → admin, /t → tradie). A fixed "/t" forced every icon to the tradie app.
         scope: "/",
         icons: [
           {

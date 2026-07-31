@@ -137,15 +137,9 @@
       (function () {
         var isAdmin = location.pathname === "/admin" || location.pathname.indexOf("/admin/") === 0;
         if (!isAdmin) return;
+        // Drop the site PWA manifest on admin so iOS bookmarks this URL, not /t.
         var links = document.querySelectorAll('link[rel="manifest"]');
-        var link = links[0];
-        if (!link) {
-          link = document.createElement("link");
-          link.rel = "manifest";
-          document.head.appendChild(link);
-        }
-        for (var i = 1; i < links.length; i++) links[i].remove();
-        link.href = "/admin.webmanifest";
+        for (var i = 0; i < links.length; i++) links[i].remove();
         var title = document.querySelector('meta[name="apple-mobile-web-app-title"]');
         if (title) title.setAttribute("content", "TM Admin");
       })();
