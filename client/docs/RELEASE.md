@@ -1,24 +1,78 @@
 # Shipping an update
 
-The only page you need. Two commands, one commit, in this order.
+The only page you need. Start to finish: change code in Cursor → push → update Android
+→ update iOS.
 
 The native apps ship the website **inside the app** so they open with no signal. That's
 the whole point of the offline work — but it means a Vercel deploy no longer updates
-the phones. Each release has to be built and uploaded once per store.
+the phones by itself. Every release that touches the app has to be built and uploaded
+once per store, on top of the normal push.
 
 ---
 
-## The short version
+## The whole loop, start to finish
 
-| Where | What you type |
-|---|---|
-| **Windows** (here, in Cursor) | `cd client` → `npm run release` |
-| then | upload the `.aab` to Play, `git push` the version bump |
-| **MacBook** | `git pull` → `cd client` → `npm run release:ios` |
+| Step | Where | What you type |
+|---|---|---|
+| 0. Ship the code change | Windows, in Cursor | `git add`, `git commit`, `git push` — same as any commit |
+| 1. Web goes live | — | Vercel deploys automatically from that push, ~1–2 min |
+| 2. Android | Windows | `cd client` → `npm run release` → upload the `.aab` to Play → commit + push the version bump |
+| 3. iOS | MacBook | `git pull` → `cd client` → `npm run release:ios` → Archive in Xcode |
 
-Everything else — version numbers, building, syncing, finding Java — is done for you.
-Each command finishes by printing exactly what to click next. If you forget where you
-are, just re-read the last thing the terminal told you.
+Everything mechanical — version numbers, building, syncing, finding Java — is done for
+you by the two npm scripts. Each one finishes by printing exactly what to click next.
+If you forget where you are, just re-read the last thing the terminal told you.
+
+**If the change is web-only** (landing page, admin, anything outside the tradie app
+shell), step 0 is the whole job — stop there, nothing else to do.
+
+**If the change touches anything under `client/src` that the tradie app uses**, all
+four steps apply, in order. Android before iOS specifically — the Mac reads the version
+number Windows sets, it never invents its own, so doing iOS first leaves it with
+nothing to read.
+
+---
+
+## 0. One-time setup per machine
+
+Skip this section once it's done — it doesn't need repeating. It exists because a
+fresh machine (or the first time you set this up) hits two blockers that have nothing
+to do with the release itself: git not knowing who you are, and GitHub not accepting a
+plain password over HTTPS.
+
+**Git needs an identity**, or every commit fails with `Author identity unknown`:
+
+```bash
+git config user.name "Miguel Coelho"
+git config user.email "migsandbron@gmail.com"
+```
+
+(Drop `--global` as shown above to scope it to just this repo, or add `--global` once
+if every repo on this machine should use the same identity.)
+
+**GitHub needs real authentication for `git push`** — it stopped accepting your account
+password over HTTPS years ago. The GitHub CLI sets this up once, properly, so you never
+see a username/token prompt again:
+
+```bash
+brew install gh      # Mac — if Homebrew itself is missing, see below
+gh auth login
+```
+
+Answer: **GitHub.com** → **HTTPS** → **Login with a web browser**. It gives you a
+one-time code, opens your browser, you approve it, done. `git push` and `git pull` just
+work after that.
+
+If `brew` itself isn't installed:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+then follow the two `echo` lines it prints at the end to add Homebrew to your `PATH`,
+then run the `gh` install above.
+
+On Windows, the equivalent is `winget install GitHub.cli` then the same `gh auth login`.
 
 ---
 
@@ -87,6 +141,40 @@ Then App Store Connect → TestFlight. Processing takes 5–30 min. Internal tes
 it immediately with no review; external testers need Beta App Review the first time
 (1–2 days).
 
+### If `git pull` fails with "local changes would be overwritten"
+
+Xcode writes to `project.pbxproj` on its own — opening the project, or re-resolving
+signing, can leave uncommitted edits sitting there from a previous session. `git pull`
+will refuse rather than risk losing them. Don't discard blindly — check what it is first:
+
+```bash
+git diff client/ios/App/App.xcodeproj/project.pbxproj
+```
+
+If it's your signing setup (`DEVELOPMENT_TEAM`, `CODE_SIGN_ENTITLEMENTS`), stash it,
+pull, then bring it back:
+
+```bash
+git stash
+git pull
+git stash pop
+```
+
+If `stash pop` reports a **conflict** in `project.pbxproj`, don't hand-edit the merge
+markers — this file is Xcode's generated format and a manual edit can easily leave a
+duplicate key that corrupts the project. Instead, take the clean pulled version and
+let Xcode regenerate the signing config, which is guaranteed valid:
+
+```bash
+git checkout --ours client/ios/App/App.xcodeproj/project.pbxproj
+git add client/ios/App/App.xcodeproj/project.pbxproj
+git stash drop
+```
+
+Then in Xcode: **App** project → **App** target → **Signing & Capabilities** → set
+**Team** again. Takes a few seconds, and this should be a one-time thing — once that
+commit is pushed once, future pulls on this Mac (or any other) won't hit it again.
+
 ---
 
 ## Version numbers
@@ -151,6 +239,9 @@ re-run `npm run release`.
 
 | What you see | What it means |
 |---|---|
+| `Author identity unknown` | This machine has no git identity yet — see [One-time setup](#0-one-time-setup-per-machine) above. |
+| `Username for 'https://github.com'` prompt | Not authenticated with GitHub over HTTPS. Run `gh auth login` — see [One-time setup](#0-one-time-setup-per-machine). |
+| `git pull` refuses: "local changes would be overwritten" | See [If git pull fails](#if-git-pull-fails-with-local-changes-would-be-overwritten) above. |
 | `CAPACITOR_SERVER_URL is set` | You're in the terminal you used for device testing. Open a fresh one. |
 | `keystore.properties is missing` | See [native-ship-guide.md](./native-ship-guide.md) Part B. One-time setup. |
 | `Couldn't find a JDK` | Install Android Studio, or set `JAVA_HOME` to a JDK 17+. |
