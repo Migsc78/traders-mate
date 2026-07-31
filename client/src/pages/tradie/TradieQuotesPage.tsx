@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatGbp, tradieApi } from "../../api/tradie";
-import { EmptyState, IconChevron, StatusPill } from "./ui";
+import { EmptyState, QueryError, IconChevron, StatusPill } from "./ui";
 import { SwipeListRow } from "./SwipeListRow";
+import { useOffline } from "../../lib/connectivity";
 
 type QuoteRow = {
   id: string;
@@ -13,6 +14,7 @@ type QuoteRow = {
 
 export default function TradieQuotesPage() {
   const qc = useQueryClient();
+  const offline = useOffline();
   const quotes = useQuery({ queryKey: ["tradie-quotes"], queryFn: () => tradieApi.quotes() });
 
   const archive = useMutation({
@@ -30,7 +32,8 @@ export default function TradieQuotesPage() {
     },
   });
 
-  const busy = archive.isPending || remove.isPending;
+  // See TradieJobsPage — swipe actions need the server, so lock them offline.
+  const busy = offline || archive.isPending || remove.isPending;
 
   const confirmDelete = (q: QuoteRow) => {
     const label = q.enquiry?.name || "this quote";
@@ -46,7 +49,7 @@ export default function TradieQuotesPage() {
       </header>
 
       {quotes.isLoading && <p className="muted-text">Loading…</p>}
-      {quotes.isError && <p className="error">{(quotes.error as Error).message}</p>}
+      <QueryError error={quotes.error} />
 
       <ul className="t-list">
         {(quotes.data || []).map(

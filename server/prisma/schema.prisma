@@ -256,10 +256,32 @@ model Client {
   appointments     Appointment[]
   certificates     Certificate[]
   customerContacts CustomerContact[]
+  idempotencyKeys  IdempotencyKey[]
 
   @@index([status])
   @@index([destPhone])
   @@index([twilioNumber])
+}
+
+/// Replay guard for writes queued on a tradie's phone while they had no signal.
+///
+/// The offline outbox retries a request until it gets a definite answer, and a
+/// request can easily succeed on the server but never make it back over a dying
+/// connection. Without this, a voice note recorded in a plant room would build a
+/// second draft quote on every retry. The stored response is replayed verbatim so
+/// the client sees the original result, not a duplicate.
+model IdempotencyKey {
+  id             String   @id @default(cuid())
+  key            String
+  clientId       String
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  endpoint       String
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now())
+
+  @@unique([clientId, key])
+  @@index([createdAt])
 }
 
 /// Durable CRM notes for a household/customer, keyed by normalised phone digits.

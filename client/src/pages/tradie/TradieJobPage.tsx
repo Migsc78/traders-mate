@@ -4,11 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   formatGbp,
   getTradieSession,
+  sendOrQueue,
   tradieApi,
   type QuoteDto,
   type QuoteLineDto,
 } from "../../api/tradie";
-import { IconPhone, StatusPill, initialsOf } from "./ui";
+import { IconPhone, NeedsSignal, QueryError, StatusPill, initialsOf } from "./ui";
+import { useOffline } from "../../lib/connectivity";
 
 function triageLabel(t: string): string {
   switch (t) {
@@ -28,6 +30,7 @@ export default function TradieJobPage() {
   const session = getTradieSession();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const offline = useOffline();
   const [notes, setNotes] = useState("");
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState<QuoteDto | null>(null);
@@ -67,37 +70,66 @@ export default function TradieJobPage() {
     return quotes.find((q) => q.status === "DRAFT") || quotes[0] || null;
   }, [draft, job.data]);
 
+  const who = (job.data?.name as string | undefined) || "job";
+
+  // Drafting needs Claude/Whisper server-side, so with no signal the write is
+  // queued instead: the tradie captures on site, the quote is built the moment
+  // they're back in range. The audio itself is already local, so nothing is lost.
   const fromNotes = useMutation({
-    mutationFn: () => tradieApi.notesToQuote(enquiryId, notes),
-    onSuccess: (q: QuoteDto) => {
-      setDraft(q);
+    mutationFn: () =>
+      sendOrQueue<QuoteDto>({
+        label: `Quote from notes · ${who}`,
+        path: `/jobs/${enquiryId}/notes`,
+        method: "POST",
+        body: { transcript: notes },
+        invalidates: ["tradie-job", "tradie-quotes", "tradie-jobs"],
+      }),
+    onSuccess: (r) => {
+      if (r.queued) {
+        setNotes("");
+        return;
+      }
+      setDraft(r.result);
       qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
     },
   });
 
   const fromVoice = useMutation({
-    mutationFn: async (payload: { contentType: string; dataBase64: string; durationSec: number }) => {
-      const r = await tradieApi.voiceToQuote(enquiryId, payload.contentType, payload.dataBase64, payload.durationSec);
-      return r.quote;
-    },
-    onSuccess: (q: QuoteDto) => {
-      setDraft(q);
+    mutationFn: (payload: { contentType: string; dataBase64: string; durationSec: number }) =>
+      sendOrQueue<{ quote: QuoteDto }>({
+        label: `Voice note · ${who}`,
+        path: `/jobs/${enquiryId}/voice`,
+        method: "POST",
+        body: payload,
+        invalidates: ["tradie-job", "tradie-quotes", "tradie-jobs"],
+      }),
+    onSuccess: (r) => {
+      if (r.queued) return;
+      setDraft(r.result.quote);
       qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
     },
   });
 
   const saveLines = useMutation({
     mutationFn: (lines: QuoteLineDto[]) =>
-      tradieApi.saveLines(activeQuote!.id, {
-        lines: lines.map((l) => ({
-          label: l.label,
-          qty: Number(l.qty),
-          unit: l.unit,
-          unitPricePence: Number(l.unitPricePence),
-          vatRate: Number(l.vatRate ?? 20),
-        })),
+      sendOrQueue<QuoteDto>({
+        label: `Quote edits · ${who}`,
+        path: `/quotes/${activeQuote!.id}/lines`,
+        method: "PUT",
+        body: {
+          lines: lines.map((l) => ({
+            label: l.label,
+            qty: Number(l.qty),
+            unit: l.unit,
+            unitPricePence: Number(l.unitPricePence),
+            vatRate: Number(l.vatRate ?? 20),
+          })),
+        },
+        invalidates: ["tradie-job", "tradie-quotes"],
       }),
-    onSuccess: (q: QuoteDto) => setDraft(q),
+    onSuccess: (r) => {
+      if (!r.queued) setDraft(r.result);
+    },
   });
 
   const approve = useMutation({
@@ -328,7 +360,7 @@ export default function TradieJobPage() {
             disabled={fromNotes.isPending || notes.trim().length < 3}
             onClick={() => fromNotes.mutate()}
           >
-            {fromNotes.isPending ? "Building…" : "Draft from notes"}
+            {fromNotes.isPending ? "Building…" : offline ? "Save notes for later" : "Draft from notes"}
           </button>
           {!recording ? (
             <button onClick={() => void startRecording()} disabled={fromVoice.isPending}>
@@ -336,14 +368,19 @@ export default function TradieJobPage() {
             </button>
           ) : (
             <button className="danger" onClick={stopRecording}>
-              Stop & transcribe
+              {offline ? "Stop & save" : "Stop & transcribe"}
             </button>
           )}
         </div>
-        {(fromNotes.isError || fromVoice.isError) && (
-          <p className="error">{((fromNotes.error || fromVoice.error) as Error).message}</p>
+        {offline && (
+          <NeedsSignal>
+            Saved on your phone — we&apos;ll price it up the moment you&apos;re back in range.
+          </NeedsSignal>
         )}
-        {fromVoice.isPending && <p className="muted-text">Transcribing &amp; pricing…</p>}
+        <QueryError error={fromNotes.error || fromVoice.error} />
+        {fromVoice.isPending && (
+          <p className="muted-text">{offline ? "Saving…" : "Transcribing & pricing…"}</p>
+        )}
       </div>
 
       {activeQuote && (
@@ -396,7 +433,10 @@ export default function TradieJobPage() {
                 ))}
                 <div className="tradie-actions">
                   <button onClick={addLine}>+ Line</button>
-                  <button onClick={() => saveLines.mutate(activeQuote.lines)} disabled={saveLines.isPending}>
+                  <button
+                    onClick={() => saveLines.mutate(activeQuote.lines)}
+                    disabled={saveLines.isPending}
+                  >
                     {saveLines.isPending ? "Saving…" : "Save edits"}
                   </button>
                 </div>
@@ -424,12 +464,13 @@ export default function TradieJobPage() {
                   <button
                     className="primary t-btn--block"
                     onClick={() => approve.mutate()}
-                    disabled={approve.isPending}
+                    disabled={offline || approve.isPending}
                   >
                     {approve.isPending ? "Sending…" : "Approve & send to customer"}
                   </button>
                   <button
                     className="danger"
+                    disabled={offline || remove.isPending}
                     onClick={() => {
                       if (confirm("Delete this draft?")) remove.mutate();
                     }}
@@ -437,11 +478,12 @@ export default function TradieJobPage() {
                     Delete draft
                   </button>
                 </div>
-                {(saveLines.isError || approve.isError || remove.isError) && (
-                  <p className="error">
-                    {((saveLines.error || approve.error || remove.error) as Error).message}
-                  </p>
+                {offline && (
+                  <NeedsSignal>
+                    Edits are saved on your phone. Sending and deleting need signal.
+                  </NeedsSignal>
                 )}
+                <QueryError error={saveLines.error || approve.error || remove.error} />
               </div>
             )}
 
@@ -453,11 +495,12 @@ export default function TradieJobPage() {
                 <button
                   className="convert t-btn--block"
                   onClick={() => makeInvoice.mutate()}
-                  disabled={makeInvoice.isPending}
+                  disabled={offline || makeInvoice.isPending}
                 >
                   {makeInvoice.isPending ? "Creating…" : "Create invoice"}
                 </button>
-                {makeInvoice.isError && <p className="error">{(makeInvoice.error as Error).message}</p>}
+                {offline && <NeedsSignal>Invoicing needs signal.</NeedsSignal>}
+                <QueryError error={makeInvoice.error} />
               </div>
             )}
           </div>
@@ -492,12 +535,13 @@ export default function TradieJobPage() {
           <button
             type="button"
             className="primary t-btn--block"
-            disabled={!smsText.trim() || sendSms.isPending}
+            disabled={offline || !smsText.trim() || sendSms.isPending}
             onClick={() => sendSms.mutate()}
           >
             {sendSms.isPending ? "Sending…" : "Send SMS"}
           </button>
-          {sendSms.isError && <p className="error">{(sendSms.error as Error).message}</p>}
+          {offline && <NeedsSignal>Texting the customer needs signal.</NeedsSignal>}
+          <QueryError error={sendSms.error} />
         </div>
         <div className="tradie-actions" style={{ marginTop: 12 }}>
           <Link className="t-btn--block" to={`/t/diary/new?enquiryId=${enquiryId}`}>

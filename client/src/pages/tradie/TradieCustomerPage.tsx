@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatGbp, tradieApi, type CustomerProfile } from "../../api/tradie";
+import { formatGbp, sendOrQueue, tradieApi, type CustomerProfile } from "../../api/tradie";
 import { EmptyState, IconChevron, IconPhone, StatusPill, initialsOf } from "./ui";
 
 function fmtDate(iso: string) {
@@ -37,9 +37,16 @@ export default function TradieCustomerPage() {
   }, [profile.data]);
 
   const saveNotes = useMutation({
-    mutationFn: () => tradieApi.updateCustomer(phoneKey, { notes, plantNotes }),
-    onSuccess: () => {
-      setSavedFlash("Notes saved");
+    mutationFn: () =>
+      sendOrQueue({
+        label: `Customer notes · ${profile.data?.name || phoneKey}`,
+        path: `/customers/${encodeURIComponent(phoneKey)}`,
+        method: "PATCH",
+        body: { notes, plantNotes },
+        invalidates: ["tradie-customer", "tradie-customers"],
+      }),
+    onSuccess: (r) => {
+      setSavedFlash(r.queued ? "Saved — will sync" : "Notes saved");
       void qc.invalidateQueries({ queryKey: ["tradie-customer", phoneKey] });
       window.setTimeout(() => setSavedFlash(""), 2000);
     },

@@ -6,7 +6,7 @@ import { blobToDataUrl, prepareGreetingUpload, preferredRecorderMime } from "../
 import { supportMailto, SUPPORT_EMAIL } from "../../lib/supportMail";
 import { DivertManualGuide } from "./DivertManualGuide";
 import { PayNowExplainer } from "./PayNowExplainer";
-import { StatusPill } from "./ui";
+import { QueryError, StatusPill } from "./ui";
 
 export default function TradieSettingsPage() {
   const qc = useQueryClient();
@@ -699,7 +699,7 @@ export default function TradieSettingsPage() {
         >
           {save.isPending ? "Saving…" : "Save settings"}
         </button>
-        {save.isError && <p className="error">{(save.error as Error).message}</p>}
+        <QueryError error={save.error} />
         {save.isSuccess && <p className="muted-text" style={{ textAlign: "center" }}>Saved.</p>}
         <button
           className="linkish"

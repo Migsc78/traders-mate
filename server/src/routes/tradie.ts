@@ -6,6 +6,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
 import { ApiError } from "../middleware/error.js";
+import { idempotent } from "../middleware/idempotency.js";
 import { sendMessage, toE164UK, twilioConfigured } from "../services/messaging/sender.js";
 import { storeAudio } from "../services/storage/store.js";
 import { createMagicLogin, createClientSession, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
@@ -1138,7 +1139,7 @@ tradieRouter.get("/jobs/:enquiryId", requireClient, async (req, res, next) => {
 });
 
 // ---- Voice / notes → draft ----
-tradieRouter.post("/jobs/:enquiryId/notes", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/jobs/:enquiryId/notes", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const body = z.object({ transcript: z.string().min(3).max(8000) }).parse(req.body ?? {});
     const enquiry = await prisma.enquiry.findFirst({
@@ -1165,9 +1166,9 @@ tradieRouter.post("/jobs/:enquiryId/notes", requireClient, requireActiveAccount,
   } catch (err) {
     next(err);
   }
-});
+}));
 
-tradieRouter.post("/jobs/:enquiryId/voice", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/jobs/:enquiryId/voice", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -1218,7 +1219,7 @@ tradieRouter.post("/jobs/:enquiryId/voice", requireClient, requireActiveAccount,
   } catch (err) {
     next(err);
   }
-});
+}));
 
 const priceBookItemSchema = z.object({
   id: z.string().optional(),
@@ -1251,14 +1252,14 @@ tradieRouter.get("/price-book", requireClient, async (req, res, next) => {
   }
 });
 
-tradieRouter.put("/price-book", requireClient, async (req, res, next) => {
+tradieRouter.put("/price-book", requireClient, idempotent(async (req, res, next) => {
   try {
     const body = z.object({ items: z.array(priceBookItemSchema) }).parse(req.body ?? {});
     res.json(await savePriceBookItems(clientId(req), body.items));
   } catch (err) {
     next(err);
   }
-});
+}));
 
 tradieRouter.post("/price-book/import", requireClient, async (req, res, next) => {
   try {
@@ -1293,7 +1294,7 @@ tradieRouter.get("/quotes/:id", requireClient, async (req, res, next) => {
   }
 });
 
-tradieRouter.put("/quotes/:id/lines", requireClient, async (req, res, next) => {
+tradieRouter.put("/quotes/:id/lines", requireClient, idempotent(async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -1345,7 +1346,7 @@ tradieRouter.put("/quotes/:id/lines", requireClient, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
+}));
 
 tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
@@ -1715,7 +1716,7 @@ tradieRouter.get("/customers", requireClient, async (req, res, next) => {
 });
 
 /** POST /customers — add a contact without a job yet */
-tradieRouter.post("/customers", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/customers", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const cid = clientId(req);
     const body = z
@@ -1756,7 +1757,7 @@ tradieRouter.post("/customers", requireClient, requireActiveAccount, async (req,
   } catch (err) {
     next(err);
   }
-});
+}));
 
 /** GET /customers/:phoneKey — CRM profile assembled from jobs + notes for this phone */
 tradieRouter.get("/customers/:phoneKey", requireClient, async (req, res, next) => {
@@ -1915,7 +1916,7 @@ tradieRouter.get("/customers/:phoneKey", requireClient, async (req, res, next) =
 });
 
 /** PATCH /customers/:phoneKey — save CRM notes / plant details */
-tradieRouter.patch("/customers/:phoneKey", requireClient, async (req, res, next) => {
+tradieRouter.patch("/customers/:phoneKey", requireClient, idempotent(async (req, res, next) => {
   try {
     const cid = clientId(req);
     const phoneKey = String(req.params.phoneKey || "").replace(/\D/g, "").slice(-10);
@@ -1968,7 +1969,7 @@ tradieRouter.patch("/customers/:phoneKey", requireClient, async (req, res, next)
   } catch (err) {
     next(err);
   }
-});
+}));
 
 // ---- Two-way SMS composer ----
 tradieRouter.post("/jobs/:enquiryId/messages", requireClient, requireActiveAccount, async (req, res, next) => {
@@ -2095,7 +2096,7 @@ tradieRouter.get("/appointments", requireClient, async (req, res, next) => {
   }
 });
 
-tradieRouter.post("/appointments", requireClient, requireActiveAccount, async (req, res, next) => {
+tradieRouter.post("/appointments", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
   try {
     const { createAppointment } = await import("../services/diary/appointments.js");
     const body = z
@@ -2142,7 +2143,7 @@ tradieRouter.post("/appointments", requireClient, requireActiveAccount, async (r
   } catch (err) {
     next(err);
   }
-});
+}));
 
 tradieRouter.post("/appointments/:id/on-my-way", requireClient, async (req, res, next) => {
   try {

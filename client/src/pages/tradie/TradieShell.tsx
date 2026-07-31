@@ -3,8 +3,9 @@ import { NavLink, Outlet, Navigate, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTradieSession, setTradieSession, tradieApi, TradieApiError } from "../../api/tradie";
 import { supportMailto } from "../../lib/supportMail";
-import { OfflineNotice } from "../../components/OfflineNotice";
+import { SyncStatus } from "../../components/SyncStatus";
 import { useOfflinePrefetch } from "../../lib/useOfflinePrefetch";
+import { useOutboxSync } from "../../lib/useOutbox";
 import {
   IconArchive,
   IconCustomers,
@@ -133,6 +134,7 @@ export default function TradieShell() {
   const inboxBadge = inbox.data?.needsYouCount ?? 0;
 
   useOfflinePrefetch(!!session && me.isSuccess && !!me.data?.accountActive);
+  useOutboxSync(!!session);
 
   const confirmDivert = useMutation({
     mutationFn: () => tradieApi.onboardingConfirmDivert(),
@@ -178,7 +180,7 @@ export default function TradieShell() {
   if (unauthorized) return <Navigate to="/t/auth" replace />;
 
   // Only hard-stop when there's nothing cached to show. With saved data we carry on
-  // and let <OfflineNotice /> explain why things look stale.
+  // and let <SyncStatus /> explain why things look stale.
   if (me.isError && !me.data) {
     return (
       <div className="tradie-shell tradie-shell--app t-gate">
@@ -251,7 +253,7 @@ export default function TradieShell() {
         </div>
       </header>
 
-      <OfflineNotice syncedAt={me.dataUpdatedAt} degraded={me.isError && !!me.data} />
+      <SyncStatus syncedAt={me.dataUpdatedAt} />
 
       {me.data?.billingRequired && (
         <p className="t-banner t-banner--danger">

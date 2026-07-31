@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getTradieSession, tradieApi } from "../../api/tradie";
-import { EmptyState, initialsOf } from "./ui";
+import { getTradieSession, sendOrQueue, tradieApi, type AppointmentDto } from "../../api/tradie";
+import { isOfflineNow } from "../../lib/connectivity";
+import { EmptyState, QueryError, initialsOf } from "./ui";
 
 type Step = "choice" | "existing" | "form";
 
@@ -79,7 +80,12 @@ export default function TradieNewBookingPage() {
       const endsAt = new Date(startsAt.getTime() + hours * 60 * 60 * 1000);
 
       let enquiryForAppt = linkedEnquiryId;
-      if (isNewProspect && !enquiryForAppt) {
+      // Creating the job first needs its id back before the appointment can
+      // reference it, and there's no way to fake that with no signal. The
+      // appointment carries the customer's name, phone and address regardless,
+      // so the visit is fully captured — only the link to a job record is
+      // skipped, and only for a brand-new prospect booked offline.
+      if (isNewProspect && !enquiryForAppt && !isOfflineNow()) {
         const jobRow = await tradieApi.createJob({
           name: name.trim(),
           phone: phone.trim(),
@@ -89,16 +95,22 @@ export default function TradieNewBookingPage() {
         enquiryForAppt = jobRow.id;
       }
 
-      return tradieApi.createAppointment({
-        enquiryId: enquiryForAppt || null,
-        title: title.trim() || "Appointment",
-        notes: notes.trim() || null,
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
-        address: address.trim() || null,
-        customerName: name.trim(),
-        customerPhone: phone.trim(),
-        allowClash,
+      return sendOrQueue<AppointmentDto>({
+        label: `Booking · ${name.trim()}`,
+        path: "/appointments",
+        method: "POST",
+        body: {
+          enquiryId: enquiryForAppt || null,
+          title: title.trim() || "Appointment",
+          notes: notes.trim() || null,
+          startsAt: startsAt.toISOString(),
+          endsAt: endsAt.toISOString(),
+          address: address.trim() || null,
+          customerName: name.trim(),
+          customerPhone: phone.trim(),
+          allowClash,
+        },
+        invalidates: ["tradie-appointments", "tradie-jobs", "tradie-customers"],
       });
     },
     onSuccess: () => {
@@ -182,7 +194,7 @@ export default function TradieNewBookingPage() {
             />
           </label>
           {customers.isLoading && <p className="muted-text">Loading customers…</p>}
-          {customers.isError && <p className="error">{(customers.error as Error).message}</p>}
+          <QueryError error={customers.error} />
           {!customers.isLoading && filtered.length === 0 && (
             <EmptyState title="No matching customers" hint="Add them as a new prospect instead." />
           )}

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { formatGbp, tradieApi } from "../../api/tradie";
-import { EmptyState, IconChevron, StatusPill } from "./ui";
+import { EmptyState, QueryError, IconChevron, StatusPill } from "./ui";
 import { SwipeListRow } from "./SwipeListRow";
+import { useOffline } from "../../lib/connectivity";
 
 type JobRow = {
   id: string;
@@ -17,6 +18,7 @@ type JobRow = {
 
 export default function TradieJobsPage() {
   const qc = useQueryClient();
+  const offline = useOffline();
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
   const jobs = useQuery({
     queryKey: ["tradie-jobs"],
@@ -37,7 +39,9 @@ export default function TradieJobsPage() {
     },
   });
 
-  const busy = archive.isPending || remove.isPending;
+  // Swipe actions hit the server, so offline they'd just fail after the row has
+  // already slid away — locking the swipe is less alarming than an error.
+  const busy = offline || archive.isPending || remove.isPending;
 
   const confirmDelete = (job: JobRow) => {
     if (!window.confirm(`Delete job for ${job.name}? This can’t be undone.`)) return;
@@ -61,7 +65,7 @@ export default function TradieJobsPage() {
       )}
 
       {jobs.isLoading && <p className="muted-text">Loading…</p>}
-      {jobs.isError && <p className="error">{(jobs.error as Error).message}</p>}
+      <QueryError error={jobs.error} />
 
       <ul className="t-list">
         {(jobs.data || []).map((j: JobRow) => (

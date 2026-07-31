@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../api/tradie";
-import { useOnline } from "./useOnline";
+import { useOffline } from "./connectivity";
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -23,11 +23,11 @@ function startOfDay(d: Date): Date {
  */
 export function useOfflinePrefetch(enabled: boolean): void {
   const qc = useQueryClient();
-  const online = useOnline();
+  const offline = useOffline();
   const ranForThisOnlineStretch = useRef(false);
 
   useEffect(() => {
-    if (!online) {
+    if (offline) {
       ranForThisOnlineStretch.current = false;
       return;
     }
@@ -63,5 +63,5 @@ export function useOfflinePrefetch(enabled: boolean): void {
           });
         }
       });
-  }, [enabled, online, qc]);
+  }, [enabled, offline, qc]);
 }

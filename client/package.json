@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "npx tsc --noEmit -p tsconfig.json",
+    "test": "npx tsx src/lib/outboxPolicy.test.ts",
     "icons": "node scripts/make-icons.mjs",
     "cap:sync": "npm run build && npx cap sync",
     "cap:android": "npx cap open android",

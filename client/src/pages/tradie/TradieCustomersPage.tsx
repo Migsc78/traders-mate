@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { formatGbp, tradieApi } from "../../api/tradie";
-import { EmptyState, IconChevron, StatusPill, initialsOf } from "./ui";
+import { EmptyState, QueryError, IconChevron, StatusPill, initialsOf } from "./ui";
 
 function phoneKeyOf(phone: string, fallback?: string) {
   return fallback || phone.replace(/\D/g, "").slice(-10) || phone;
@@ -23,7 +23,7 @@ export default function TradieCustomersPage() {
       </header>
 
       {customers.isLoading && <p className="muted-text">Loading…</p>}
-      {customers.isError && <p className="error">{(customers.error as Error).message}</p>}
+      <QueryError error={customers.error} />
 
       <ul className="t-list">
         {(customers.data || []).map(

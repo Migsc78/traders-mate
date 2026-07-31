@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTradieSession, tradieApi, type CertificateDto } from "../../api/tradie";
+import { QueryError } from "../../components/QueryError";
 
 const KINDS = [
   { value: "GAS_SAFETY" as const, label: "Gas safety record" },
@@ -375,8 +376,8 @@ export default function TradieCertificatesPage() {
             </button>
           )}
 
-          {save.isError && <p className="error">{(save.error as Error).message}</p>}
-          {send.isError && <p className="error">{(send.error as Error).message}</p>}
+          <QueryError error={save.error} />
+          <QueryError error={send.error} />
           {enquiryId && <Link to={`/t/jobs/${enquiryId}`}>Back to job</Link>}
         </div>
       )}

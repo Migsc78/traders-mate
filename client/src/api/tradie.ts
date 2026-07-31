@@ -1,5 +1,7 @@
 import { apiUrl } from "./base";
 import { clearOfflineCache } from "../lib/offlineCache";
+import { clearOutbox, enqueue, newOutboxId } from "../lib/outbox";
+import { isOfflineNow, markServerReachable } from "../lib/connectivity";
 
 const SESSION_KEY = "tm_tradie_session";
 
@@ -27,8 +29,10 @@ export function setTradieSession(token: string | null) {
   } else {
     localStorage.removeItem(SESSION_KEY);
     // The offline cache holds customer names, numbers and addresses — it goes with
-    // the session, not least on a shared or handed-down phone.
+    // the session, not least on a shared or handed-down phone. The outbox goes too:
+    // queued writes belong to the account that made them.
     void clearOfflineCache();
+    void clearOutbox();
   }
 }
 
@@ -45,9 +49,13 @@ async function tRequest<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
   } catch {
+    // The only honest signal that there's no usable connection — navigator.onLine
+    // lies inside WKWebView. Drives the offline strip and the disabled actions.
+    markServerReachable(false);
     // "TypeError: Failed to fetch" means nothing to a tradie in a basement.
     throw new TradieApiError(0, "No signal — this needs a connection. Try again when you're back in range.");
   }
+  markServerReachable(true);
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
@@ -59,6 +67,58 @@ async function tRequest<T>(path: string, init?: RequestInit): Promise<T> {
     throw new TradieApiError(res.status, message);
   }
   return res.json() as Promise<T>;
+}
+
+/** Either the server answered, or the write is safely queued for when it can. */
+export type QueuedOr<T> = { queued: true } | { queued: false; result: T };
+
+/**
+ * Send a write now if possible, otherwise put it in the outbox.
+ *
+ * The immediate attempt carries the *same* Idempotency-Key the queued retry will
+ * use. That matters: a request can reach the server and have its response die on
+ * a one-bar connection, which is indistinguishable from never arriving. Sharing
+ * the key means the retry is recognised and the original response replayed,
+ * instead of a second draft quote appearing.
+ *
+ * Only for routes the server marks idempotent — see middleware/idempotency.ts.
+ */
+export async function sendOrQueue<T>(opts: {
+  label: string;
+  path: string;
+  method: "POST" | "PUT" | "PATCH";
+  body: unknown;
+  invalidates: string[];
+}): Promise<QueuedOr<T>> {
+  const id = newOutboxId();
+  const queueIt = async (): Promise<QueuedOr<T>> => {
+    await enqueue({
+      id,
+      label: opts.label,
+      path: opts.path,
+      method: opts.method,
+      body: opts.body,
+      invalidates: opts.invalidates,
+    });
+    return { queued: true };
+  };
+
+  // Known offline — don't make the tradie wait on a fetch that can't succeed.
+  if (isOfflineNow()) return queueIt();
+
+  try {
+    const result = await tRequest<T>(opts.path, {
+      method: opts.method,
+      body: JSON.stringify(opts.body),
+      headers: { "Idempotency-Key": id },
+    });
+    return { queued: false, result };
+  } catch (err) {
+    // Only queue when the network was the problem. A 4xx is a real rejection and
+    // must surface now, while the tradie still has the screen in front of them.
+    if (err instanceof TradieApiError && err.isOffline) return queueIt();
+    throw err;
+  }
 }
 
 async function signupRequest<T>(path: string, body: unknown): Promise<T> {

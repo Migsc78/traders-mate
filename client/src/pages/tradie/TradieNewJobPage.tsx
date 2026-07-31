@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../../api/tradie";
-import { EmptyState, initialsOf } from "./ui";
+import { EmptyState, QueryError, initialsOf } from "./ui";
 
 type Step = "choice" | "new" | "existing" | "existing-form";
 
@@ -151,7 +151,7 @@ export default function TradieNewJobPage() {
             />
           </label>
           {customers.isLoading && <p className="muted-text">Loading customers…</p>}
-          {customers.isError && <p className="error">{(customers.error as Error).message}</p>}
+          <QueryError error={customers.error} />
           {!customers.isLoading && filtered.length === 0 && (
             <EmptyState
               title="No matching customers"

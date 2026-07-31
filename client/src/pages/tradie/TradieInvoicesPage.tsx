@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatGbp, tradieApi, type InvoiceDto } from "../../api/tradie";
 import { openExternalUrl } from "../../lib/openExternalUrl";
-import { EmptyState, StatusPill } from "./ui";
+import { EmptyState, QueryError, StatusPill } from "./ui";
 
 export default function TradieInvoicesPage() {
   const qc = useQueryClient();
@@ -41,7 +41,7 @@ export default function TradieInvoicesPage() {
       </header>
 
       {invoices.isLoading && <p className="muted-text">Loading…</p>}
-      {invoices.isError && <p className="error">{(invoices.error as Error).message}</p>}
+      <QueryError error={invoices.error} />
 
       <ul className="tradie-invoice-list">
         {(invoices.data || []).map((inv: InvoiceDto) => (

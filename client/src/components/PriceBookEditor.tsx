@@ -8,6 +8,8 @@ import {
   type PriceBookImportRow,
   type PriceBookRow,
 } from "../lib/priceBookFile";
+import { useOffline } from "../lib/connectivity";
+import { QueryError } from "./QueryError";
 
 export type PriceBookApi = {
   list: () => Promise<PriceBookRow[]>;
@@ -42,6 +44,7 @@ export default function PriceBookEditor({
   compact?: boolean;
 }) {
   const qc = useQueryClient();
+  const offline = useOffline();
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<PriceBookRow[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -142,7 +145,11 @@ export default function PriceBookEditor({
           <button type="button" onClick={() => exportPriceBook(rows)} disabled={!rows.length}>
             Export
           </button>
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={doImport.isPending}>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={offline || doImport.isPending}
+          >
             {doImport.isPending ? "Importing…" : "Import Excel"}
           </button>
           <input
@@ -156,7 +163,7 @@ export default function PriceBookEditor({
       </div>
 
       {list.isLoading && <p>Loading…</p>}
-      {list.isError && <p className="error">{(list.error as Error).message}</p>}
+      <QueryError error={list.error} />
       {error && <p className="error">{error}</p>}
       {notice && <p className="muted-text">{notice}</p>}
 
@@ -370,6 +377,12 @@ export default function PriceBookEditor({
           {save.isPending ? "Saving…" : "Save price book"}
         </button>
       </div>
+      {offline && (
+        <p className="t-needs-signal">
+          Edits are saved on your phone and sync when you&apos;re back in range.
+          Excel import needs signal.
+        </p>
+      )}
     </div>
   );
 }

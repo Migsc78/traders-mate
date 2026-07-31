@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { tradieApi } from "../../api/tradie";
+import { sendOrQueue } from "../../api/tradie";
 
 export default function TradieNewCustomerPage() {
   const navigate = useNavigate();
@@ -13,14 +13,22 @@ export default function TradieNewCustomerPage() {
 
   const create = useMutation({
     mutationFn: () =>
-      tradieApi.createCustomer({
-        name: name.trim(),
-        phone: phone.trim(),
-        notes: notes.trim() || null,
+      sendOrQueue<{ phoneKey: string }>({
+        label: `New customer · ${name.trim()}`,
+        path: "/customers",
+        method: "POST",
+        body: { name: name.trim(), phone: phone.trim(), notes: notes.trim() || null },
+        invalidates: ["tradie-customers"],
       }),
-    onSuccess: (c: { phoneKey: string }) => {
+    onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ["tradie-customers"] });
-      navigate(`/t/customers/${encodeURIComponent(c.phoneKey)}`, { replace: true });
+      if (r.queued) {
+        // No phoneKey to navigate to until the server has seen it — the customer
+        // list is the honest place to land, with the queued item shown as pending.
+        navigate("/t/customers", { replace: true });
+        return;
+      }
+      navigate(`/t/customers/${encodeURIComponent(r.result.phoneKey)}`, { replace: true });
     },
     onError: (err: unknown) => {
       setError(err instanceof Error ? err.message : "Could not save customer");

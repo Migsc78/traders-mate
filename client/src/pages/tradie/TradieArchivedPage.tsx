@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatGbp, tradieApi } from "../../api/tradie";
-import { EmptyState, StatusPill } from "./ui";
+import { EmptyState, QueryError, StatusPill } from "./ui";
 
 type Tab = "jobs" | "quotes";
 
@@ -63,7 +63,7 @@ export default function TradieArchivedPage() {
       </div>
 
       {archived.isLoading && <p className="muted-text">Loading…</p>}
-      {archived.isError && <p className="error">{(archived.error as Error).message}</p>}
+      <QueryError error={archived.error} />
 
       {tab === "jobs" && !archived.isLoading && (
         <>

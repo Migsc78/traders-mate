@@ -760,6 +760,78 @@ a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38,
 }
 .t-banner-action:disabled { opacity: 0.6; cursor: default; }
 
+/* ---------- offline status ---------- */
+/* Slate, not red: no signal is a working condition for a tradie, not a fault. */
+.t-offline-strip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 16px;
+  padding: 9px 13px;
+  border-radius: var(--t-radius-sm);
+  background: #2b3440;
+  color: #f3f5f7;
+  font-size: 13px;
+  font-weight: 600;
+}
+.t-offline-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f5a524;
+}
+.t-offline-strip-when {
+  color: #aeb6c0;
+  font-weight: 500;
+}
+.t-needs-signal {
+  margin: 10px 0 0;
+  color: var(--t-ink-faint);
+  font-size: 13px;
+  font-weight: 500;
+}
+.t-offline-strip--attention { background: #6b3524; }
+.t-offline-strip-more {
+  margin-left: auto;
+  color: #aeb6c0;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.tradie-shell button.t-offline-strip {
+  width: 100%;
+  text-align: left;
+  border: none;
+  min-height: 0;
+  cursor: pointer;
+}
+.t-sync-list {
+  list-style: none;
+  margin: -10px 0 16px;
+  padding: 10px 13px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  border: 1px solid var(--t-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.t-sync-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.t-sync-list li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.t-sync-list strong { font-size: 14px; font-weight: 600; }
+.t-sync-list span { font-size: 12.5px; color: var(--t-ink-soft); }
+.t-sync-list li.is-failed span { color: var(--t-red); }
+.t-sync-list li > button {
+  margin-left: auto;
+  min-height: 0;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
 .t-trial-note {
   margin: -14px 0 16px;
 }

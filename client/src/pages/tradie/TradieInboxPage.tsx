@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../../api/tradie";
-import { EmptyState, IconChevron, IconPhone } from "./ui";
+import { EmptyState, QueryError, IconChevron, IconPhone } from "./ui";
 
 type InboxItem = {
   id: string;
@@ -106,7 +106,7 @@ export default function TradieInboxPage() {
       </header>
 
       {inbox.isLoading && <p className="muted-text">Loading inbox…</p>}
-      {inbox.isError && <p className="error">{(inbox.error as Error).message}</p>}
+      <QueryError error={inbox.error} />
 
       {/* Require real data (even stale/cached), not just "no error yet" — otherwise a
           failed fetch with no cache reads as a reassuring "Inbox is clear". */}

@@ -1,5 +1,7 @@
 /** Shared UI primitives for the tradie app — icons, status pills, empty states. */
 
+export { QueryError } from "../../components/QueryError";
+
 type IconProps = { size?: number };
 
 function svgProps(size: number) {
@@ -136,4 +138,9 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
       {hint && <p>{hint}</p>}
     </div>
   );
+}
+
+/** Why a button is greyed out. Says it where the button is, quietly. */
+export function NeedsSignal({ children = "Needs signal to send." }: { children?: string }) {
+  return <p className="t-needs-signal">{children}</p>;
 }

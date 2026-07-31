@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTradieSession, tradieApi, type AppointmentDto } from "../../api/tradie";
-import { EmptyState } from "./ui";
+import { EmptyState, QueryError } from "./ui";
+import { useOffline } from "../../lib/connectivity";
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -32,6 +33,7 @@ function mapsLinks(address: string) {
 export default function TradieDiaryPage() {
   const session = getTradieSession();
   const qc = useQueryClient();
+  const offline = useOffline();
   const [params] = useSearchParams();
   const enquiryId = params.get("enquiryId");
   const [day, setDay] = useState(() => startOfDay(new Date()));
@@ -124,7 +126,7 @@ export default function TradieDiaryPage() {
       </div>
 
       {appts.isLoading && <p className="muted-text">Loading diary…</p>}
-      {appts.isError && <p className="error">{(appts.error as Error).message}</p>}
+      <QueryError error={appts.error} />
 
       {[...grouped.entries()].map(([dayLabel, rows]) => (
         <section key={dayLabel} className="t-diary-day">
@@ -146,7 +148,7 @@ export default function TradieDiaryPage() {
                     type="button"
                     className="primary"
                     onClick={() => onMyWay.mutate(a.id)}
-                    disabled={onMyWay.isPending}
+                    disabled={offline || onMyWay.isPending}
                   >
                     On my way
                   </button>
@@ -166,7 +168,7 @@ export default function TradieDiaryPage() {
                     type="button"
                     className="danger"
                     onClick={() => setCancelFor(a)}
-                    disabled={cancel.isPending}
+                    disabled={offline || cancel.isPending}
                   >
                     Cancel
                   </button>

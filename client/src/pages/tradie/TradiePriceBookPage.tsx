@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import PriceBookEditor from "../../components/PriceBookEditor";
-import { tradieApi } from "../../api/tradie";
+import { sendOrQueue, tradieApi } from "../../api/tradie";
+import type { PriceBookRow } from "../../lib/priceBookFile";
 
 export default function TradiePriceBookPage() {
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
@@ -24,7 +25,18 @@ export default function TradiePriceBookPage() {
         queryKey={["tradie-price-book"]}
         api={{
           list: () => tradieApi.priceBook(),
-          save: (items) => tradieApi.savePriceBook(items),
+          save: async (items) => {
+            const r = await sendOrQueue<PriceBookRow[]>({
+              label: "Rates update",
+              path: "/price-book",
+              method: "PUT",
+              body: { items },
+              invalidates: ["tradie-price-book"],
+            });
+            // Queued — hand back what the tradie typed so the editor keeps showing
+            // their edits until the server's version comes back.
+            return r.queued ? (items as PriceBookRow[]) : r.result;
+          },
           importRows: (rows) => tradieApi.importPriceBook(rows),
           deactivate: (id) => tradieApi.deactivatePriceBookItem(id),
         }}
