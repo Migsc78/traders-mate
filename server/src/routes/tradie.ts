@@ -1030,6 +1030,37 @@ tradieRouter.post("/jobs/:enquiryId/promote", requireClient, requireActiveAccoun
   }
 });
 
+tradieRouter.post("/jobs/:enquiryId/archive", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: cid, pipeline: "JOB" },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
+    const updated = await prisma.enquiry.update({
+      where: { id: enquiry.id },
+      data: { pipeline: "ARCHIVED" },
+    });
+    res.json({ id: updated.id, pipeline: updated.pipeline });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.delete("/jobs/:enquiryId", requireClient, requireActiveAccount, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const enquiry = await prisma.enquiry.findFirst({
+      where: { id: req.params.enquiryId, clientId: cid },
+    });
+    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
+    await prisma.enquiry.delete({ where: { id: enquiry.id } });
+    res.json({ ok: true, id: enquiry.id });
+  } catch (err) {
+    next(err);
+  }
+});
+
 tradieRouter.post("/jobs/:enquiryId/kill", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
     const cid = clientId(req);

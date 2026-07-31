@@ -405,6 +405,56 @@ button.t-add-btn {
 .t-list { list-style: none; padding: 0; margin: 0; }
 .t-list > li { margin-bottom: 10px; }
 
+.t-swipe {
+  position: relative;
+  border-radius: var(--t-radius);
+  overflow: hidden;
+  touch-action: pan-y;
+}
+.t-swipe-under {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.t-swipe-action {
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  transition: opacity 0.12s ease;
+}
+.t-swipe-action.show { opacity: 1; }
+.t-swipe-action--archive {
+  background: var(--t-blue, #2f6fed);
+  color: #fff;
+  flex: 1;
+  justify-content: flex-start;
+}
+.t-swipe-action--delete {
+  background: var(--t-red, #d64545);
+  color: #fff;
+  flex: 1;
+  justify-content: flex-end;
+}
+.t-swipe-front {
+  position: relative;
+  z-index: 1;
+  will-change: transform;
+}
+.t-swipe-front--anim {
+  transition: transform 0.18s cubic-bezier(0.22, 0.7, 0.3, 1);
+}
+.t-swipe-front .t-row {
+  margin: 0;
+}
+
 @keyframes t-rise {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

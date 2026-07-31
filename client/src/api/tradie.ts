@@ -382,6 +382,15 @@ export const tradieApi = {
       { method: "POST", body: "{}" }
     ),
 
+  archiveJob: (enquiryId: string) =>
+    tRequest<{ id: string; pipeline: string }>(`/jobs/${enquiryId}/archive`, {
+      method: "POST",
+      body: "{}",
+    }),
+
+  deleteJob: (enquiryId: string) =>
+    tRequest<{ ok: boolean; id: string }>(`/jobs/${enquiryId}`, { method: "DELETE" }),
+
   killJob: (enquiryId: string, reason: "dead" | "spam") =>
     tRequest<{ id: string; pipeline: string; triage: string; killedAt: string | null }>(
       `/jobs/${enquiryId}/kill`,

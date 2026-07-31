@@ -105,6 +105,7 @@ enum EnquiryPipeline {
   INBOX
   JOB
   KILLED
+  ARCHIVED
 }
 
 /// AI / heuristic pre-qualification tag for inbox triage
