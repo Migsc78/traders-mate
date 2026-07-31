@@ -1,0 +1,27 @@
+{
+  "name": "TradiesMate",
+  "short_name": "TradiesMate",
+  "description": "Missed-call rescue, van quotes, Pay Now, diary and certificates for UK trades.",
+  "theme_color": "#ff5a1f",
+  "background_color": "#fff7f2",
+  "display": "standalone",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -15,37 +15,11 @@ export default defineConfig({
         "sitemap.xml",
         "llms.txt",
         "admin.webmanifest",
+        "manifest.webmanifest",
       ],
-      manifest: {
-        name: "TradiesMate",
-        short_name: "TradiesMate",
-        description:
-          "Missed-call rescue, van quotes, Pay Now, diary and certificates for UK trades.",
-        theme_color: "#ff5a1f",
-        background_color: "#fff7f2",
-        display: "standalone",
-        // No fixed start_url: iOS Add to Home Screen must keep the page you were on
-        // (/admin → admin, /t → tradie). A fixed "/t" forced every icon to the tradie app.
-        scope: "/",
-        icons: [
-          {
-            src: "/icons/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "/icons/icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-          {
-            src: "/icons/icon-512-maskable.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
-        ],
-      },
+      // Static public/manifest.webmanifest (no start_url) — VitePWA defaults start_url to "/"
+      // which breaks iOS Add to Home Screen for /admin.
+      manifest: false,
       workbox: {
         navigateFallback: "/index.html",
         // Public quote/invoice pages are proxied to Railway — never serve the SPA shell for them.
@@ -61,7 +35,7 @@ export default defineConfig({
           /^\/llms\.txt$/,
           /^\/og-image\.png$/,
         ],
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,txt,xml,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,txt,xml,woff2,webmanifest}"],
       },
     }),
   ],
