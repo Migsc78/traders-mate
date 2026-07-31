@@ -3,16 +3,6 @@ const ADMIN_MANIFEST = "/admin.webmanifest";
 const TRADIE_APP_TITLE = "TradiesMate";
 const ADMIN_APP_TITLE = "TM Admin";
 
-function ensureManifestLink(): HTMLLinkElement {
-  let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = "manifest";
-    document.head.appendChild(link);
-  }
-  return link;
-}
-
 function setAppleWebAppTitle(title: string) {
   let meta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
   if (!meta) {
