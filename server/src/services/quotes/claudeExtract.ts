@@ -14,22 +14,44 @@ export interface ExtractedLine {
 export interface ExtractResult {
   summary: string;
   callout: boolean;
+  /** Set when the notes clearly describe one of the tradie's saved templates. */
+  templateId: string | null;
   lines: ExtractedLine[];
   assumptions: string[];
 }
 
+/** What the model is shown about each template it can match against. */
+export interface TemplateCandidate {
+  id: string;
+  name: string;
+  description?: string | null;
+  tags?: string[];
+}
+
 const SYSTEM = `You extract UK trades job line items from a tradie's spoken or typed notes.
 Return ONLY valid JSON matching this schema:
-{"summary":string,"callout":boolean,"lines":[{"label":string,"qty":number,"unit":"EACH"|"HOUR"|"DAY"|"JOB"|"METRE","skuHint"?:string,"notes"?:string}],"assumptions":string[]}
+{"summary":string,"callout":boolean,"templateId":string|null,"lines":[{"label":string,"qty":number,"unit":"EACH"|"HOUR"|"DAY"|"JOB"|"METRE","skuHint"?:string,"notes"?:string}],"assumptions":string[]}
 Rules:
 - Understand UK trade slang (combi, CU, TRV, first fix, second fix, rads, etc.).
 - NEVER invent prices — only quantities and labels.
 - Prefer skuHint from: CALL, LAB_HR, COMBI_SWAP, RAD_SWAP, TAP_FIT, TOILET, CU_UPG, SOCKET, EICR, LIGHT, SERVICE, TRV, POWERFLUSH when relevant.
 - If a call-out / attendance fee is implied, set callout true and include a CALL line.
 - Put uncertainty in assumptions[].
-- If notes are empty or nonsense, return empty lines and say so in assumptions.`;
+- If notes are empty or nonsense, return empty lines and say so in assumptions.
 
-export async function extractJobLinesWithHaiku(transcript: string): Promise<ExtractResult> {
+Templates:
+- You may be given a list of the tradie's saved job templates.
+- Set templateId ONLY when the notes clearly describe that standard job. A boiler
+  swap is not a boiler service. When unsure, set templateId to null — a wrong
+  template is worse than none, because it prices work the customer didn't ask for.
+- Set templateId to null when no list is given.
+- ALWAYS list every item you hear in lines[], including ones the template already
+  covers. Duplicates are removed later; anything you leave out is lost.`;
+
+export async function extractJobLinesWithHaiku(
+  transcript: string,
+  templates: TemplateCandidate[] = []
+): Promise<ExtractResult> {
   const apiKey = getClaudeApiKey();
   if (!apiKey) throw new Error("Claude API key not configured — add it in Settings");
 
@@ -48,7 +70,21 @@ export async function extractJobLinesWithHaiku(transcript: string): Promise<Extr
       messages: [
         {
           role: "user",
-          content: `Job notes / transcript:\n\n${transcript.slice(0, 8000)}`,
+          content: [
+            templates.length
+              ? `The tradie's saved templates:\n${templates
+                  .map(
+                    (t) =>
+                      `- id=${t.id} | ${t.name}${t.description ? ` — ${t.description}` : ""}${
+                        t.tags?.length ? ` [${t.tags.join(", ")}]` : ""
+                      }`
+                  )
+                  .join("\n")}\n`
+              : "",
+            `Job notes / transcript:\n\n${transcript.slice(0, 8000)}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
         },
       ],
     }),
@@ -93,9 +129,15 @@ function normalizeExtract(raw: Record<string, unknown>): ExtractResult {
     })
     .filter((l) => l.label.length > 0);
 
+  // Passed through as-is; the caller checks it against the templates it actually
+  // offered, so a hallucinated id resolves to no match rather than an error.
+  const templateId =
+    typeof raw.templateId === "string" && raw.templateId.trim() ? raw.templateId.trim() : null;
+
   return {
     summary: String(raw.summary || "").trim() || "Job quote",
     callout: Boolean(raw.callout),
+    templateId,
     lines,
     assumptions: Array.isArray(raw.assumptions) ? raw.assumptions.map((a) => String(a)) : [],
   };

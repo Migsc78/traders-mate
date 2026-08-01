@@ -1,5 +1,6 @@
 import { prisma } from "../../db.js";
 import { extractJobLinesWithHaiku } from "./claudeExtract.js";
+import { mergeTemplateWithHeard } from "./templateMatch.js";
 import { matchPriceBook, quoteLineInclude } from "./priceBook.js";
 import { totalsFromLines, type LineInput } from "./money.js";
 import { newPublicToken } from "./magicAuth.js";
@@ -16,9 +17,57 @@ export async function buildDraftQuoteFromTranscript(opts: {
   const book = await prisma.priceBookItem.findMany({
     where: { clientId: opts.clientId, active: true },
   });
-  const extracted = await extractJobLinesWithHaiku(opts.transcript);
 
-  const lines: LineInput[] = [];
+  // Only templates the tradie has opted into for drafting. Name and description
+  // are enough for the model to recognise the job; prices stay server-side so it
+  // can't invent them.
+  const templates = await prisma.quoteTemplate.findMany({
+    where: { clientId: opts.clientId, active: true, useForAiDrafting: true },
+    include: { items: { orderBy: { sortOrder: "asc" } } },
+  });
+
+  const extracted = await extractJobLinesWithHaiku(
+    opts.transcript,
+    templates.map((t) => ({ id: t.id, name: t.name, description: t.description, tags: t.tags }))
+  );
+
+  const matchedTemplate = extracted.templateId
+    ? templates.find((t) => t.id === extracted.templateId)
+    : undefined;
+
+  /**
+   * When a template matches, its lines are the scope of the job and carry the
+   * tradie's own prices. Anything else heard in the notes still goes through the
+   * price book below, so "boiler service plus a power flush" gets both.
+   */
+  const templateLines: LineInput[] = [];
+  let heardForPriceBook = extracted.lines;
+  if (matchedTemplate) {
+    const merged = mergeTemplateWithHeard(
+      {
+        included: matchedTemplate.items.filter((i) => !i.isAddOn),
+        addOns: matchedTemplate.items.filter((i) => i.isAddOn),
+      },
+      extracted.lines
+    );
+    for (const line of merged.lines) {
+      templateLines.push({
+        label: line.label,
+        qty: line.qty,
+        unit: line.unit as PriceUnit,
+        unitPricePence: line.unitPricePence,
+        vatRate: line.vatRate,
+        source: "BOOK",
+      });
+    }
+    heardForPriceBook = merged.extras;
+    await prisma.quoteTemplate.update({
+      where: { id: matchedTemplate.id },
+      data: { lastUsedAt: new Date(), useCount: { increment: 1 } },
+    });
+  }
+
+  const lines: LineInput[] = [...templateLines];
   if (extracted.callout && !extracted.lines.some((l) => /call.?out/i.test(l.label) || l.skuHint === "CALL")) {
     const call = book.find((b) => b.isCallout) || matchPriceBook(book, { label: "Call-out", skuHint: "CALL" });
     if (call) {
@@ -34,7 +83,7 @@ export async function buildDraftQuoteFromTranscript(opts: {
     }
   }
 
-  for (const el of extracted.lines) {
+  for (const el of heardForPriceBook) {
     const matched = matchPriceBook(book, { label: el.label, skuHint: el.skuHint, unit: el.unit });
     if (matched) {
       lines.push({
