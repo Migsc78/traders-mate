@@ -5,8 +5,11 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
+import type { PriceUnit } from "@prisma/client";
 import { ApiError } from "../middleware/error.js";
 import { idempotent } from "../middleware/idempotency.js";
+import { ensureQuoteTemplates } from "../services/quotes/templates.js";
+import { sendEmail } from "../services/email/send.js";
 import { sendMessage, toE164UK, twilioConfigured } from "../services/messaging/sender.js";
 import { storeAudio } from "../services/storage/store.js";
 import { createMagicLogin, createClientSession, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
@@ -1351,7 +1354,13 @@ tradieRouter.put("/quotes/:id/lines", requireClient, idempotent(async (req, res,
 tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, async (req, res, next) => {
   try {
     const body = z
-      .object({ depositPercent: z.number().int().min(0).max(100).optional() })
+      .object({
+        depositPercent: z.number().int().min(0).max(100).optional(),
+        // Step 8 lets the tradie pick where it goes. SMS alone stays the default
+        // so the existing job-page flow behaves exactly as before.
+        channels: z.array(z.enum(["SMS", "WHATSAPP", "EMAIL"])).min(1).optional(),
+        email: z.string().email().max(160).optional(),
+      })
       .parse(req.body ?? {});
     const quote = await prisma.quote.findFirst({
       where: { id: req.params.id, clientId: clientId(req) },
@@ -1402,15 +1411,37 @@ tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, as
     const depositNote =
       depositPence > 0 ? ` Deposit ${formatGbp(depositPence)} (${depositPercent}%) due on accept.` : "";
     const smsBody = `Hi ${quote.enquiry.name}, your quote from ${quote.client.businessName} is ready: ${formatGbp(quote.totalPence)}.${depositNote} View & accept: ${publicUrl}`;
-    const results = await sendMessage({ to: quote.enquiry.phone, channel: "SMS", body: smsBody });
-    await logMessage({
-      clientId: quote.clientId,
-      enquiryId: quote.enquiryId,
-      direction: "OUTBOUND",
-      toAddr: quote.enquiry.phone,
-      body: smsBody,
-      twilioSid: results[0]?.id,
-    });
+
+    const channels = body.channels ?? ["SMS"];
+    const wantsText = channels.includes("SMS");
+    const wantsWhatsApp = channels.includes("WHATSAPP");
+    if (wantsText || wantsWhatsApp) {
+      const channel = wantsText && wantsWhatsApp ? "BOTH" : wantsText ? "SMS" : "WHATSAPP";
+      const results = await sendMessage({ to: quote.enquiry.phone, channel, body: smsBody });
+      await logMessage({
+        clientId: quote.clientId,
+        enquiryId: quote.enquiryId,
+        direction: "OUTBOUND",
+        toAddr: quote.enquiry.phone,
+        body: smsBody,
+        twilioSid: results[0]?.id,
+      });
+    }
+
+    const emailTo = body.email || quote.enquiry.email;
+    if (channels.includes("EMAIL") && emailTo) {
+      // Best-effort: a failed email must not leave the quote stuck as a draft when
+      // the text already went out.
+      try {
+        await sendEmail({
+          to: emailTo,
+          subject: `Your quote from ${quote.client.businessName} — ${formatGbp(quote.totalPence)}`,
+          text: `${smsBody}\n\n${quote.termsNote || ""}`.trim(),
+        });
+      } catch (e) {
+        console.warn("[quote] email failed", e instanceof Error ? e.message : e);
+      }
+    }
 
     const sentAt = new Date();
     const updated = await prisma.quote.update({
@@ -1420,6 +1451,8 @@ tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, as
         sentAt,
         depositPercent,
         depositPence,
+        // The countdown the customer sees starts when it's sent, not when drafted.
+        validUntil: new Date(sentAt.getTime() + quote.validDays * 24 * 60 * 60 * 1000),
         ...(pdfUrl ? { pdfUrl } : {}),
       },
       include: { lines: quoteLineInclude },
@@ -1542,6 +1575,613 @@ tradieRouter.get("/archived", requireClient, async (req, res, next) => {
 });
 
 // ---- Quotes list ----
+// ---- Quote templates & standalone quote creation (wireframe steps 1-8) ----
+
+/** "Q-1052" — short, human, and unique enough per client without a counter table. */
+function newQuoteReference(): string {
+  return `Q-${Date.now().toString(36).toUpperCase().slice(-5)}`;
+}
+
+/** Step 2 — browse templates, with the counts and categories the chips need. */
+tradieRouter.get("/templates", requireClient, async (req, res, next) => {
+  try {
+    await ensureQuoteTemplates(clientId(req));
+    const templates = await prisma.quoteTemplate.findMany({
+      where: { clientId: clientId(req), active: true },
+      orderBy: [{ lastUsedAt: "desc" }, { name: "asc" }],
+      include: { items: { select: { id: true, isAddOn: true } } },
+    });
+    res.json(
+      templates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        category: t.category,
+        description: t.description,
+        lastUsedAt: t.lastUsedAt,
+        updatedAt: t.updatedAt,
+        tags: t.tags,
+        useForAiDrafting: t.useForAiDrafting,
+        itemCount: t.items.filter((i) => !i.isAddOn).length,
+        addOnCount: t.items.filter((i) => i.isAddOn).length,
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+const templateItemSchema = z.object({
+  label: z.string().min(1).max(300),
+  qty: z.number().default(1),
+  unit: z.string().default("JOB"),
+  unitPricePence: z.number().int().default(0),
+  vatRate: z.number().int().default(20),
+  isAddOn: z.boolean().default(false),
+  priceBookItemId: z.string().nullable().optional(),
+});
+
+/**
+ * Create a template, optionally with an id the phone chose.
+ *
+ * Same reasoning as quotes: the price book is cached on the device, so a tradie
+ * can build a template with no signal and the write queues. Accepting their id is
+ * what lets the follow-up "add these items" and "save" writes find the same row.
+ */
+tradieRouter.post("/templates", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        id: z.string().min(8).max(64).optional(),
+        name: z.string().min(1).max(160),
+        category: z.string().max(60).nullable().optional(),
+        description: z.string().max(500).nullable().optional(),
+        tags: z.array(z.string().max(40)).max(8).default([]),
+        defaultDurationMins: z.number().int().min(0).max(60 * 24 * 30).nullable().optional(),
+        useForAiDrafting: z.boolean().default(true),
+        vatRate: z.number().int().min(0).max(100).default(20),
+        depositPercent: z.number().int().min(0).max(100).nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
+        items: z.array(templateItemSchema).default([]),
+      })
+      .parse(req.body ?? {});
+
+    if (body.id) {
+      const clash = await prisma.quoteTemplate.findUnique({
+        where: { id: body.id },
+        select: { clientId: true },
+      });
+      if (clash) {
+        if (clash.clientId !== clientId(req)) throw new ApiError(409, "id_taken", "Template id already used");
+        // Retry after a lost response — hand back what's there rather than duplicating.
+        const existing = await prisma.quoteTemplate.findUnique({
+          where: { id: body.id },
+          include: { items: { orderBy: { sortOrder: "asc" } } },
+        });
+        res.status(200).json(existing);
+        return;
+      }
+    }
+
+    const created = await prisma.quoteTemplate.create({
+      data: {
+        ...(body.id ? { id: body.id } : {}),
+        clientId: clientId(req),
+        name: body.name.trim(),
+        category: body.category ?? null,
+        description: body.description ?? null,
+        tags: body.tags,
+        defaultDurationMins: body.defaultDurationMins ?? null,
+        useForAiDrafting: body.useForAiDrafting,
+        vatRate: body.vatRate,
+        depositPercent: body.depositPercent ?? null,
+        notes: body.notes ?? null,
+        items: {
+          create: body.items.map((i, index) => ({
+            label: i.label,
+            qty: i.qty,
+            unit: i.unit,
+            unitPricePence: i.unitPricePence,
+            vatRate: i.vatRate,
+            isAddOn: i.isAddOn,
+            sortOrder: index,
+            priceBookItemId: i.priceBookItemId ?? null,
+          })),
+        },
+      },
+      include: { items: { orderBy: { sortOrder: "asc" } } },
+    });
+    res.status(201).json(created);
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/**
+ * Update a template. When `items` is present it replaces the whole set.
+ *
+ * Wholesale replacement rather than per-item diffing because the edit screen is a
+ * single "Save template" — the tradie reorders, retitles and deletes freely, and
+ * trying to reconcile that into individual operations would be all risk and no gain.
+ */
+tradieRouter.patch("/templates/:id", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        name: z.string().min(1).max(160).optional(),
+        category: z.string().max(60).nullable().optional(),
+        description: z.string().max(500).nullable().optional(),
+        tags: z.array(z.string().max(40)).max(8).optional(),
+        defaultDurationMins: z.number().int().min(0).max(60 * 24 * 30).nullable().optional(),
+        useForAiDrafting: z.boolean().optional(),
+        vatRate: z.number().int().min(0).max(100).optional(),
+        depositPercent: z.number().int().min(0).max(100).nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
+        items: z.array(templateItemSchema).optional(),
+      })
+      .parse(req.body ?? {});
+
+    const template = await prisma.quoteTemplate.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      select: { id: true },
+    });
+    if (!template) throw new ApiError(404, "not_found", "Template not found");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (body.items) {
+        await tx.quoteTemplateItem.deleteMany({ where: { templateId: template.id } });
+      }
+      return tx.quoteTemplate.update({
+        where: { id: template.id },
+        data: {
+          ...(body.name !== undefined ? { name: body.name.trim() } : {}),
+          ...(body.category !== undefined ? { category: body.category } : {}),
+          ...(body.description !== undefined ? { description: body.description } : {}),
+          ...(body.tags !== undefined ? { tags: body.tags } : {}),
+          ...(body.defaultDurationMins !== undefined
+            ? { defaultDurationMins: body.defaultDurationMins }
+            : {}),
+          ...(body.useForAiDrafting !== undefined ? { useForAiDrafting: body.useForAiDrafting } : {}),
+          ...(body.vatRate !== undefined ? { vatRate: body.vatRate } : {}),
+          ...(body.depositPercent !== undefined ? { depositPercent: body.depositPercent } : {}),
+          ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          ...(body.items
+            ? {
+                items: {
+                  create: body.items.map((i, index) => ({
+                    label: i.label,
+                    qty: i.qty,
+                    unit: i.unit,
+                    unitPricePence: i.unitPricePence,
+                    vatRate: i.vatRate,
+                    isAddOn: i.isAddOn,
+                    sortOrder: index,
+                    priceBookItemId: i.priceBookItemId ?? null,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: { items: { orderBy: { sortOrder: "asc" } } },
+      });
+    });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/** Soft delete — quotes already built from it keep their lines regardless. */
+tradieRouter.delete("/templates/:id", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const template = await prisma.quoteTemplate.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      select: { id: true },
+    });
+    if (!template) throw new ApiError(404, "not_found", "Template not found");
+    await prisma.quoteTemplate.update({ where: { id: template.id }, data: { active: false } });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/** Duplicate — the fastest way to make a near-identical variant of a job. */
+tradieRouter.post("/templates/:id/duplicate", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const body = z.object({ id: z.string().min(8).max(64).optional() }).parse(req.body ?? {});
+    const source = await prisma.quoteTemplate.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      include: { items: { orderBy: { sortOrder: "asc" } } },
+    });
+    if (!source) throw new ApiError(404, "not_found", "Template not found");
+
+    if (body.id) {
+      const clash = await prisma.quoteTemplate.findUnique({ where: { id: body.id }, select: { id: true } });
+      if (clash) {
+        const existing = await prisma.quoteTemplate.findUnique({
+          where: { id: body.id },
+          include: { items: { orderBy: { sortOrder: "asc" } } },
+        });
+        res.status(200).json(existing);
+        return;
+      }
+    }
+
+    const copy = await prisma.quoteTemplate.create({
+      data: {
+        ...(body.id ? { id: body.id } : {}),
+        clientId: clientId(req),
+        name: `${source.name} (copy)`,
+        category: source.category,
+        description: source.description,
+        tags: source.tags,
+        defaultDurationMins: source.defaultDurationMins,
+        useForAiDrafting: source.useForAiDrafting,
+        vatRate: source.vatRate,
+        depositPercent: source.depositPercent,
+        notes: source.notes,
+        items: {
+          create: source.items.map((i) => ({
+            label: i.label,
+            qty: i.qty,
+            unit: i.unit,
+            unitPricePence: i.unitPricePence,
+            vatRate: i.vatRate,
+            isAddOn: i.isAddOn,
+            sortOrder: i.sortOrder,
+            priceBookItemId: i.priceBookItemId,
+          })),
+        },
+      },
+      include: { items: { orderBy: { sortOrder: "asc" } } },
+    });
+    res.status(201).json(copy);
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/** Step 3 — what's included vs what's an optional extra. */
+tradieRouter.get("/templates/:id", requireClient, async (req, res, next) => {
+  try {
+    const template = await prisma.quoteTemplate.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      include: { items: { orderBy: { sortOrder: "asc" } } },
+    });
+    if (!template) throw new ApiError(404, "not_found", "Template not found");
+    res.json({
+      id: template.id,
+      name: template.name,
+      category: template.category,
+      description: template.description,
+      tags: template.tags,
+      defaultDurationMins: template.defaultDurationMins,
+      useForAiDrafting: template.useForAiDrafting,
+      vatRate: template.vatRate,
+      depositPercent: template.depositPercent,
+      notes: template.notes,
+      included: template.items.filter((i) => !i.isAddOn),
+      addOns: template.items.filter((i) => i.isAddOn),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Create a draft with no customer yet.
+ *
+ * The customer is attached at preview (step 8) so capture is never blocked —
+ * a tradie standing in someone's kitchen shouldn't have to do data entry before
+ * they can start pricing. Quote.enquiryId already allowed null.
+ */
+async function createDraftQuote(
+  client: string,
+  lines: {
+    label: string;
+    qty: number;
+    // Template items store the unit as free text; QuoteLine wants the enum.
+    unit: string;
+    unitPricePence: number;
+    vatRate: number;
+    priceBookItemId?: string | null;
+  }[],
+  id?: string
+) {
+  const asUnit = (u: string): PriceUnit =>
+    (["EACH", "HOUR", "DAY", "JOB", "METRE"] as const).includes(u as PriceUnit) ? (u as PriceUnit) : "JOB";
+  const quote = await prisma.quote.create({
+    data: {
+      // The phone picks the id when offline so it can navigate straight to the draft.
+      ...(id ? { id } : {}),
+      clientId: client,
+      status: "DRAFT",
+      reference: newQuoteReference(),
+      publicToken: randomBytes(18).toString("base64url"),
+      lines: {
+        create: lines.map((l, i) => ({
+          label: l.label,
+          qty: l.qty,
+          unit: asUnit(l.unit),
+          unitPricePence: l.unitPricePence,
+          vatRate: l.vatRate,
+          priceBookItemId: l.priceBookItemId ?? null,
+          source: "BOOK",
+          sort: i,
+        })),
+      },
+    },
+  });
+  await recomputeQuoteTotals(quote.id);
+  return prisma.quote.findUnique({
+    where: { id: quote.id },
+    include: { lines: quoteLineInclude, enquiry: true },
+  });
+}
+
+/** Step 3 → 6. Chosen add-ons come through as ids so pricing stays server-side. */
+
+
+/** Step 1 "Blank" — start from nothing with a single empty line to type into. */
+
+
+/** Step 4 — notes to draft, with no job attached yet. */
+
+
+/** Step 5 — voice to draft, with no job attached yet. */
+
+
+/**
+ * Create a draft, optionally with an id the phone chose.
+ *
+ * A tradie with no signal still needs to open the quote they just started, so the
+ * phone mints the id, navigates immediately, and this write is queued. Accepting
+ * that id is what makes every later edit — lines, terms, customer — line up
+ * against the same record when the queue drains.
+ *
+ * Lines arrive fully resolved rather than as a templateId so the flow behaves
+ * identically offline, and so a tradie quotes the prices they actually saw on
+ * screen rather than whatever the template says by the time it syncs.
+ */
+tradieRouter.post("/quotes", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        id: z.string().min(8).max(64).optional(),
+        templateId: z.string().optional(),
+        lines: z
+          .array(
+            z.object({
+              label: z.string().max(300).default(""),
+              qty: z.number().default(1),
+              unit: z.string().default("JOB"),
+              unitPricePence: z.number().int().default(0),
+              vatRate: z.number().int().default(20),
+            })
+          )
+          .default([]),
+      })
+      .parse(req.body ?? {});
+
+    if (body.id) {
+      const clash = await prisma.quote.findUnique({ where: { id: body.id }, select: { clientId: true } });
+      if (clash) {
+        // Already created — the phone retried after a lost response. Hand back the
+        // existing draft rather than erroring, same principle as the idempotency keys.
+        if (clash.clientId !== clientId(req)) throw new ApiError(409, "id_taken", "Quote id already used");
+        const existing = await prisma.quote.findUnique({
+          where: { id: body.id },
+          include: { lines: quoteLineInclude, enquiry: true },
+        });
+        res.status(200).json(existing);
+        return;
+      }
+    }
+
+    const quote = await createDraftQuote(
+      clientId(req),
+      body.lines.map((l) => ({ ...l, priceBookItemId: null })),
+      body.id
+    );
+
+    if (body.templateId) {
+      await prisma.quoteTemplate
+        .updateMany({
+          where: { id: body.templateId, clientId: clientId(req) },
+          data: { lastUsedAt: new Date(), useCount: { increment: 1 } },
+        })
+        .catch(() => undefined);
+    }
+
+    res.status(201).json(quote);
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/** Step 4 — build priced lines into a draft the phone already created. */
+tradieRouter.post("/quotes/:id/from-notes", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const body = z.object({ transcript: z.string().min(3).max(8000) }).parse(req.body ?? {});
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      select: { id: true },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+
+    await ensurePriceBook(clientId(req));
+    const voice = await prisma.voiceNote.create({
+      data: { clientId: clientId(req), transcript: body.transcript, status: "READY" },
+    });
+    const built = await buildDraftQuoteFromTranscript({
+      clientId: clientId(req),
+      voiceNoteId: voice.id,
+      transcript: body.transcript,
+      intoQuoteId: quote.id,
+    });
+    res.status(201).json(built);
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/** Step 5 — same, from audio recorded on the phone. */
+tradieRouter.post("/quotes/:id/from-voice", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        contentType: z.string().min(3).max(40),
+        dataBase64: z.string().min(10),
+        durationSec: z.number().optional(),
+      })
+      .parse(req.body ?? {});
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+      select: { id: true },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+
+    const b64 = body.dataBase64.includes(",")
+      ? body.dataBase64.slice(body.dataBase64.indexOf(",") + 1)
+      : body.dataBase64;
+    const buf = Buffer.from(b64, "base64");
+    const stored = await storeAudio(body.contentType, buf);
+
+    const voice = await prisma.voiceNote.create({
+      data: {
+        clientId: clientId(req),
+        audioUrl: stored.url,
+        status: "TRANSCRIBING",
+        durationSec: body.durationSec ?? null,
+      },
+    });
+
+    const filename = path.basename(stored.path || "quote.webm");
+    const fileBuf = stored.path ? await fs.readFile(stored.path) : buf;
+    const transcript = await transcribeWithWhisper(fileBuf, filename, body.contentType);
+    await ensurePriceBook(clientId(req));
+    const built = await buildDraftQuoteFromTranscript({
+      clientId: clientId(req),
+      voiceNoteId: voice.id,
+      transcript,
+      intoQuoteId: quote.id,
+    });
+    res.status(201).json({ quote: built, transcript });
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/** Step 7 — deposit, how long it stands, and what the tradie promised on timing. */
+tradieRouter.patch("/quotes/:id/terms", requireClient, idempotent(async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        depositPercent: z.number().int().min(0).max(100).optional(),
+        validDays: z.number().int().min(1).max(365).optional(),
+        earliestStartAt: z.string().nullable().optional(),
+        estimatedDuration: z.string().max(80).nullable().optional(),
+        termsNote: z.string().max(2000).nullable().optional(),
+      })
+      .parse(req.body ?? {});
+
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+
+    const depositPercent = body.depositPercent ?? quote.depositPercent;
+    const updated = await prisma.quote.update({
+      where: { id: quote.id },
+      data: {
+        depositPercent,
+        // Kept in step so the preview and the customer's page agree without a recompute.
+        depositPence: depositPercent > 0 ? Math.round((quote.totalPence * depositPercent) / 100) : 0,
+        ...(body.validDays !== undefined ? { validDays: body.validDays } : {}),
+        ...(body.earliestStartAt !== undefined
+          ? { earliestStartAt: body.earliestStartAt ? new Date(body.earliestStartAt) : null }
+          : {}),
+        ...(body.estimatedDuration !== undefined ? { estimatedDuration: body.estimatedDuration } : {}),
+        ...(body.termsNote !== undefined ? { termsNote: body.termsNote } : {}),
+      },
+      include: { lines: quoteLineInclude, enquiry: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/**
+ * Step 8 — attach the customer, right before sending.
+ *
+ * Reuses the existing job record when one matches the number, so a quote raised
+ * on the doorstep lands against the same customer as their missed call rather
+ * than creating a duplicate contact.
+ */
+tradieRouter.patch("/quotes/:id/customer", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        enquiryId: z.string().optional(),
+        name: z.string().min(1).max(120).optional(),
+        phone: z.string().min(5).max(32).optional(),
+        email: z.string().email().max(160).nullable().optional(),
+        postcode: z.string().max(16).nullable().optional(),
+      })
+      .parse(req.body ?? {});
+
+    const quote = await prisma.quote.findFirst({
+      where: { id: req.params.id, clientId: clientId(req) },
+    });
+    if (!quote) throw new ApiError(404, "not_found", "Quote not found");
+
+    let enquiryId = body.enquiryId ?? null;
+    if (!enquiryId) {
+      if (!body.name || !body.phone) {
+        throw new ApiError(400, "customer_required", "Pick a customer or enter a name and number");
+      }
+      const phone = toE164UK(body.phone) || body.phone.trim();
+      const existing = await prisma.enquiry.findFirst({
+        where: { clientId: clientId(req), phone },
+        orderBy: { createdAt: "desc" },
+      });
+      if (existing) {
+        enquiryId = existing.id;
+      } else {
+        const created = await prisma.enquiry.create({
+          data: {
+            clientId: clientId(req),
+            name: body.name.trim(),
+            phone,
+            email: body.email ?? null,
+            postcode: body.postcode ?? null,
+            message: "Quote raised on site",
+            source: "MANUAL",
+            pipeline: "JOB",
+          },
+        });
+        enquiryId = created.id;
+      }
+    } else {
+      const owned = await prisma.enquiry.findFirst({
+        where: { id: enquiryId, clientId: clientId(req) },
+        select: { id: true },
+      });
+      if (!owned) throw new ApiError(404, "not_found", "Customer not found");
+    }
+
+    const updated = await prisma.quote.update({
+      where: { id: quote.id },
+      data: { enquiryId },
+      include: { lines: quoteLineInclude, enquiry: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}));
+
 tradieRouter.get("/quotes", requireClient, async (req, res, next) => {
   try {
     const quotes = await prisma.quote.findMany({

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { MoneyInput, NumberInput } from "./NumericInput";
 import {
   downloadPriceBookTemplate,
@@ -38,11 +39,14 @@ export default function PriceBookEditor({
   api,
   title = "Price book",
   compact = false,
+  templatesHref,
 }: {
   queryKey: unknown[];
   api: PriceBookApi;
   title?: string;
   compact?: boolean;
+  /** Set by the tradie app only — the admin CRM has no quote templates. */
+  templatesHref?: string;
 }) {
   const qc = useQueryClient();
   const offline = useOffline();
@@ -140,9 +144,11 @@ export default function PriceBookEditor({
           </p>
         </div>
         <div className="tradie-actions">
-          <button type="button" onClick={() => downloadPriceBookTemplate()}>
-            Template
-          </button>
+          {templatesHref && (
+            <Link className="primary" to={templatesHref}>
+              + Template
+            </Link>
+          )}
           <button type="button" onClick={() => exportPriceBook(rows)} disabled={!rows.length}>
             Export
           </button>
@@ -161,6 +167,14 @@ export default function PriceBookEditor({
             onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
           />
         </div>
+        {/* Kept, but demoted: "+ Template" now owns that word on this screen, and
+            without a blank sheet there's no way to know what Import Excel expects. */}
+        <p className="t-blank-sheet">
+          <button type="button" className="linkish" onClick={() => downloadPriceBookTemplate()}>
+            Download blank sheet
+          </button>{" "}
+          <span className="muted-text">for bulk entry in Excel</span>
+        </p>
       </div>
 
       {list.isLoading && <p>Loading…</p>}

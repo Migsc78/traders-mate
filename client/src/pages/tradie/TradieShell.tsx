@@ -78,6 +78,112 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       subtitle: fromInbox ? "Call back, quote, or make a job" : "Quote & message customer",
     };
   }
+  // Template authoring, reached from Rates.
+  if (pathname.startsWith("/t/rates/templates")) {
+    const id = pathname.match(/^\/t\/rates\/templates\/([^/]+)/)?.[1];
+    if (pathname === "/t/rates/templates") {
+      return {
+        backTo: "/t/price-book",
+        backLabel: "Rates",
+        title: "Templates",
+        subtitle: "Reusable quote templates",
+      };
+    }
+    if (pathname.endsWith("/new")) {
+      return {
+        backTo: "/t/rates/templates",
+        backLabel: "Templates",
+        title: "New template",
+        subtitle: "Name it and set the basics",
+      };
+    }
+    if (pathname.endsWith("/items")) {
+      return {
+        backTo: `/t/rates/templates/${id}/edit`,
+        backLabel: "Template",
+        title: "Add items from price book",
+        subtitle: "Search and select rates",
+      };
+    }
+    if (pathname.endsWith("/saved")) {
+      return {
+        backTo: "/t/rates/templates",
+        backLabel: "Templates",
+        title: "Template saved",
+        subtitle: "Ready to use in a quote",
+      };
+    }
+    return {
+      backTo: "/t/rates/templates",
+      backLabel: "Templates",
+      title: "Edit template",
+      subtitle: "Items, pricing and notes",
+    };
+  }
+
+  // Quote builder — each step names itself and steps back one, so the tradie can
+  // always retreat to the previous decision rather than losing the whole draft.
+  if (pathname.startsWith("/t/quotes/new") || /^\/t\/quotes\/[^/]+\/(edit|terms|preview)$/.test(pathname)) {
+    const quoteId = pathname.match(/^\/t\/quotes\/([^/]+)\/(?:edit|terms|preview)$/)?.[1];
+    const steps: Record<string, DetailChrome> = {
+      "/t/quotes/new": {
+        backTo: "/t/quotes",
+        backLabel: "Quotes",
+        title: "New quote",
+        subtitle: "Template, notes, voice or blank",
+      },
+      "/t/quotes/new/templates": {
+        backTo: "/t/quotes/new",
+        backLabel: "New quote",
+        title: "Templates",
+        subtitle: "Find the right job template",
+      },
+      "/t/quotes/new/notes": {
+        backTo: "/t/quotes/new",
+        backLabel: "New quote",
+        title: "Notes to quote",
+        subtitle: "Paste your notes, we'll price it",
+      },
+      "/t/quotes/new/voice": {
+        backTo: "/t/quotes/new",
+        backLabel: "New quote",
+        title: "Voice to quote",
+        subtitle: "Speak the job, get a draft",
+      },
+    };
+    if (steps[pathname]) return steps[pathname];
+    if (pathname.startsWith("/t/quotes/new/templates/")) {
+      return {
+        backTo: "/t/quotes/new/templates",
+        backLabel: "Templates",
+        title: "Template",
+        subtitle: "What's included and add-ons",
+      };
+    }
+    if (pathname.endsWith("/edit")) {
+      return {
+        backTo: "/t/quotes/new",
+        backLabel: "New quote",
+        title: "Edit quote",
+        subtitle: "Items, quantities, pricing",
+      };
+    }
+    if (pathname.endsWith("/terms")) {
+      return {
+        backTo: `/t/quotes/${quoteId}/edit`,
+        backLabel: "Edit",
+        title: "Deposit & terms",
+        subtitle: "Set expectations clearly",
+      };
+    }
+    return {
+      backTo: `/t/quotes/${quoteId}/terms`,
+      backLabel: "Terms",
+      title: "Preview quote",
+      subtitle: "Check it, then send",
+    };
+  }
+
   if (pathname === "/t/customers/new") {
     return {
       backTo: "/t/customers",

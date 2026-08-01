@@ -23,6 +23,7 @@ export default function TradiePriceBookPage() {
       </header>
       <PriceBookEditor
         queryKey={["tradie-price-book"]}
+        templatesHref="/t/rates/templates"
         api={{
           list: () => tradieApi.priceBook(),
           save: async (items) => {

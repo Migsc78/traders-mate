@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { formatGbp, sendOrQueue, tradieApi } from "../../api/tradie";
 import { EmptyState, QueryError, IconChevron, StatusPill } from "./ui";
 import { SwipeListRow } from "./SwipeListRow";
@@ -63,9 +64,14 @@ export default function TradieQuotesPage() {
 
   return (
     <div>
-      <header className="t-page-head">
-        <h2>Quotes</h2>
-        <p>Swipe right to archive · left to delete</p>
+      <header className="t-page-head t-page-head--row">
+        <div>
+          <h2>Quotes</h2>
+          <p>Swipe right to archive · left to delete</p>
+        </div>
+        <Link className="t-add-btn" to="/t/quotes/new" aria-label="New quote">
+          +
+        </Link>
       </header>
 
       {quotes.isLoading && <p className="muted-text">Loading…</p>}

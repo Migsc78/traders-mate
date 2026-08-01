@@ -24,6 +24,19 @@ import TradieJobPage from "./pages/tradie/TradieJobPage";
 import TradieNewJobPage from "./pages/tradie/TradieNewJobPage";
 import TradiePriceBookPage from "./pages/tradie/TradiePriceBookPage";
 import TradieQuotesPage from "./pages/tradie/TradieQuotesPage";
+import QuoteStartPage from "./pages/tradie/quote/QuoteStartPage";
+import QuoteTemplatesPage from "./pages/tradie/quote/QuoteTemplatesPage";
+import QuoteTemplateDetailPage from "./pages/tradie/quote/QuoteTemplateDetailPage";
+import QuoteNotesPage from "./pages/tradie/quote/QuoteNotesPage";
+import QuoteVoicePage from "./pages/tradie/quote/QuoteVoicePage";
+import QuoteEditPage from "./pages/tradie/quote/QuoteEditPage";
+import QuoteTermsPage from "./pages/tradie/quote/QuoteTermsPage";
+import QuotePreviewPage from "./pages/tradie/quote/QuotePreviewPage";
+import TemplateLibraryPage from "./pages/tradie/template/TemplateLibraryPage";
+import TemplateDetailsPage from "./pages/tradie/template/TemplateDetailsPage";
+import TemplateAddItemsPage from "./pages/tradie/template/TemplateAddItemsPage";
+import TemplateEditPage from "./pages/tradie/template/TemplateEditPage";
+import TemplateSavedPage from "./pages/tradie/template/TemplateSavedPage";
 import TradieInvoicesPage from "./pages/tradie/TradieInvoicesPage";
 import TradieCustomersPage from "./pages/tradie/TradieCustomersPage";
 import TradieCustomerPage from "./pages/tradie/TradieCustomerPage";
@@ -97,11 +110,24 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="archived" element={<TradieArchivedPage />} />
             <Route path="onboarding" element={<TradieOnboardingPage />} />
             <Route path="quotes" element={<TradieQuotesPage />} />
+            <Route path="quotes/new" element={<QuoteStartPage />} />
+            <Route path="quotes/new/templates" element={<QuoteTemplatesPage />} />
+            <Route path="quotes/new/templates/:templateId" element={<QuoteTemplateDetailPage />} />
+            <Route path="quotes/new/notes" element={<QuoteNotesPage />} />
+            <Route path="quotes/new/voice" element={<QuoteVoicePage />} />
+            <Route path="quotes/:quoteId/edit" element={<QuoteEditPage />} />
+            <Route path="quotes/:quoteId/terms" element={<QuoteTermsPage />} />
+            <Route path="quotes/:quoteId/preview" element={<QuotePreviewPage />} />
             <Route path="invoices" element={<TradieInvoicesPage />} />
             <Route path="customers" element={<TradieCustomersPage />} />
             <Route path="customers/new" element={<TradieNewCustomerPage />} />
             <Route path="customers/:phoneKey" element={<TradieCustomerPage />} />
             <Route path="price-book" element={<TradiePriceBookPage />} />
+            <Route path="rates/templates" element={<TemplateLibraryPage />} />
+            <Route path="rates/templates/new" element={<TemplateDetailsPage />} />
+            <Route path="rates/templates/:templateId/items" element={<TemplateAddItemsPage />} />
+            <Route path="rates/templates/:templateId/edit" element={<TemplateEditPage />} />
+            <Route path="rates/templates/:templateId/saved" element={<TemplateSavedPage />} />
             <Route path="diary" element={<TradieDiaryPage />} />
             <Route path="diary/new" element={<TradieNewBookingPage />} />
             <Route path="certificates" element={<TradieCertificatesPage />} />

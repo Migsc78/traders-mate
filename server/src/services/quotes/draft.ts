@@ -10,6 +10,8 @@ export async function buildDraftQuoteFromTranscript(opts: {
   enquiryId?: string | null;
   voiceNoteId?: string | null;
   transcript: string;
+  /** Fill this existing draft instead of creating one — see below. */
+  intoQuoteId?: string | null;
 }) {
   const book = await prisma.priceBookItem.findMany({
     where: { clientId: opts.clientId, active: true },
@@ -71,33 +73,55 @@ export async function buildDraftQuoteFromTranscript(opts: {
   const totals = totalsFromLines(lines, vatInclusive);
   const validUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-  const quote = await prisma.quote.create({
-    data: {
-      clientId: opts.clientId,
-      enquiryId: opts.enquiryId || null,
-      voiceNoteId: opts.voiceNoteId || null,
-      status: "DRAFT",
-      vatInclusive,
-      ...totals,
-      publicToken: newPublicToken(),
-      customerNote: extracted.summary || null,
-      assumptions: extracted.assumptions.length ? extracted.assumptions.join("\n") : null,
-      validUntil,
-      lines: {
-        create: lines.map((l, i) => ({
-          sort: i,
-          label: l.label,
-          qty: l.qty,
-          unit: l.unit,
-          unitPricePence: l.unitPricePence,
-          vatRate: l.vatRate,
-          priceBookItemId: l.priceBookItemId || null,
-          source: l.source || "MANUAL",
-        })),
-      },
-    },
-    include: { lines: quoteLineInclude },
-  });
+  const lineData = lines.map((l, i) => ({
+    sort: i,
+    label: l.label,
+    qty: l.qty,
+    unit: l.unit,
+    unitPricePence: l.unitPricePence,
+    vatRate: l.vatRate,
+    priceBookItemId: l.priceBookItemId || null,
+    source: l.source || "MANUAL",
+  }));
+
+  /**
+   * When intoQuoteId is set we're filling a quote the phone already created and
+   * navigated to — the tradie captured notes with no signal, and this is the
+   * queued write catching up. Creating a second quote here would leave them with
+   * a duplicate and an empty draft they're still looking at.
+   */
+  const quote = opts.intoQuoteId
+    ? await prisma.$transaction(async (tx) => {
+        await tx.quoteLine.deleteMany({ where: { quoteId: opts.intoQuoteId! } });
+        return tx.quote.update({
+          where: { id: opts.intoQuoteId! },
+          data: {
+            voiceNoteId: opts.voiceNoteId || null,
+            vatInclusive,
+            ...totals,
+            customerNote: extracted.summary || null,
+            assumptions: extracted.assumptions.length ? extracted.assumptions.join("\n") : null,
+            lines: { create: lineData },
+          },
+          include: { lines: quoteLineInclude },
+        });
+      })
+    : await prisma.quote.create({
+        data: {
+          clientId: opts.clientId,
+          enquiryId: opts.enquiryId || null,
+          voiceNoteId: opts.voiceNoteId || null,
+          status: "DRAFT",
+          vatInclusive,
+          ...totals,
+          publicToken: newPublicToken(),
+          customerNote: extracted.summary || null,
+          assumptions: extracted.assumptions.length ? extracted.assumptions.join("\n") : null,
+          validUntil,
+          lines: { create: lineData },
+        },
+        include: { lines: quoteLineInclude },
+      });
 
   if (opts.voiceNoteId) {
     await prisma.voiceNote.update({

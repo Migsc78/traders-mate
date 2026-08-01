@@ -643,13 +643,48 @@ export const tradieApi = {
     }
   ) => tRequest<QuoteDto>(`/quotes/${id}/lines`, { method: "PUT", body: JSON.stringify(body) }),
 
-  approve: (id: string, body?: { depositPercent?: number }) =>
+  approve: (
+    id: string,
+    body?: {
+      depositPercent?: number;
+      channels?: ("SMS" | "WHATSAPP" | "EMAIL")[];
+      email?: string;
+    }
+  ) =>
     tRequest<QuoteDto & { publicUrl: string }>(`/quotes/${id}/approve`, {
       method: "POST",
       body: JSON.stringify(body ?? {}),
     }),
 
   deleteQuote: (id: string) => tRequest<{ ok: boolean }>(`/quotes/${id}`, { method: "DELETE" }),
+
+  quoteTemplates: () => tRequest<QuoteTemplateSummary[]>("/templates"),
+
+  quoteTemplate: (id: string) => tRequest<QuoteTemplateDetail>(`/templates/${id}`),
+
+  deleteTemplate: (id: string) => tRequest<{ ok: boolean }>(`/templates/${id}`, { method: "DELETE" }),
+
+  createQuote: (body: {
+    id: string;
+    templateId?: string;
+    lines: { label: string; qty: number; unit: string; unitPricePence: number; vatRate: number }[];
+  }) => tRequest<QuoteDto>("/quotes", { method: "POST", body: JSON.stringify(body) }),
+
+  saveQuoteTerms: (
+    id: string,
+    body: {
+      depositPercent?: number;
+      validDays?: number;
+      earliestStartAt?: string | null;
+      estimatedDuration?: string | null;
+      termsNote?: string | null;
+    }
+  ) => tRequest<QuoteDto>(`/quotes/${id}/terms`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  setQuoteCustomer: (
+    id: string,
+    body: { enquiryId?: string; name?: string; phone?: string; email?: string | null }
+  ) => tRequest<QuoteDto>(`/quotes/${id}/customer`, { method: "PATCH", body: JSON.stringify(body) }),
 
   archiveQuote: (id: string) =>
     tRequest<{ id: string; status: string }>(`/quotes/${id}/archive`, {
@@ -827,7 +862,76 @@ export interface QuoteDto {
   customerNote: string | null;
   assumptions: string | null;
   publicToken: string;
+  reference: string | null;
+  depositPercent: number;
+  depositPence: number;
+  validDays: number;
+  earliestStartAt: string | null;
+  estimatedDuration: string | null;
+  termsNote: string | null;
+  enquiry?: { id: string; name: string; phone: string; email: string | null } | null;
   lines: QuoteLineDto[];
+}
+
+export interface QuoteTemplateSummary {
+  id: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  lastUsedAt: string | null;
+  updatedAt: string;
+  tags: string[];
+  useForAiDrafting: boolean;
+  itemCount: number;
+  addOnCount: number;
+}
+
+export interface TemplateItemInput {
+  label: string;
+  qty: number;
+  unit: string;
+  unitPricePence: number;
+  vatRate: number;
+  isAddOn: boolean;
+  priceBookItemId?: string | null;
+}
+
+export interface TemplateDraft {
+  name: string;
+  category?: string | null;
+  description?: string | null;
+  tags?: string[];
+  defaultDurationMins?: number | null;
+  useForAiDrafting?: boolean;
+  vatRate?: number;
+  depositPercent?: number | null;
+  notes?: string | null;
+  items?: TemplateItemInput[];
+}
+
+export interface QuoteTemplateItemDto {
+  id: string;
+  label: string;
+  qty: number;
+  unit: string;
+  unitPricePence: number;
+  vatRate: number;
+  isAddOn: boolean;
+}
+
+export interface QuoteTemplateDetail {
+  id: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  tags: string[];
+  defaultDurationMins: number | null;
+  useForAiDrafting: boolean;
+  vatRate: number;
+  depositPercent: number | null;
+  notes: string | null;
+  included: QuoteTemplateItemDto[];
+  addOns: QuoteTemplateItemDto[];
 }
 
 export interface PriceBookItem {

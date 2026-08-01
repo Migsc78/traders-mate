@@ -257,6 +257,7 @@ model Client {
   certificates     Certificate[]
   customerContacts CustomerContact[]
   idempotencyKeys  IdempotencyKey[]
+  quoteTemplates   QuoteTemplate[]
 
   @@index([status])
   @@index([destPhone])
@@ -330,6 +331,8 @@ model Enquiry {
   client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name         String
   phone        String
+  /// Optional — lets a quote be emailed as well as texted.
+  email        String?
   message      String?
   postcode     String? // customer's job postcode, if given
   distanceMiles Float? // computed distance from client.postcode, if both are known
@@ -473,6 +476,15 @@ model Quote {
   sentAt          DateTime?
   decidedAt       DateTime?
   validUntil      DateTime?
+  /// Human-facing ref shown on the quote — "Q-1052". Assigned per client.
+  reference       String?
+  /// How long the quote stands, in days. Drives validUntil when sent.
+  validDays       Int         @default(30)
+  /// Availability the tradie promised — shown to the customer, not scheduled.
+  earliestStartAt DateTime?
+  estimatedDuration String?
+  /// Free text terms shown under the totals ("Payment on completion…").
+  termsNote       String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -482,6 +494,63 @@ model Quote {
 
   @@index([clientId, status, createdAt])
   @@index([enquiryId])
+}
+
+/// A reusable bundle of priced lines for a job the tradie does often.
+///
+/// Seeded per trade so a new account has something useful on day one, then edited
+/// freely. Distinct from the price book: that's individual rates, this is "a boiler
+/// install is these 18 things".
+model QuoteTemplate {
+  id          String              @id @default(cuid())
+  clientId    String
+  client      Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  /// Groups the filter chips on the browse screen — "Heating", "Bathrooms".
+  category    String?
+  description String?
+  /// Free labels the tradie picks — "Common job", "Emergency", "Service", "Install".
+  tags        String[]            @default([])
+  /// Rough time on the job, shown when quoting. Minutes so it survives "01:30".
+  defaultDurationMins Int?
+  /// Whether this template may be suggested when drafting from notes or voice.
+  /// Stored now; the drafting side doesn't read it yet.
+  useForAiDrafting Boolean        @default(true)
+  vatRate     Int                 @default(20)
+  /// Optional default deposit for quotes built from this template.
+  depositPercent Int?
+  /// Exclusions and caveats carried onto the quote.
+  notes       String?
+  /// Bumped whenever a quote is started from this template, to order "Recent".
+  lastUsedAt  DateTime?
+  useCount    Int                 @default(0)
+  active      Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  items       QuoteTemplateItem[]
+
+  @@index([clientId, active, name])
+  @@index([clientId, lastUsedAt])
+}
+
+model QuoteTemplateItem {
+  id              String        @id @default(cuid())
+  templateId      String
+  template        QuoteTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label           String
+  qty             Float         @default(1)
+  unit            String        @default("JOB")
+  unitPricePence  Int           @default(0)
+  vatRate         Int           @default(20)
+  /// Optional extras the tradie ticks on the template screen rather than getting
+  /// by default — "Smart thermostat +£150".
+  isAddOn         Boolean       @default(false)
+  sortOrder       Int           @default(0)
+  /// Kept in step with the price book where it came from, so rate changes flow through.
+  priceBookItemId String?
+
+  @@index([templateId, isAddOn, sortOrder])
 }
 
 model QuoteLine {

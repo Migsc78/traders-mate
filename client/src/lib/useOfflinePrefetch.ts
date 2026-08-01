@@ -42,6 +42,18 @@ export function useOfflinePrefetch(enabled: boolean): void {
     void qc.prefetchQuery({ queryKey: ["tradie-price-book"], queryFn: () => tradieApi.priceBook() });
     void qc.prefetchQuery({ queryKey: ["tradie-customers"], queryFn: () => tradieApi.customers() });
     void qc.prefetchQuery({ queryKey: ["tradie-quotes"], queryFn: () => tradieApi.quotes() });
+    // Templates and their contents, so a quote can be started from one with no signal.
+    void qc
+      .prefetchQuery({ queryKey: ["tradie-quote-templates"], queryFn: () => tradieApi.quoteTemplates() })
+      .then(() => {
+        const list = qc.getQueryData<{ id: string }[]>(["tradie-quote-templates"]) || [];
+        for (const t of list) {
+          void qc.prefetchQuery({
+            queryKey: ["tradie-quote-template", t.id],
+            queryFn: () => tradieApi.quoteTemplate(t.id),
+          });
+        }
+      });
     void qc.prefetchQuery({
       queryKey: ["tradie-appointments", thisWeek.from, thisWeek.to],
       queryFn: () => tradieApi.appointments(thisWeek.from, thisWeek.to),

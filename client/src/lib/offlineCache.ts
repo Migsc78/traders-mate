@@ -6,8 +6,9 @@
  * customer address, diary, price book and recent quotes/invoices still open when
  * the phone has nothing.
  *
- * Reads only — offline writes are a separate piece of work. Nothing here queues
- * a mutation, so a tradie never sees a save that silently never happened.
+ * Reads only. Writes made with no signal go through the durable queue in
+ * lib/outbox.ts, which is what stops a tradie ever seeing a save that silently
+ * never happened.
  */
 import type { PersistedClient, Persister } from "@tanstack/react-query-persist-client";
 
@@ -29,6 +30,9 @@ const PERSISTED_KEYS = new Set([
   "tradie-appointments",
   "tradie-price-book",
   "tradie-quotes",
+  "tradie-quote",
+  "tradie-quote-templates",
+  "tradie-quote-template",
   "tradie-invoices",
   "tradie-certificates",
   "tradie-certificate",

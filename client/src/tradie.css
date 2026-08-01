@@ -1826,3 +1826,460 @@ html.native-app .tradie-bottom-nav {
   .tradie-shell button,
   .t-row { transition: none; }
 }
+
+/* ---------- quote builder (wireframe steps 1-8) ---------- */
+
+.t-quote-lead {
+  margin: 0 0 16px;
+  color: var(--t-ink-soft);
+  font-size: 14px;
+}
+
+/* Step 1 — the four ways in */
+.t-start-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.tradie-shell .t-start-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px 16px;
+  min-height: 118px;
+  border-radius: var(--t-radius);
+  background: var(--t-surface);
+  border: 1px solid var(--t-hairline);
+  box-shadow: var(--t-shadow);
+  color: var(--t-ink);
+  text-align: left;
+  text-decoration: none;
+}
+.t-start-card svg { color: var(--t-accent); margin-bottom: 6px; }
+.t-start-card strong { font-size: 15.5px; font-weight: 700; }
+.t-start-card span { font-size: 12.5px; color: var(--t-ink-soft); line-height: 1.35; }
+.tradie-shell .t-start-card:disabled { opacity: 0.55; }
+
+/* Step 2 — search + category chips */
+.t-search-wrap { margin-bottom: 12px; }
+.tradie-shell .t-search-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  font-size: 15px;
+}
+.t-chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 14px;
+  scrollbar-width: none;
+}
+.t-chip-row::-webkit-scrollbar { display: none; }
+.tradie-shell .t-chip {
+  flex: none;
+  padding: 7px 14px;
+  min-height: 0;
+  border-radius: 999px;
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.tradie-shell .t-chip.is-active {
+  background: var(--t-ink);
+  border-color: var(--t-ink);
+  color: #fff;
+}
+
+/* Step 3 — included / add-ons */
+.t-seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-slate-soft);
+}
+.tradie-shell .t-seg button {
+  flex: 1;
+  min-height: 0;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--t-ink-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.tradie-shell .t-seg button.is-active {
+  background: var(--t-surface);
+  color: var(--t-ink);
+  box-shadow: var(--t-shadow);
+}
+.t-template-items {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  overflow: hidden;
+}
+.t-template-items li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--t-hairline-2);
+  font-size: 14px;
+}
+.t-template-items li:last-child { border-bottom: none; }
+.t-template-item-label { flex: 1; min-width: 0; }
+.t-template-item-qty { color: var(--t-ink-faint); font-variant-numeric: tabular-nums; }
+.t-template-item-price { color: var(--t-ink-soft); font-weight: 600; }
+.tradie-shell .t-addon-toggle {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-size: 18px;
+  line-height: 1;
+}
+.tradie-shell .t-addon-toggle.is-on {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+  color: #fff;
+}
+.t-template-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+.t-template-total strong { font-size: 20px; font-weight: 800; }
+
+/* Steps 4-5 — capture */
+.tradie-shell .t-notes-area {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.tradie-shell .t-generate-btn { margin-bottom: 16px; font-weight: 700; }
+.t-draft-done {
+  margin-top: 16px;
+  padding: 18px 16px;
+  border-radius: var(--t-radius);
+  background: var(--t-green-soft);
+  border: 1px solid #bfe6d0;
+  text-align: center;
+}
+.t-draft-done-title { margin: 0 0 4px; font-weight: 700; color: var(--t-green); }
+.t-draft-done .muted-text { margin: 0 0 14px; }
+
+.t-voice-page { display: flex; flex-direction: column; align-items: center; padding-top: 22px; }
+.tradie-shell .t-mic {
+  width: 132px;
+  height: 132px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--t-accent-soft);
+  background: var(--t-surface);
+  color: var(--t-accent);
+  box-shadow: var(--t-shadow-raised);
+}
+.tradie-shell .t-mic.is-live {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+  color: #fff;
+  animation: t-pulse 1.4s ease-in-out infinite;
+}
+@keyframes t-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 90, 31, 0.34); }
+  50% { box-shadow: 0 0 0 16px rgba(255, 90, 31, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tradie-shell .t-mic.is-live { animation: none; }
+}
+.t-voice-state { margin: 20px 0 2px; font-size: 17px; font-weight: 700; }
+.t-voice-hint { text-align: center; margin: 0 0 18px; max-width: 280px; }
+
+/* Step 6 — line items */
+.t-lines-head {
+  display: grid;
+  grid-template-columns: 1fr 52px 62px 78px;
+  gap: 8px;
+  padding: 0 4px 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-ink-faint);
+}
+.t-lines { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.t-lines li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+}
+.tradie-shell .t-line-label { width: 100%; font-weight: 600; }
+.t-line-fields { display: grid; grid-template-columns: 52px 72px 1fr auto 28px; gap: 8px; align-items: center; }
+.t-line-fields input, .t-line-fields select { min-width: 0; }
+.t-line-total { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.tradie-shell .t-line-remove {
+  width: 28px; height: 28px; min-height: 0; padding: 0;
+  border: none; background: none; color: var(--t-ink-faint); font-size: 20px; line-height: 1;
+}
+.t-totals {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface-2);
+  border: 1px solid var(--t-hairline);
+}
+.t-totals p { display: flex; justify-content: space-between; margin: 0 0 8px; font-size: 14px; }
+.t-totals p:last-child { margin-bottom: 0; }
+.t-totals-grand { padding-top: 10px; border-top: 1px solid var(--t-hairline); font-size: 17px; font-weight: 800; }
+
+/* Step 7 — terms */
+.t-quote-terms .t-card { margin-bottom: 8px; }
+.t-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 13px; font-weight: 600; color: var(--t-ink-soft); }
+.t-field:last-child { margin-bottom: 0; }
+.t-deposit-row { display: flex; align-items: center; gap: 10px; }
+.t-deposit-row input { flex: 1; }
+.t-deposit-pct {
+  flex: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--t-accent-soft);
+  color: var(--t-accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.t-terms-total { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 14px; font-size: 15px; }
+.t-terms-total strong { font-size: 22px; font-weight: 800; }
+
+/* Step 8 — preview & send */
+.t-preview-card { margin-bottom: 8px; }
+.t-preview-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.t-preview-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--t-hairline-2); font-size: 14.5px; }
+.tradie-shell button.t-preview-row--btn {
+  width: 100%; min-height: 0; border: none; border-radius: 0;
+  background: none; text-align: left; font: inherit; color: var(--t-accent-ink); font-weight: 600;
+  border-bottom: 1px solid var(--t-hairline-2);
+}
+.t-preview-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; font-size: 15px; }
+.t-preview-total strong { font-size: 24px; font-weight: 800; }
+.t-send-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.tradie-shell .t-send-option {
+  display: grid;
+  grid-template-columns: 86px 1fr 22px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+  padding: 12px 4px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: var(--t-ink);
+}
+.tradie-shell .t-send-option:disabled { opacity: 0.45; }
+.t-send-label { font-weight: 700; font-size: 14.5px; }
+.t-send-detail { color: var(--t-ink-soft); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-send-tick { color: var(--t-accent); font-weight: 800; text-align: right; }
+.tradie-shell .t-send-option.is-on .t-send-label { color: var(--t-accent-ink); }
+
+/* ---------- template authoring (wireframe 1-6) ---------- */
+
+.t-blank-sheet { margin: 10px 0 0; font-size: 13px; }
+.tradie-shell .t-blank-sheet .linkish { min-height: 0; padding: 0; font-size: 13px; }
+
+/* Library rows carry their own actions alongside the link */
+.t-tpl-row { display: flex; align-items: stretch; gap: 6px; }
+.t-tpl-row > .t-row { flex: 1; min-width: 0; }
+.t-tpl-actions { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.tradie-shell .t-tpl-actions button {
+  width: 34px;
+  min-height: 0;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--t-ink-faint);
+  font-size: 17px;
+  line-height: 1;
+}
+
+/* Details form */
+.t-template-form .t-field { margin-bottom: 16px; }
+.t-field-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-ink-soft);
+}
+.t-chip-row--wrap { flex-wrap: wrap; overflow: visible; margin-bottom: 18px; }
+.t-duration-row { display: flex; align-items: center; gap: 8px; }
+.t-duration-row input { flex: 1; }
+.t-duration-row span { color: var(--t-ink-faint); font-size: 13px; }
+.t-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 4px 0 20px;
+  padding: 14px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+}
+.t-toggle-row > span { display: flex; flex-direction: column; gap: 3px; }
+.t-toggle-row strong { font-size: 14px; }
+.t-toggle-row .muted-text { font-size: 12.5px; }
+.t-toggle-row input[type="checkbox"] {
+  flex: none;
+  width: 48px;
+  height: 28px;
+  margin: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: var(--t-slate-soft);
+  border: 1px solid var(--t-hairline);
+  position: relative;
+  transition: background 0.15s ease;
+}
+.t-toggle-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(19, 28, 38, 0.25);
+  transition: transform 0.15s ease;
+}
+.t-toggle-row input[type="checkbox"]:checked { background: var(--t-accent); border-color: var(--t-accent); }
+.t-toggle-row input[type="checkbox"]:checked::after { transform: translateX(20px); }
+
+/* Add items from price book */
+.t-pick-list { list-style: none; margin: 0 0 14px; padding: 0; }
+.t-pick-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--t-hairline-2);
+  font-size: 14.5px;
+}
+.t-pick-row input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--t-accent); }
+.t-pick-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.t-pick-main .muted-text { font-size: 12px; }
+.t-pick-price { font-weight: 700; font-variant-numeric: tabular-nums; }
+.t-pick-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-accent-soft);
+  border: 1px solid #f7d3c1;
+}
+.t-pick-bar > span { display: flex; flex-direction: column; gap: 2px; }
+.t-pick-bar strong { font-size: 14px; }
+.t-pick-bar .muted-text { font-size: 12.5px; }
+.tradie-shell .t-pick-bar button {
+  min-height: 0;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--t-accent-ink);
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+/* Edit template */
+.t-two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 6px; }
+.tradie-shell .t-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 8px 0 12px;
+  padding: 13px 14px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 0;
+}
+
+/* Saved confirmation */
+.t-template-saved { text-align: center; padding-top: 12px; }
+.t-saved-mark {
+  width: 74px;
+  height: 74px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--t-green-soft);
+  border: 2px solid #bfe6d0;
+  color: var(--t-green);
+  font-size: 34px;
+  line-height: 70px;
+  font-weight: 800;
+}
+.t-saved-title { margin: 0 0 8px; font-size: 21px; }
+.t-saved-pill {
+  display: inline-block;
+  margin: 0 0 20px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  background: var(--t-green-soft);
+  color: var(--t-green);
+  font-size: 13px;
+  font-weight: 700;
+}
+.t-saved-summary { text-align: left; margin-bottom: 14px; }
+.t-saved-summary p { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 10px; font-size: 14px; }
+.t-saved-summary p:last-child { margin-bottom: 0; }
+.t-saved-note {
+  margin: 0 0 18px;
+  padding: 13px 14px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-green-soft);
+  border: 1px solid #bfe6d0;
+  color: var(--t-green);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+}
