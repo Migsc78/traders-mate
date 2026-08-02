@@ -2283,3 +2283,174 @@ html.native-app .tradie-bottom-nav {
   font-weight: 600;
   text-align: left;
 }
+
+/* ---------- rates: price book browse + rate creation (wireframe 1-4) ---------- */
+
+.t-rates-tools {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.tradie-shell .t-rates-tools > *,
+.tradie-shell .t-rates-tools button {
+  flex: 1;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tradie-shell .t-rates-tools button:disabled { opacity: 0.5; }
+
+/* Collapsible category sections */
+.t-rate-section {
+  margin-bottom: 10px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  overflow: hidden;
+}
+.tradie-shell .t-rate-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+  padding: 13px 14px;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  font-size: 14.5px;
+  text-align: left;
+}
+.t-rate-section-head strong { flex: none; font-weight: 700; }
+.t-rate-section-head .muted-text { flex: 1; font-size: 12.5px; }
+.t-rate-section-icon { display: inline-flex; color: var(--t-accent); }
+.t-rate-caret {
+  flex: none;
+  color: var(--t-ink-faint);
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.t-rate-caret.is-open { transform: rotate(180deg); }
+.t-rate-section-body { border-top: 1px solid var(--t-hairline-2); padding: 4px 0 10px; }
+
+/* One rate — collapsed row, expands into the editor in place */
+.t-rate-item { border-bottom: 1px solid var(--t-hairline-2); }
+.t-rate-item:last-of-type { border-bottom: none; }
+.t-rate-item.is-inactive { opacity: 0.6; }
+.tradie-shell .t-rate-item-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+  padding: 11px 14px;
+  border: none;
+  background: none;
+  color: var(--t-ink);
+  text-align: left;
+}
+.t-rate-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t-rate-item-main strong { font-size: 14.5px; font-weight: 600; }
+.t-rate-item-main .muted-text { font-size: 12px; }
+.t-rate-item-side { flex: none; display: flex; align-items: center; gap: 8px; }
+.t-rate-item-side .t-money { font-size: 15px; }
+.t-rate-item-edit { padding: 4px 14px 16px; }
+.t-rate-item-edit label { margin-bottom: 12px; }
+.t-rate-item-checks {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.tradie-shell .t-rate-item-checks label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+.tradie-shell .t-rate-item-checks input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--t-accent);
+}
+.tradie-shell .t-rate-item-checks .linkish { margin-left: auto; min-height: 0; padding: 0; }
+.t-rate-empty { padding: 10px 14px; font-size: 13px; }
+.tradie-shell .t-rate-add {
+  min-height: 0;
+  padding: 8px 14px 2px;
+  font-size: 13px;
+}
+
+/* Save bar only appears once something has actually changed */
+.t-rates-save { margin-top: 14px; }
+
+/* New rate item form */
+.t-rate-form .t-field { margin-bottom: 16px; }
+.tradie-shell .t-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+  margin: 0 0 16px;
+  padding: 13px 14px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  font-size: 15px;
+  text-align: left;
+}
+.t-picker-row .t-chevron { color: var(--t-ink-faint); }
+
+/* Category picker */
+.t-step-lede { margin: 0 0 16px; color: var(--t-ink-soft); font-size: 14px; }
+.t-choice-list { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 10px; }
+.tradie-shell .t-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  min-height: 0;
+  padding: 14px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink);
+  text-align: left;
+}
+.tradie-shell .t-choice-row.is-active {
+  border-color: var(--t-accent);
+  background: var(--t-accent-soft);
+}
+.t-choice-icon { flex: none; display: inline-flex; color: var(--t-accent); }
+.t-choice-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t-choice-main strong { font-size: 15px; font-weight: 700; }
+.t-choice-main .muted-text { font-size: 12.5px; }
+.t-choice-row.is-active .t-choice-main strong { color: var(--t-accent-ink); }
+.t-choice-radio {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--t-hairline);
+  background: var(--t-surface);
+}
+.t-choice-row.is-active .t-choice-radio {
+  border-color: var(--t-accent);
+  box-shadow: inset 0 0 0 4px var(--t-surface), inset 0 0 0 10px var(--t-accent);
+}

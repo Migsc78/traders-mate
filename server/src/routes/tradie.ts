@@ -14,6 +14,7 @@ import { sendMessage, toE164UK, twilioConfigured } from "../services/messaging/s
 import { storeAudio } from "../services/storage/store.js";
 import { createMagicLogin, createClientSession, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
 import {
+  createPriceBookItem,
   deactivatePriceBookItem,
   ensurePriceBook,
   listPriceBook,
@@ -1228,6 +1229,9 @@ const priceBookItemSchema = z.object({
   id: z.string().optional(),
   sku: z.string().nullable().optional(),
   label: z.string().min(1),
+  // Left optional on purpose — an app build that predates categories must not
+  // blank them by omission. See savePriceBookItems.
+  category: z.string().nullable().optional(),
   unit: z.enum(["EACH", "HOUR", "DAY", "JOB", "METRE"]),
   unitPricePence: z.number().int().min(0),
   vatRate: z.number().min(0).max(100).default(20),
@@ -1238,6 +1242,7 @@ const priceBookItemSchema = z.object({
 const importRowSchema = z.object({
   sku: z.string().nullable().optional(),
   label: z.string().min(1),
+  category: z.string().nullable().optional(),
   unit: z.string().optional(),
   unitPriceGbp: z.number().optional(),
   unitPricePence: z.number().int().min(0).optional(),
@@ -1259,6 +1264,16 @@ tradieRouter.put("/price-book", requireClient, idempotent(async (req, res, next)
   try {
     const body = z.object({ items: z.array(priceBookItemSchema) }).parse(req.body ?? {});
     res.json(await savePriceBookItems(clientId(req), body.items));
+  } catch (err) {
+    next(err);
+  }
+}));
+
+/** Single-rate create from the "New rate item" flow — see createPriceBookItem. */
+tradieRouter.post("/price-book/items", requireClient, idempotent(async (req, res, next) => {
+  try {
+    const body = priceBookItemSchema.parse(req.body ?? {});
+    res.status(201).json(await createPriceBookItem(clientId(req), body));
   } catch (err) {
     next(err);
   }

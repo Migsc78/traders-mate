@@ -7,6 +7,8 @@ export interface PriceBookRow {
   id?: string;
   sku: string | null;
   label: string;
+  /** Optional so an older payload can't be read as "clear the category". */
+  category?: string | null;
   unit: string;
   unitPricePence: number;
   vatRate: number;
@@ -17,6 +19,7 @@ export interface PriceBookRow {
 export interface PriceBookImportRow {
   sku?: string | null;
   label: string;
+  category?: string | null;
   unit?: string;
   unitPriceGbp?: number;
   vatRate?: number;
@@ -24,12 +27,22 @@ export interface PriceBookImportRow {
   active?: boolean;
 }
 
-export const TEMPLATE_HEADERS = ["sku", "label", "unit", "price_gbp", "vat_pct", "callout", "active"] as const;
+export const TEMPLATE_HEADERS = [
+  "sku",
+  "label",
+  "category",
+  "unit",
+  "price_gbp",
+  "vat_pct",
+  "callout",
+  "active",
+] as const;
 
 export const TEMPLATE_SAMPLE: PriceBookImportRow[] = [
   {
     sku: "CALL",
     label: "Call-out / first hour",
+    category: "CALLOUT",
     unit: "JOB",
     unitPriceGbp: 85,
     vatRate: 20,
@@ -39,6 +52,7 @@ export const TEMPLATE_SAMPLE: PriceBookImportRow[] = [
   {
     sku: "LAB_HR",
     label: "Labour (additional hour)",
+    category: "LABOUR",
     unit: "HOUR",
     unitPriceGbp: 55,
     vatRate: 20,
@@ -81,9 +95,12 @@ export function rowsFromSheet(data: ArrayBuffer | string): PriceBookImportRow[] 
       if (!label) return null;
       const priceRaw = Number(pick(row, "price_gbp", "price", "unit_price", "unit_price_gbp") ?? 0);
       const skuVal = pick(row, "sku", "code");
+      const catVal = pick(row, "category", "group", "section");
       return {
         sku: skuVal != null ? String(skuVal).trim() || null : null,
         label,
+        // Absent column stays absent — the server reads that as "leave it alone".
+        category: catVal != null ? String(catVal).trim() || null : undefined,
         unit: String(pick(row, "unit") ?? "JOB"),
         unitPriceGbp: Number.isFinite(priceRaw) ? priceRaw : 0,
         vatRate: Number(pick(row, "vat_pct", "vat", "vat_rate") ?? 20),
@@ -117,6 +134,7 @@ function toSheetRows(items: PriceBookRow[] | PriceBookImportRow[]) {
     return {
       sku: i.sku ?? "",
       label: i.label,
+      category: i.category ?? "",
       unit: i.unit || "JOB",
       price_gbp: priceGbp,
       vat_pct: i.vatRate ?? 20,
@@ -127,9 +145,23 @@ function toSheetRows(items: PriceBookRow[] | PriceBookImportRow[]) {
 }
 
 function downloadWorkbook(rows: Record<string, unknown>[], filename: string) {
-  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ sku: "", label: "", unit: "JOB", price_gbp: 0, vat_pct: 20, callout: "no", active: "yes" }], {
-    header: [...TEMPLATE_HEADERS],
-  });
+  const ws = XLSX.utils.json_to_sheet(
+    rows.length
+      ? rows
+      : [
+          {
+            sku: "",
+            label: "",
+            category: "SERVICE",
+            unit: "JOB",
+            price_gbp: 0,
+            vat_pct: 20,
+            callout: "no",
+            active: "yes",
+          },
+        ],
+    { header: [...TEMPLATE_HEADERS] }
+  );
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Price book");
   XLSX.writeFile(wb, filename);

@@ -414,6 +414,8 @@ model PriceBookItem {
   sku            String?
   label          String
   tradeTag       String?
+  /// SERVICE | MATERIAL | LABOUR | CALLOUT | OTHER — groups the price book.
+  category       String?
   unit           PriceUnit @default(JOB)
   unitPricePence Int
   vatRate        Float     @default(20)

@@ -774,6 +774,7 @@ export const tradieApi = {
   importPriceBook: (rows: {
     sku?: string | null;
     label: string;
+    category?: string | null;
     unit?: string;
     unitPriceGbp?: number;
     vatRate?: number;
@@ -938,6 +939,8 @@ export interface PriceBookItem {
   id: string;
   label: string;
   sku: string | null;
+  /** SERVICE | MATERIAL | LABOUR | CALLOUT | OTHER — see lib/rateCategories. */
+  category: string | null;
   unit: string;
   unitPricePence: number;
   vatRate: number;

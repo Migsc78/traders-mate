@@ -1,40 +1,45 @@
 import type { PriceUnit } from "@prisma/client";
 import { prisma } from "../../db.js";
 
+/** Groups the price book on the Rates screen. Free text so adding one later needs no migration. */
+export const PRICE_BOOK_CATEGORIES = ["SERVICE", "MATERIAL", "LABOUR", "CALLOUT", "OTHER"] as const;
+export type PriceBookCategory = (typeof PRICE_BOOK_CATEGORIES)[number];
+
 export interface SeedItem {
   sku: string;
   label: string;
   tradeTag: string;
+  category: PriceBookCategory;
   unit: PriceUnit;
   unitPricePence: number;
   isCallout?: boolean;
 }
 
 const PLUMBER: SeedItem[] = [
-  { sku: "CALL", label: "Call-out / first hour", tradeTag: "plumber", unit: "JOB", unitPricePence: 8500, isCallout: true },
-  { sku: "LAB_HR", label: "Labour (additional hour)", tradeTag: "plumber", unit: "HOUR", unitPricePence: 5500 },
-  { sku: "COMBI_SWAP", label: "Combi boiler swap (labour only)", tradeTag: "plumber", unit: "JOB", unitPricePence: 65000 },
-  { sku: "RAD_SWAP", label: "Radiator swap", tradeTag: "plumber", unit: "EACH", unitPricePence: 12000 },
-  { sku: "TAP_FIT", label: "Tap fit / replace", tradeTag: "plumber", unit: "EACH", unitPricePence: 7500 },
-  { sku: "TOILET", label: "Toilet replace", tradeTag: "plumber", unit: "JOB", unitPricePence: 18000 },
+  { sku: "CALL", label: "Call-out / first hour", tradeTag: "plumber", category: "CALLOUT", unit: "JOB", unitPricePence: 8500, isCallout: true },
+  { sku: "LAB_HR", label: "Labour (additional hour)", tradeTag: "plumber", category: "LABOUR", unit: "HOUR", unitPricePence: 5500 },
+  { sku: "COMBI_SWAP", label: "Combi boiler swap (labour only)", tradeTag: "plumber", category: "SERVICE", unit: "JOB", unitPricePence: 65000 },
+  { sku: "RAD_SWAP", label: "Radiator swap", tradeTag: "plumber", category: "SERVICE", unit: "EACH", unitPricePence: 12000 },
+  { sku: "TAP_FIT", label: "Tap fit / replace", tradeTag: "plumber", category: "SERVICE", unit: "EACH", unitPricePence: 7500 },
+  { sku: "TOILET", label: "Toilet replace", tradeTag: "plumber", category: "SERVICE", unit: "JOB", unitPricePence: 18000 },
 ];
 
 const ELECTRICIAN: SeedItem[] = [
-  { sku: "CALL", label: "Call-out / first hour", tradeTag: "electrician", unit: "JOB", unitPricePence: 9000, isCallout: true },
-  { sku: "LAB_HR", label: "Labour (additional hour)", tradeTag: "electrician", unit: "HOUR", unitPricePence: 6000 },
-  { sku: "CU_UPG", label: "Consumer unit upgrade (labour)", tradeTag: "electrician", unit: "JOB", unitPricePence: 45000 },
-  { sku: "SOCKET", label: "Additional socket", tradeTag: "electrician", unit: "EACH", unitPricePence: 8500 },
-  { sku: "EICR", label: "EICR (up to 10 circuits)", tradeTag: "electrician", unit: "JOB", unitPricePence: 18000 },
-  { sku: "LIGHT", label: "Light fitting install", tradeTag: "electrician", unit: "EACH", unitPricePence: 6500 },
+  { sku: "CALL", label: "Call-out / first hour", tradeTag: "electrician", category: "CALLOUT", unit: "JOB", unitPricePence: 9000, isCallout: true },
+  { sku: "LAB_HR", label: "Labour (additional hour)", tradeTag: "electrician", category: "LABOUR", unit: "HOUR", unitPricePence: 6000 },
+  { sku: "CU_UPG", label: "Consumer unit upgrade (labour)", tradeTag: "electrician", category: "SERVICE", unit: "JOB", unitPricePence: 45000 },
+  { sku: "SOCKET", label: "Additional socket", tradeTag: "electrician", category: "SERVICE", unit: "EACH", unitPricePence: 8500 },
+  { sku: "EICR", label: "EICR (up to 10 circuits)", tradeTag: "electrician", category: "SERVICE", unit: "JOB", unitPricePence: 18000 },
+  { sku: "LIGHT", label: "Light fitting install", tradeTag: "electrician", category: "SERVICE", unit: "EACH", unitPricePence: 6500 },
 ];
 
 const HEATING: SeedItem[] = [
-  { sku: "CALL", label: "Call-out / first hour", tradeTag: "heating", unit: "JOB", unitPricePence: 8500, isCallout: true },
-  { sku: "LAB_HR", label: "Labour (additional hour)", tradeTag: "heating", unit: "HOUR", unitPricePence: 5500 },
-  { sku: "SERVICE", label: "Boiler service", tradeTag: "heating", unit: "JOB", unitPricePence: 9500 },
-  { sku: "COMBI_SWAP", label: "Combi boiler swap (labour only)", tradeTag: "heating", unit: "JOB", unitPricePence: 65000 },
-  { sku: "TRV", label: "TRV fit", tradeTag: "heating", unit: "EACH", unitPricePence: 4500 },
-  { sku: "POWERFLUSH", label: "Powerflush", tradeTag: "heating", unit: "JOB", unitPricePence: 35000 },
+  { sku: "CALL", label: "Call-out / first hour", tradeTag: "heating", category: "CALLOUT", unit: "JOB", unitPricePence: 8500, isCallout: true },
+  { sku: "LAB_HR", label: "Labour (additional hour)", tradeTag: "heating", category: "LABOUR", unit: "HOUR", unitPricePence: 5500 },
+  { sku: "SERVICE", label: "Boiler service", tradeTag: "heating", category: "SERVICE", unit: "JOB", unitPricePence: 9500 },
+  { sku: "COMBI_SWAP", label: "Combi boiler swap (labour only)", tradeTag: "heating", category: "SERVICE", unit: "JOB", unitPricePence: 65000 },
+  { sku: "TRV", label: "TRV fit", tradeTag: "heating", category: "SERVICE", unit: "EACH", unitPricePence: 4500 },
+  { sku: "POWERFLUSH", label: "Powerflush", tradeTag: "heating", category: "SERVICE", unit: "JOB", unitPricePence: 35000 },
 ];
 
 export const TRADE_PRESETS = [
@@ -98,6 +103,7 @@ export async function ensurePriceBook(
       sku: i.sku,
       label: i.label,
       tradeTag: i.tradeTag,
+      category: i.category,
       unit: i.unit,
       unitPricePence: i.unitPricePence,
       isCallout: i.isCallout ?? false,
@@ -141,12 +147,20 @@ export function gbpToPence(gbp: number): number {
 export interface PriceBookUpsertRow {
   sku?: string | null;
   label: string;
+  category?: string | null;
   unit?: string;
   unitPriceGbp?: number;
   unitPricePence?: number;
   vatRate?: number;
   isCallout?: boolean;
   active?: boolean;
+}
+
+/** Anything unrecognised lands in Other rather than being dropped. */
+export function parsePriceBookCategory(raw: unknown): PriceBookCategory | null {
+  if (raw == null || raw === "") return null;
+  const c = String(raw).trim().toUpperCase() as PriceBookCategory;
+  return PRICE_BOOK_CATEGORIES.includes(c) ? c : "OTHER";
 }
 
 export interface UpsertPriceBookResult {
@@ -211,12 +225,16 @@ export async function upsertPriceBookRows(
     const skuRaw = row.sku != null ? String(row.sku).trim() : "";
     const sku = skuRaw || null;
     const skuKey = sku?.toUpperCase();
+    // A spreadsheet with no category column shouldn't blank the ones already set,
+    // so only touch the field when the sheet actually carried a value.
+    const category = parsePriceBookCategory(row.category);
+    const categoryPatch = category ? { category } : {};
 
     const match = skuKey ? bySku.get(skuKey) : undefined;
     if (match) {
       const updatedRow = await prisma.priceBookItem.update({
         where: { id: match.id },
-        data: { sku, label, unit, unitPricePence, vatRate, isCallout, active },
+        data: { sku, label, unit, unitPricePence, vatRate, isCallout, active, ...categoryPatch },
       });
       bySku.set(skuKey!, updatedRow);
       updated += 1;
@@ -231,6 +249,7 @@ export async function upsertPriceBookRows(
           vatRate,
           isCallout,
           active,
+          category: category ?? (isCallout ? "CALLOUT" : "OTHER"),
         },
       });
       if (skuKey) bySku.set(skuKey, createdRow);
@@ -241,21 +260,29 @@ export async function upsertPriceBookRows(
   return { created, updated, skipped, items: await listPriceBook(clientId) };
 }
 
-export async function savePriceBookItems(
-  clientId: string,
-  items: {
-    id?: string;
-    sku?: string | null;
-    label: string;
-    unit: PriceUnit;
-    unitPricePence: number;
-    vatRate: number;
-    isCallout?: boolean;
-    active?: boolean;
-  }[]
-) {
+export interface PriceBookItemInput {
+  id?: string;
+  sku?: string | null;
+  label: string;
+  category?: string | null;
+  unit: PriceUnit;
+  unitPricePence: number;
+  vatRate: number;
+  isCallout?: boolean;
+  active?: boolean;
+}
+
+export async function savePriceBookItems(clientId: string, items: PriceBookItemInput[]) {
   const saved = [];
   for (const item of items) {
+    /**
+     * Older app builds don't send category at all. Writing `null` for them would
+     * silently empty the tradie's categories every time they saved from a phone
+     * that hadn't updated yet, so an absent key leaves the column alone.
+     */
+    const categoryPatch =
+      item.category === undefined ? {} : { category: parsePriceBookCategory(item.category) };
+
     if (item.id) {
       const owned = await prisma.priceBookItem.findFirst({ where: { id: item.id, clientId } });
       if (!owned) continue;
@@ -270,6 +297,7 @@ export async function savePriceBookItems(
             vatRate: item.vatRate,
             isCallout: item.isCallout ?? false,
             active: item.active ?? true,
+            ...categoryPatch,
           },
         })
       );
@@ -285,12 +313,41 @@ export async function savePriceBookItems(
             vatRate: item.vatRate,
             isCallout: item.isCallout ?? false,
             active: item.active ?? true,
+            category: parsePriceBookCategory(item.category) ?? "OTHER",
           },
         })
       );
     }
   }
   return saved;
+}
+
+/**
+ * Create one rate from the "New rate item" flow.
+ *
+ * The phone mints the id so a rate added with no signal exists immediately and
+ * keeps the same identity when the queued write lands. Upserting on that id means
+ * a retry that got through the first time updates rather than creating a twin.
+ */
+export async function createPriceBookItem(clientId: string, item: PriceBookItemInput) {
+  await ensurePriceBook(clientId);
+  const data = {
+    sku: item.sku?.trim() || null,
+    label: item.label.trim(),
+    unit: item.unit,
+    unitPricePence: Math.max(0, Math.round(item.unitPricePence)),
+    vatRate: item.vatRate,
+    isCallout: item.isCallout ?? false,
+    active: item.active ?? true,
+    category: parsePriceBookCategory(item.category) ?? "OTHER",
+  };
+
+  if (item.id) {
+    const owned = await prisma.priceBookItem.findFirst({ where: { id: item.id, clientId } });
+    if (owned) return prisma.priceBookItem.update({ where: { id: owned.id }, data });
+    return prisma.priceBookItem.create({ data: { id: item.id, clientId, ...data } });
+  }
+  return prisma.priceBookItem.create({ data: { clientId, ...data } });
 }
 
 /** Include shape for quote lines so the UI can show price-book provenance. */

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 import { MoneyInput, NumberInput } from "./NumericInput";
 import {
   downloadPriceBookTemplate,
@@ -34,19 +33,23 @@ function blankRow(): PriceBookRow {
   };
 }
 
+/**
+ * Bulk price-book grid for the admin CRM.
+ *
+ * The tradie app has its own Rates screen (pages/tradie/rate/RatesBook) built for
+ * a phone — categories, search, one row open at a time. This stays a wide grid
+ * because that's the right shape for support staff fixing a book on a desktop.
+ */
 export default function PriceBookEditor({
   queryKey,
   api,
   title = "Price book",
   compact = false,
-  templatesHref,
 }: {
   queryKey: unknown[];
   api: PriceBookApi;
   title?: string;
   compact?: boolean;
-  /** Set by the tradie app only — the admin CRM has no quote templates. */
-  templatesHref?: string;
 }) {
   const qc = useQueryClient();
   const offline = useOffline();
@@ -144,11 +147,6 @@ export default function PriceBookEditor({
           </p>
         </div>
         <div className="tradie-actions">
-          {templatesHref && (
-            <Link className="primary" to={templatesHref}>
-              + Template
-            </Link>
-          )}
           <button type="button" onClick={() => exportPriceBook(rows)} disabled={!rows.length}>
             Export
           </button>
@@ -167,8 +165,7 @@ export default function PriceBookEditor({
             onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
           />
         </div>
-        {/* Kept, but demoted: "+ Template" now owns that word on this screen, and
-            without a blank sheet there's no way to know what Import Excel expects. */}
+        {/* Without a blank sheet there's no way to know what Import Excel expects. */}
         <p className="t-blank-sheet">
           <button type="button" className="linkish" onClick={() => downloadPriceBookTemplate()}>
             Download blank sheet

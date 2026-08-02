@@ -78,6 +78,23 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       subtitle: fromInbox ? "Call back, quote, or make a job" : "Quote & message customer",
     };
   }
+  // Adding a rate, reached from the + on Rates.
+  if (pathname === "/t/rates/new") {
+    return {
+      backTo: "/t/price-book",
+      backLabel: "Rates",
+      title: "New rate item",
+      subtitle: "Keep it fast and simple",
+    };
+  }
+  if (pathname === "/t/rates/new/category") {
+    return {
+      backTo: "/t/rates/new",
+      backLabel: "New rate",
+      title: "Choose category",
+      subtitle: "Where it sits in your price book",
+    };
+  }
   // Template authoring, reached from Rates.
   if (pathname.startsWith("/t/rates/templates")) {
     const id = pathname.match(/^\/t\/rates\/templates\/([^/]+)/)?.[1];

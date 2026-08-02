@@ -339,6 +339,7 @@ const priceBookItemSchema = z.object({
   id: z.string().optional(),
   sku: z.string().nullable().optional(),
   label: z.string().min(1),
+  category: z.string().nullable().optional(),
   unit: z.enum(["EACH", "HOUR", "DAY", "JOB", "METRE"]),
   unitPricePence: z.number().int().min(0),
   vatRate: z.number().min(0).max(100).default(20),
@@ -349,6 +350,7 @@ const priceBookItemSchema = z.object({
 const importRowSchema = z.object({
   sku: z.string().nullable().optional(),
   label: z.string().min(1),
+  category: z.string().nullable().optional(),
   unit: z.string().optional(),
   unitPriceGbp: z.number().optional(),
   unitPricePence: z.number().int().min(0).optional(),
