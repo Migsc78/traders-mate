@@ -24,7 +24,7 @@ import {
 } from "../services/quotes/priceBook.js";
 import { buildDraftQuoteFromTranscript, recomputeQuoteTotals } from "../services/quotes/draft.js";
 import { scheduleQuoteFollowUps, cancelQuoteFollowUps } from "../services/quotes/followups.js";
-import { formatGbp } from "../services/quotes/money.js";
+import { formatGbp, totalsFromLines } from "../services/quotes/money.js";
 import { transcribeWithWhisper } from "../services/quotes/whisper.js";
 import { claudeConfigured, openaiConfigured } from "../settings.js";
 import { logMessage } from "../services/messaging/log.js";
@@ -1905,7 +1905,19 @@ async function createDraftQuote(
 ) {
   const asUnit = (u: string): PriceUnit =>
     (["EACH", "HOUR", "DAY", "JOB", "METRE"] as const).includes(u as PriceUnit) ? (u as PriceUnit) : "JOB";
-  const quote = await prisma.quote.create({
+  const lineRows = lines.map((l, i) => ({
+    label: l.label,
+    qty: l.qty,
+    unit: asUnit(l.unit),
+    unitPricePence: l.unitPricePence,
+    vatRate: l.vatRate,
+    priceBookItemId: l.priceBookItemId ?? null,
+    source: "BOOK" as const,
+    sort: i,
+  }));
+  // Totals on create — avoids a follow-up recompute + re-fetch round trip.
+  const totals = totalsFromLines(lineRows, true);
+  return prisma.quote.create({
     data: {
       // The phone picks the id when offline so it can navigate straight to the draft.
       ...(id ? { id } : {}),
@@ -1913,23 +1925,10 @@ async function createDraftQuote(
       status: "DRAFT",
       reference: newQuoteReference(),
       publicToken: randomBytes(18).toString("base64url"),
-      lines: {
-        create: lines.map((l, i) => ({
-          label: l.label,
-          qty: l.qty,
-          unit: asUnit(l.unit),
-          unitPricePence: l.unitPricePence,
-          vatRate: l.vatRate,
-          priceBookItemId: l.priceBookItemId ?? null,
-          source: "BOOK",
-          sort: i,
-        })),
-      },
+      vatInclusive: true,
+      ...totals,
+      lines: { create: lineRows },
     },
-  });
-  await recomputeQuoteTotals(quote.id);
-  return prisma.quote.findUnique({
-    where: { id: quote.id },
     include: { lines: quoteLineInclude, enquiry: true },
   });
 }
@@ -2157,10 +2156,26 @@ tradieRouter.patch("/quotes/:id/customer", requireClient, requireActiveAccount, 
         throw new ApiError(400, "customer_required", "Pick a customer or enter a name and number");
       }
       const phone = toE164UK(body.phone) || body.phone.trim();
-      const existing = await prisma.enquiry.findFirst({
-        where: { clientId: clientId(req), phone },
-        orderBy: { createdAt: "desc" },
-      });
+      const phoneKey = customerPhoneKey(phone);
+      // Match 07… and +44… as the same customer — exact string match was creating
+      // duplicate jobs whenever the picker and the stored enquiry disagreed on format.
+      const variants = new Set<string>([phone, body.phone.trim()]);
+      if (phone.startsWith("+44") && phone.length > 3) variants.add(`0${phone.slice(3)}`);
+      if (phone.startsWith("0") && phone.length > 1) variants.add(`+44${phone.slice(1)}`);
+      const existing =
+        (await prisma.enquiry.findFirst({
+          where: { clientId: clientId(req), phone: { in: [...variants] } },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        })) ||
+        (
+          await prisma.enquiry.findMany({
+            where: { clientId: clientId(req) },
+            orderBy: { createdAt: "desc" },
+            take: 100,
+            select: { id: true, phone: true },
+          })
+        ).find((e) => customerPhoneKey(e.phone) === phoneKey);
       if (existing) {
         enquiryId = existing.id;
       } else {
@@ -2172,7 +2187,7 @@ tradieRouter.patch("/quotes/:id/customer", requireClient, requireActiveAccount, 
             email: body.email ?? null,
             postcode: body.postcode ?? null,
             message: "Quote raised on site",
-            source: "MANUAL",
+            source: "manual",
             pipeline: "JOB",
           },
         });

@@ -60,12 +60,20 @@ export async function startQuote(
     ...(rows || []),
   ]);
 
-  await sendOrQueue<QuoteDto>({
+  // Don't wait on the network — the edit screen renders from the optimistic
+  // cache above. sendOrQueue still runs (or parks in the outbox) so later line /
+  // terms / customer writes address the same id when the create lands.
+  void sendOrQueue<QuoteDto>({
     label: opts.label,
     path: "/quotes",
     method: "POST",
     body: { id, templateId: opts.templateId, lines: opts.lines },
     invalidates: ["tradie-quote", "tradie-quotes"],
+  }).then((result) => {
+    if (!result.queued) {
+      qc.setQueryData(["tradie-quote", id], result.result);
+      void qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
+    }
   });
 
   return id;

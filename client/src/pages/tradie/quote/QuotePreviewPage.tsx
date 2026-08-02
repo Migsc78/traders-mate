@@ -52,9 +52,10 @@ export default function QuotePreviewPage() {
       qc.setQueryData<QuoteDto>(["tradie-quote", quoteId], (q) =>
         q ? { ...q, enquiry: { id: "", name: body.name || "", phone: body.phone || "", email: null } } : q
       );
+      // Close the sheet immediately — attach finishes in the background.
+      setPicking(false);
     },
     onSuccess: () => {
-      setPicking(false);
       void qc.invalidateQueries({ queryKey: ["tradie-quote", quoteId] });
     },
   });

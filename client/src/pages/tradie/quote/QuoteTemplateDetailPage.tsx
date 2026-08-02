@@ -130,10 +130,16 @@ export default function QuoteTemplateDetailPage() {
 
       <QueryError error={use.error} />
 
+      {t.included.length === 0 && (
+        <p className="muted-text" style={{ marginBottom: 8 }}>
+          Add included items before using this template in a quote.
+        </p>
+      )}
+
       <button
         type="button"
         className="primary t-btn--block"
-        disabled={use.isPending}
+        disabled={use.isPending || t.included.length === 0}
         onClick={() => use.mutate()}
       >
         {use.isPending ? "Building quote…" : "Use this template"}

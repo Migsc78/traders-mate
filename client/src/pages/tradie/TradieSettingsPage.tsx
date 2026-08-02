@@ -701,16 +701,17 @@ export default function TradieSettingsPage() {
         </button>
         <QueryError error={save.error} />
         {save.isSuccess && <p className="muted-text" style={{ textAlign: "center" }}>Saved.</p>}
-        <button
-          className="linkish"
-          onClick={() => {
-            setTradieSession(null);
-            window.location.href = "/t/auth";
-          }}
-        >
-          Sign out
-        </button>
       </div>
+      <button
+        className="linkish"
+        style={{ display: "block", margin: "12px auto 0", textAlign: "center" }}
+        onClick={() => {
+          setTradieSession(null);
+          window.location.href = "/t/auth";
+        }}
+      >
+        Sign out
+      </button>
     </div>
   );
 }

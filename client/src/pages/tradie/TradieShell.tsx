@@ -118,8 +118,8 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       return {
         backTo: `/t/rates/templates/${id}/edit`,
         backLabel: "Template",
-        title: "Add items from price book",
-        subtitle: "Search and select rates",
+        title: "Add items",
+        subtitle: "Search and select from your price book",
       };
     }
     if (pathname.endsWith("/saved")) {
