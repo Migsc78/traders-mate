@@ -1372,7 +1372,7 @@ tradieRouter.get("/quotes/:id", requireClient, async (req, res, next) => {
       include: { lines: quoteLineInclude, enquiry: true },
     });
     if (!quote) throw new ApiError(404, "not_found", "Quote not found");
-    res.json(quote);
+    res.json({ ...quote, publicUrl: `${appPublicUrl()}/q/${quote.publicToken}` });
   } catch (err) {
     next(err);
   }

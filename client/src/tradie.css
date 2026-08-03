@@ -2291,10 +2291,13 @@ html.native-app .tradie-bottom-nav {
   font-size: 14px;
 }
 .t-preview-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
+.tradie-shell button.t-preview-action,
 .tradie-shell a.t-preview-action,
 .tradie-shell .t-preview-action {
   display: inline-flex;
@@ -2302,7 +2305,7 @@ html.native-app .tradie-bottom-nav {
   justify-content: center;
   gap: 6px;
   min-height: 44px;
-  padding: 10px 12px;
+  padding: 10px 16px;
   border-radius: 999px;
   border: 1.5px solid var(--t-hairline);
   background: var(--t-surface);
@@ -2312,15 +2315,11 @@ html.native-app .tradie-bottom-nav {
   text-decoration: none;
   box-sizing: border-box;
 }
-.tradie-shell a.t-preview-action--accept,
-.tradie-shell .t-preview-action--accept {
-  border-color: #bbf7d0;
-  background: #ecfdf5;
-  color: #15803d;
-}
-.tradie-shell .t-preview-action.is-disabled {
+.tradie-shell button.t-preview-action:disabled {
   opacity: 0.45;
-  pointer-events: none;
+}
+.t-preview-actions .t-pill {
+  flex: none;
 }
 .t-quote-preview > .t-section-label { margin-top: 18px; }
 .t-send-list {

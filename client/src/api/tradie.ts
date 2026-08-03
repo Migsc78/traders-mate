@@ -876,6 +876,7 @@ export interface QuoteDto {
   customerNote: string | null;
   assumptions: string | null;
   publicToken: string;
+  publicUrl?: string;
   reference: string | null;
   depositPercent: number;
   depositPence: number;

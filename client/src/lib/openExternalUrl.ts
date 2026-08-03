@@ -29,6 +29,10 @@ export async function openExternalUrl(url: string): Promise<void> {
 
 function absolutize(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
-  if (url.startsWith("/")) return `${window.location.origin}${url}`;
+  if (url.startsWith("/")) {
+    const apiBase = String(import.meta.env.VITE_API_BASE || "").replace(/\/$/, "");
+    if (apiBase) return `${apiBase}${url}`;
+    return `${window.location.origin}${url}`;
+  }
   return url;
 }

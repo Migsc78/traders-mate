@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatGbp, sendOrQueue, tradieApi, type QuoteDto } from "../../../api/tradie";
-import { NeedsSignal, QueryError } from "../ui";
+import { apiUrl } from "../../../api/base";
+import { openExternalUrl } from "../../../lib/openExternalUrl";
+import { NeedsSignal, QueryError, StatusPill } from "../ui";
 import { useOffline } from "../../../lib/connectivity";
 
 type Channel = "SMS" | "WHATSAPP" | "EMAIL";
@@ -98,7 +100,9 @@ export default function QuotePreviewPage() {
 
   const q = quote.data;
   const customer = q.enquiry;
-  const publicHref = q.publicToken ? `/q/${q.publicToken}` : null;
+  // Open against the API host the app talks to — relative `/q/…` breaks in Capacitor,
+  // and APP_PUBLIC_URL may point at a different front door than this environment's data.
+  const viewUrl = q.publicToken ? apiUrl(`/q/${q.publicToken}`) : null;
 
   const channelRows: {
     id: Channel;
@@ -140,28 +144,19 @@ export default function QuotePreviewPage() {
         <p className="t-preview-valid muted-text">Valid for {q.validDays} days</p>
 
         <div className="t-preview-actions">
-          {publicHref ? (
-            <a className="t-preview-action" href={publicHref} target="_blank" rel="noreferrer">
-              <IconDoc />
-              View quote
-            </a>
-          ) : (
-            <Link className="t-preview-action" to={`/t/quotes/${quoteId}/edit`}>
-              <IconDoc />
-              View quote
-            </Link>
-          )}
-          {publicHref ? (
-            <a className="t-preview-action t-preview-action--accept" href={publicHref} target="_blank" rel="noreferrer">
-              <IconAccept />
-              Accept online
-            </a>
-          ) : (
-            <span className="t-preview-action t-preview-action--accept is-disabled">
-              <IconAccept />
-              Accept online
-            </span>
-          )}
+          <button
+            type="button"
+            className="t-preview-action"
+            disabled={!viewUrl}
+            onClick={() => {
+              if (!viewUrl) return;
+              void openExternalUrl(viewUrl).catch(() => undefined);
+            }}
+          >
+            <IconDoc />
+            View quote
+          </button>
+          <StatusPill status={q.status || "DRAFT"} />
         </div>
       </div>
 
@@ -301,21 +296,6 @@ function IconDoc() {
       />
       <path d="M9.5 1.6V5H13" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
       <path d="M5.5 8h5M5.5 10.5h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconAccept() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="m5.2 8.1 2 2 3.6-3.8"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }
