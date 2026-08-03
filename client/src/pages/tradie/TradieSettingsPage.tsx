@@ -34,11 +34,14 @@ export default function TradieSettingsPage() {
   const [missedCallMode, setMissedCallMode] = useState<"SMS_QUALIFY" | "VOICEMAIL">("SMS_QUALIFY");
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [defaultDepositPercent, setDefaultDepositPercent] = useState(0);
+  const [defaultTermsNote, setDefaultTermsNote] = useState("");
+  const [logoMsg, setLogoMsg] = useState("");
 
   const [twilioMsg, setTwilioMsg] = useState("");
   const [greetingMsg, setGreetingMsg] = useState("");
   const [recording, setRecording] = useState(false);
   const [connectMsg, setConnectMsg] = useState("");
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!me.data) return;
@@ -58,6 +61,7 @@ export default function TradieSettingsPage() {
     setMissedCallMode(me.data.missedCallMode || "SMS_QUALIFY");
     setGoogleReviewUrl(me.data.googleReviewUrl || "");
     setDefaultDepositPercent(me.data.defaultDepositPercent || 0);
+    setDefaultTermsNote(me.data.defaultTermsNote || "");
   }, [me.data]);
 
   useEffect(() => {
@@ -96,6 +100,7 @@ export default function TradieSettingsPage() {
         missedCallMode: modeOverride ?? missedCallMode,
         googleReviewUrl: googleReviewUrl || null,
         defaultDepositPercent,
+        defaultTermsNote: defaultTermsNote.trim() || null,
       }),
     onSuccess: (r: {
       ok: boolean;
@@ -162,6 +167,32 @@ export default function TradieSettingsPage() {
       qc.invalidateQueries({ queryKey: ["tradie-me"] });
     },
     onError: (e: Error) => setGreetingMsg(e.message),
+  });
+
+  const uploadLogo = useMutation({
+    mutationFn: async (file: File) => {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Could not read image"));
+        reader.readAsDataURL(file);
+      });
+      return tradieApi.uploadLogo(file.type || "image/png", dataUrl, file.name);
+    },
+    onSuccess: () => {
+      setLogoMsg("Logo saved — it will show on quotes and invoices.");
+      void qc.invalidateQueries({ queryKey: ["tradie-me"] });
+    },
+    onError: (e: Error) => setLogoMsg(e.message),
+  });
+
+  const deleteLogo = useMutation({
+    mutationFn: () => tradieApi.deleteLogo(),
+    onSuccess: () => {
+      setLogoMsg("Logo removed.");
+      void qc.invalidateQueries({ queryKey: ["tradie-me"] });
+    },
+    onError: (e: Error) => setLogoMsg(e.message),
   });
 
   const startGreetingRec = async () => {
@@ -408,7 +439,56 @@ export default function TradieSettingsPage() {
       </div>
 
       <div className="t-settings-group">
-        <p className="t-section-label">Bank details — shown on invoices</p>
+        <p className="t-section-label">Business logo</p>
+        <div className="t-card">
+          <div className="t-logo-settings">
+            {me.data?.logoUrl ? (
+              <img className="t-logo-preview" src={me.data.logoUrl} alt="Business logo" />
+            ) : (
+              <div className="t-logo-preview t-logo-preview--empty">No logo yet</div>
+            )}
+            <div className="t-logo-actions">
+              <input
+                ref={logoFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) uploadLogo.mutate(file);
+                }}
+              />
+              <button
+                type="button"
+                className="t-btn"
+                disabled={uploadLogo.isPending}
+                onClick={() => logoFileRef.current?.click()}
+              >
+                {uploadLogo.isPending ? "Uploading…" : me.data?.logoUrl ? "Replace logo" : "Upload logo"}
+              </button>
+              {me.data?.logoUrl && (
+                <button
+                  type="button"
+                  className="t-btn"
+                  disabled={deleteLogo.isPending}
+                  onClick={() => deleteLogo.mutate()}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="muted-text" style={{ marginTop: 10 }}>
+            Shown on customer quotes and invoices. Square PNG or JPEG works best.
+          </p>
+          {logoMsg && <p className="muted-text">{logoMsg}</p>}
+          <QueryError error={uploadLogo.error || deleteLogo.error} />
+        </div>
+      </div>
+
+      <div className="t-settings-group">
+        <p className="t-section-label">Bank details — shown on quotes &amp; invoices</p>
         <div className="t-card">
           <div className="form">
             <label>
@@ -468,6 +548,18 @@ export default function TradieSettingsPage() {
               <span className="muted-text" style={{ fontWeight: 400 }}>
                 0 = off. Whole number 1–100. Requires Pay Now (Stripe Connect) so customers can pay the
                 deposit on accept.
+              </span>
+            </label>
+            <label>
+              Default quote terms
+              <textarea
+                rows={3}
+                value={defaultTermsNote}
+                onChange={(e) => setDefaultTermsNote(e.target.value)}
+                placeholder="Payment on completion unless otherwise agreed."
+              />
+              <span className="muted-text" style={{ fontWeight: 400 }}>
+                Prefills on Deposit &amp; terms when you write a quote. You can still edit per quote.
               </span>
             </label>
           </div>

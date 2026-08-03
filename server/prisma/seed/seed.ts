@@ -5,6 +5,9 @@
  *   npm run db:seed --prefix server
  */
 import { createHash } from "node:crypto";
+import { copyFile, mkdir } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   PrismaClient,
   WebsiteClass,
@@ -33,6 +36,17 @@ import { wipeSeedData } from "./wipe.js";
 loadEnv();
 
 const prisma = new PrismaClient();
+const __seedDir = path.dirname(fileURLToPath(import.meta.url));
+
+async function seedDemoPlumbingLogo(clientId: string): Promise<string> {
+  const src = path.join(__seedDir, "assets", "demo-plumbing-logo.png");
+  const uploadsDir = path.resolve(__seedDir, "../../uploads");
+  await mkdir(uploadsDir, { recursive: true });
+  const filename = "seed-demo-plumbing-logo.png";
+  await copyFile(src, path.join(uploadsDir, filename));
+  const base = (process.env.PUBLIC_BASE_URL || "http://localhost:4000").replace(/\/$/, "");
+  return `${base}/uploads/${filename}`;
+}
 
 function hashToken(raw: string): string {
   const secret = process.env.MAGIC_LINK_SECRET || "dev-magic-link-secret-change-me";
@@ -348,9 +362,9 @@ async function main() {
       {
         clientId: demo.id,
         kind: "LOGO" satisfies ClientAssetKind,
-        url: "https://placehold.co/200x80/png?text=SEED+Logo",
-        filename: "seed-logo.png",
-        caption: "Seed logo",
+        url: await seedDemoPlumbingLogo(demo.id),
+        filename: "seed-demo-plumbing-logo.png",
+        caption: "Demo Plumbing logo",
         sort: 0,
       },
       {

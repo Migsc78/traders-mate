@@ -37,6 +37,7 @@ import RateCategoryPage from "./pages/tradie/rate/RateCategoryPage";
 import TemplateLibraryPage from "./pages/tradie/template/TemplateLibraryPage";
 import TemplateDetailsPage from "./pages/tradie/template/TemplateDetailsPage";
 import TemplateAddItemsPage from "./pages/tradie/template/TemplateAddItemsPage";
+import QuoteAddItemsPage from "./pages/tradie/quote/QuoteAddItemsPage";
 import TemplateEditPage from "./pages/tradie/template/TemplateEditPage";
 import TemplateSavedPage from "./pages/tradie/template/TemplateSavedPage";
 import TradieInvoicesPage from "./pages/tradie/TradieInvoicesPage";
@@ -118,6 +119,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="quotes/new/notes" element={<QuoteNotesPage />} />
             <Route path="quotes/new/voice" element={<QuoteVoicePage />} />
             <Route path="quotes/:quoteId/edit" element={<QuoteEditPage />} />
+            <Route path="quotes/:quoteId/items" element={<QuoteAddItemsPage />} />
             <Route path="quotes/:quoteId/terms" element={<QuoteTermsPage />} />
             <Route path="quotes/:quoteId/preview" element={<QuotePreviewPage />} />
             <Route path="invoices" element={<TradieInvoicesPage />} />

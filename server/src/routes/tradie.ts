@@ -11,7 +11,7 @@ import { idempotent } from "../middleware/idempotency.js";
 import { ensureQuoteTemplates } from "../services/quotes/templates.js";
 import { sendEmail } from "../services/email/send.js";
 import { sendMessage, toE164UK, twilioConfigured } from "../services/messaging/sender.js";
-import { storeAudio } from "../services/storage/store.js";
+import { storeAudio, storeImage } from "../services/storage/store.js";
 import { createMagicLogin, createClientSession, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
 import {
   createPriceBookItem,
@@ -223,6 +223,14 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       bankAccountNumber: client.bankAccountNumber,
       googleReviewUrl: client.googleReviewUrl,
       defaultDepositPercent: client.defaultDepositPercent,
+      defaultTermsNote: client.defaultTermsNote,
+      logoUrl: (
+        await prisma.clientAsset.findFirst({
+          where: { clientId: client.id, kind: "LOGO" },
+          orderBy: { createdAt: "desc" },
+          select: { url: true },
+        })
+      )?.url ?? null,
       stripeConnectOnboarded: client.stripeConnectOnboarded,
       stripeConnectAccountId: client.stripeConnectAccountId
         ? `${client.stripeConnectAccountId.slice(0, 8)}…`
@@ -262,6 +270,7 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         missedCallMode: z.enum(["SMS_QUALIFY", "VOICEMAIL"]).optional(),
         googleReviewUrl: z.string().url().max(500).nullable().optional().or(z.literal("")),
         defaultDepositPercent: z.number().int().min(0).max(100).optional(),
+        defaultTermsNote: z.string().max(2000).nullable().optional(),
       })
       .parse(req.body ?? {});
 
@@ -305,6 +314,9 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
           : {}),
         ...(body.defaultDepositPercent !== undefined
           ? { defaultDepositPercent: body.defaultDepositPercent }
+          : {}),
+        ...(body.defaultTermsNote !== undefined
+          ? { defaultTermsNote: body.defaultTermsNote?.trim() || null }
           : {}),
       },
     });
@@ -447,6 +459,58 @@ tradieRouter.delete("/me/greeting", requireClient, async (req, res, next) => {
   }
 });
 
+/** Upload / replace business logo — used on public quotes, invoices and PDFs. */
+tradieRouter.post("/me/logo", requireClient, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        contentType: z.string().min(3).max(40),
+        dataBase64: z.string().min(10),
+        filename: z.string().max(120).optional(),
+      })
+      .parse(req.body ?? {});
+
+    const b64 = body.dataBase64.includes(",")
+      ? body.dataBase64.slice(body.dataBase64.indexOf(",") + 1)
+      : body.dataBase64;
+    const buf = Buffer.from(b64, "base64");
+    const stored = await storeImage(body.contentType, buf);
+    const cid = clientId(req);
+
+    await prisma.clientAsset.updateMany({
+      where: { clientId: cid, kind: "LOGO" },
+      data: { kind: "SHOWCASE" },
+    });
+
+    const asset = await prisma.clientAsset.create({
+      data: {
+        clientId: cid,
+        kind: "LOGO",
+        url: stored.url,
+        filename: body.filename || "logo",
+        caption: "Business logo",
+        sort: 0,
+      },
+    });
+
+    res.json({ ok: true, logoUrl: asset.url });
+  } catch (err) {
+    next(err);
+  }
+});
+
+tradieRouter.delete("/me/logo", requireClient, async (req, res, next) => {
+  try {
+    await prisma.clientAsset.updateMany({
+      where: { clientId: clientId(req), kind: "LOGO" },
+      data: { kind: "SHOWCASE" },
+    });
+    res.json({ ok: true, logoUrl: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 tradieRouter.post("/billing/checkout", requireClient, async (req, res, next) => {
   try {
     const client = await prisma.client.findUnique({ where: { id: clientId(req) } });
@@ -556,6 +620,8 @@ tradieRouter.get("/onboarding", requireClient, async (req, res, next) => {
         client.bankAccountName &&
         client.bankAccountNumber
       ),
+      defaultDepositPercent: client.defaultDepositPercent,
+      defaultTermsNote: client.defaultTermsNote,
     });
   } catch (err) {
     next(err);
@@ -1375,6 +1441,7 @@ tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, as
         // so the existing job-page flow behaves exactly as before.
         channels: z.array(z.enum(["SMS", "WHATSAPP", "EMAIL"])).min(1).optional(),
         email: z.string().email().max(160).optional(),
+        message: z.string().max(1000).optional(),
       })
       .parse(req.body ?? {});
     const quote = await prisma.quote.findFirst({
@@ -1425,7 +1492,12 @@ tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, as
     const publicUrl = `${appPublicUrl()}/q/${quote.publicToken}`;
     const depositNote =
       depositPence > 0 ? ` Deposit ${formatGbp(depositPence)} (${depositPercent}%) due on accept.` : "";
-    const smsBody = `Hi ${quote.enquiry.name}, your quote from ${quote.client.businessName} is ready: ${formatGbp(quote.totalPence)}.${depositNote} View & accept: ${publicUrl}`;
+    const custom = body.message?.trim();
+    const smsBody = custom
+      ? custom.includes(publicUrl)
+        ? custom
+        : `${custom} ${publicUrl}`
+      : `Hi ${quote.enquiry.name}, your quote from ${quote.client.businessName} is ready: ${formatGbp(quote.totalPence)}.${depositNote} View & accept: ${publicUrl}`;
 
     const channels = body.channels ?? ["SMS"];
     const wantsText = channels.includes("SMS");

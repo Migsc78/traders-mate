@@ -237,6 +237,8 @@ model Client {
   googleReviewUrl  String?
   /// Default deposit % on quotes (0 = off)
   defaultDepositPercent Int @default(0)
+  /// Default terms text prefilled on Deposit & terms (quotes)
+  defaultTermsNote String?
   allowedOrigins   String[]     @default([]) // domains permitted to POST via the widget
   tradieNotifyTpl  String? // custom message the tradie receives
   customerAckTpl   String? // custom auto-reply the customer sees

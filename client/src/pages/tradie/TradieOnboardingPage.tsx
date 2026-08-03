@@ -88,6 +88,8 @@ export default function TradieOnboardingPage() {
   const [bankMsg, setBankMsg] = useState("");
   const [bankSaved, setBankSaved] = useState(false);
   const [connectMsg, setConnectMsg] = useState("");
+  const [defaultDepositPercent, setDefaultDepositPercent] = useState(0);
+  const [defaultTermsNote, setDefaultTermsNote] = useState("");
 
   useEffect(() => {
     if (!onboarding.data) return;
@@ -99,6 +101,8 @@ export default function TradieOnboardingPage() {
     setTradePreset(onboarding.data.tradePreset || "plumber");
     setRatesReady(!!onboarding.data.hasRates);
     setBankSaved(!!onboarding.data.hasBankDetails);
+    setDefaultDepositPercent(onboarding.data.defaultDepositPercent || 0);
+    setDefaultTermsNote(onboarding.data.defaultTermsNote || "");
     if (onboarding.data.step !== 4) {
       setAlertMsg("");
       setAlertSent(false);
@@ -276,10 +280,15 @@ export default function TradieOnboardingPage() {
       if (opts?.saveBank !== false && looksComplete && !bankSaved) {
         await tradieApi.onboardingBank({ bankName, bankSortCode, bankAccountName, bankAccountNumber });
       }
+      await tradieApi.updateMe({
+        defaultDepositPercent,
+        defaultTermsNote: defaultTermsNote.trim() || null,
+      });
       return tradieApi.onboardingComplete();
     },
     onSuccess: async () => {
       await refresh();
+      await qc.invalidateQueries({ queryKey: ["tradie-me"] });
       navigate("/t/diary", { replace: true });
     },
     onError: (e: Error) => setBankMsg(e.message),
@@ -747,6 +756,43 @@ export default function TradieOnboardingPage() {
                   ? "Pay Now enabled"
                   : "Enable Pay Now with Stripe"}
             </button>
+
+            <h3 className="t-onboard-subhead">Quote defaults</h3>
+            <p className="muted-text" style={{ marginTop: 0 }}>
+              Prefills Deposit &amp; terms when you write a quote. Optional — you can set these later in
+              Settings.
+            </p>
+            <div className="form">
+              <label>
+                Default deposit (%)
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="off"
+                  value={defaultDepositPercent === 0 ? "" : String(defaultDepositPercent)}
+                  placeholder="0"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    if (raw === "") {
+                      setDefaultDepositPercent(0);
+                      return;
+                    }
+                    const n = Math.min(100, Math.max(0, parseInt(raw, 10)));
+                    setDefaultDepositPercent(Number.isFinite(n) ? n : 0);
+                  }}
+                />
+              </label>
+              <label>
+                Default terms &amp; notes
+                <textarea
+                  rows={3}
+                  value={defaultTermsNote}
+                  onChange={(e) => setDefaultTermsNote(e.target.value)}
+                  placeholder="Payment on completion unless otherwise agreed."
+                />
+              </label>
+            </div>
 
             <button
               className="primary t-btn--block"

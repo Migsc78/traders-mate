@@ -192,6 +192,8 @@ export interface TradieMe {
   bankAccountNumber: string | null;
   googleReviewUrl: string | null;
   defaultDepositPercent: number;
+  defaultTermsNote: string | null;
+  logoUrl: string | null;
   stripeConnectOnboarded: boolean;
   stripeConnectAccountId: string | null;
   divertCodes: { noAnswer: string; busy: string; unreachable: string } | null;
@@ -307,6 +309,14 @@ export const tradieApi = {
   deleteGreeting: () =>
     tRequest<{ ok: boolean; greetingAudioUrl: null }>("/me/greeting", { method: "DELETE" }),
 
+  uploadLogo: (contentType: string, dataBase64: string, filename?: string) =>
+    tRequest<{ ok: boolean; logoUrl: string }>("/me/logo", {
+      method: "POST",
+      body: JSON.stringify({ contentType, dataBase64, filename }),
+    }),
+
+  deleteLogo: () => tRequest<{ ok: boolean; logoUrl: null }>("/me/logo", { method: "DELETE" }),
+
   billingCheckout: () => tRequest<{ url: string; stub: boolean }>("/billing/checkout", { method: "POST", body: "{}" }),
   billingPortal: () => tRequest<{ url: string }>("/billing/portal", { method: "POST", body: "{}" }),
 
@@ -348,6 +358,8 @@ export const tradieApi = {
         isCallout: boolean;
       }[];
       hasBankDetails: boolean;
+      defaultDepositPercent: number;
+      defaultTermsNote: string | null;
     }>("/onboarding"),
 
   onboardingProvisionNumber: () =>
@@ -649,6 +661,7 @@ export const tradieApi = {
       depositPercent?: number;
       channels?: ("SMS" | "WHATSAPP" | "EMAIL")[];
       email?: string;
+      message?: string;
     }
   ) =>
     tRequest<QuoteDto & { publicUrl: string }>(`/quotes/${id}/approve`, {

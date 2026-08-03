@@ -140,8 +140,8 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
 
   // Quote builder — each step names itself and steps back one, so the tradie can
   // always retreat to the previous decision rather than losing the whole draft.
-  if (pathname.startsWith("/t/quotes/new") || /^\/t\/quotes\/[^/]+\/(edit|terms|preview)$/.test(pathname)) {
-    const quoteId = pathname.match(/^\/t\/quotes\/([^/]+)\/(?:edit|terms|preview)$/)?.[1];
+  if (pathname.startsWith("/t/quotes/new") || /^\/t\/quotes\/[^/]+\/(edit|items|terms|preview)$/.test(pathname)) {
+    const quoteId = pathname.match(/^\/t\/quotes\/([^/]+)\/(?:edit|items|terms|preview)$/)?.[1];
     const steps: Record<string, DetailChrome> = {
       "/t/quotes/new": {
         backTo: "/t/quotes",
@@ -178,11 +178,29 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       };
     }
     if (pathname.endsWith("/edit")) {
+      const navState =
+        state && typeof state === "object"
+          ? (state as { from?: unknown; fromLabel?: unknown })
+          : null;
+      const from = typeof navState?.from === "string" ? navState.from : null;
+      const fromQuotesList = from === "/t/quotes" || from === "/t/archived";
       return {
-        backTo: "/t/quotes/new",
-        backLabel: "New quote",
+        backTo: fromQuotesList && from ? from : "/t/quotes/new",
+        backLabel: fromQuotesList
+          ? typeof navState?.fromLabel === "string"
+            ? navState.fromLabel
+            : "Back"
+          : "New quote",
         title: "Edit quote",
         subtitle: "Items, quantities, pricing",
+      };
+    }
+    if (pathname.endsWith("/items")) {
+      return {
+        backTo: `/t/quotes/${quoteId}/edit`,
+        backLabel: "Edit quote",
+        title: "Add items",
+        subtitle: "Search your rates",
       };
     }
     if (pathname.endsWith("/terms")) {
@@ -195,9 +213,9 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
     }
     return {
       backTo: `/t/quotes/${quoteId}/terms`,
-      backLabel: "Terms",
-      title: "Preview quote",
-      subtitle: "Check it, then send",
+      backLabel: "Back",
+      title: "Preview",
+      subtitle: "Share with customer",
     };
   }
 

@@ -48,6 +48,13 @@ function matches(quote: QuoteRow, needle: string): boolean {
     .some((field) => String(field).toLowerCase().includes(needle));
 }
 
+/** Open the quote itself — not the linked job, and never the Jobs tab. */
+function quoteOpenPath(q: QuoteRow): string {
+  const status = q.status === "ARCHIVED" ? q.statusBeforeArchive || "DRAFT" : q.status;
+  if (status === "DRAFT") return `/t/quotes/${q.id}/edit`;
+  return `/t/quotes/${q.id}/preview`;
+}
+
 export default function TradieQuotesPage() {
   const qc = useQueryClient();
   const quotes = useQuery({ queryKey: ["tradie-quotes"], queryFn: () => tradieApi.quotes() });
@@ -231,8 +238,8 @@ export default function TradieQuotesPage() {
                   <div className="t-row t-row--static">
                     <Link
                       className="t-row-main t-row-main--link"
-                      to={q.enquiry ? `/t/jobs/${q.enquiry.id}` : "/t/quotes"}
-                      state={q.enquiry ? { from: "/t/quotes", fromLabel: "Quotes" } : undefined}
+                      to={quoteOpenPath(q)}
+                      state={{ from: "/t/quotes", fromLabel: "Quotes" }}
                     >
                       <div className="t-row-top">
                         <strong>{q.enquiry?.name || "Quote"}</strong>
@@ -259,8 +266,8 @@ export default function TradieQuotesPage() {
               ) : (
                 <SwipeListRow
                   key={q.id}
-                  to={q.enquiry ? `/t/jobs/${q.enquiry.id}` : "/t"}
-                  linkState={q.enquiry ? { from: "/t/quotes", fromLabel: "Quotes" } : undefined}
+                  to={quoteOpenPath(q)}
+                  linkState={{ from: "/t/quotes", fromLabel: "Quotes" }}
                   onArchive={() => archive.mutate(q)}
                   onDelete={() => confirmDelete(q)}
                 >

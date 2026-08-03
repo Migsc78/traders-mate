@@ -115,8 +115,12 @@ export default function TradieArchivedPage() {
                 <div className="t-row t-row--static">
                   <Link
                     className="t-row-main t-row-main--link"
-                    to={q.enquiry ? `/t/jobs/${q.enquiry.id}` : "/t/quotes"}
-                    state={q.enquiry ? { from: "/t/archived", fromLabel: "Archived" } : undefined}
+                    to={
+                      (q.statusBeforeArchive || "DRAFT") === "DRAFT"
+                        ? `/t/quotes/${q.id}/edit`
+                        : `/t/quotes/${q.id}/preview`
+                    }
+                    state={{ from: "/t/archived", fromLabel: "Archived" }}
                   >
                     <div className="t-row-top">
                       <strong>{q.enquiry?.name || "Quote"}</strong>
