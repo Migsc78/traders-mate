@@ -1,0 +1,98 @@
+/**
+ * Run: npx tsx src/lib/dateGroups.test.ts
+ *
+ * Day headings look trivial and aren't: the bugs here are off-by-one at midnight,
+ * UTC vs local, and DST weekends. A job filed last night showing under "Today"
+ * is the kind of thing a tradie notices and stops trusting the list over.
+ */
+import { dayKey, dayLabel, groupByDay } from "./dateGroups.js";
+
+let failures = 0;
+function check(name: string, ok: boolean, detail = "") {
+  if (!ok) {
+    console.error(`FAIL: ${name}${detail ? ` — ${detail}` : ""}`);
+    failures += 1;
+  }
+}
+
+/** Local-time date, so the tests mean the same thing whatever TZ they run in. */
+const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min);
+
+const now = at(2026, 8, 3, 14, 30); // Monday 3 August 2026, half two
+
+/* ------------------------------------------------------------------- labels */
+
+check("today", dayLabel(at(2026, 8, 3, 9, 0), now) === "Today");
+check("yesterday", dayLabel(at(2026, 8, 2, 23, 55), now) === "Yesterday");
+
+// The one that matters: 23:30 last night is Yesterday even though it's only
+// fifteen hours ago, and 00:30 this morning is Today even though it's barely any.
+check("late last night is yesterday", dayLabel(at(2026, 8, 2, 23, 30), now) === "Yesterday");
+check("early this morning is today", dayLabel(at(2026, 8, 3, 0, 30), now) === "Today");
+
+check("two days back names the weekday", dayLabel(at(2026, 8, 1), now) === "Saturday", dayLabel(at(2026, 8, 1), now));
+check("six days back still a weekday", dayLabel(at(2026, 7, 28), now) === "Tuesday", dayLabel(at(2026, 7, 28), now));
+check("a week back becomes a date", dayLabel(at(2026, 7, 27), now) === "27 Jul", dayLabel(at(2026, 7, 27), now));
+check(
+  "last year carries the year",
+  dayLabel(at(2025, 11, 14), now) === "14 Nov 2025",
+  dayLabel(at(2025, 11, 14), now)
+);
+
+// Phone clock a few minutes ahead of the server shouldn't date-stamp a new job.
+check("future timestamp reads as today", dayLabel(at(2026, 8, 3, 23, 59), now) === "Today");
+check("tomorrow reads as today, not a date", dayLabel(at(2026, 8, 4, 1, 0), now) === "Today");
+
+check("garbage input", dayLabel("not a date", now) === "Undated");
+
+/* --------------------------------------------------------------------- keys */
+
+check("key is calendar-local", dayKey(at(2026, 8, 3, 23, 59)) === "2026-08-03", dayKey(at(2026, 8, 3, 23, 59)));
+check("key pads single digits", dayKey(at(2026, 1, 5)) === "2026-01-05", dayKey(at(2026, 1, 5)));
+check("same day, different times share a key", dayKey(at(2026, 8, 3, 1)) === dayKey(at(2026, 8, 3, 22)));
+
+/* ----------------------------------------------------------------- grouping */
+
+type Row = { id: string; createdAt: Date };
+
+{
+  const rows: Row[] = [
+    { id: "a", createdAt: at(2026, 8, 3, 10, 30) },
+    { id: "b", createdAt: at(2026, 8, 3, 9, 0) },
+    { id: "c", createdAt: at(2026, 8, 2, 16, 20) },
+    { id: "d", createdAt: at(2026, 7, 20) },
+  ];
+  const groups = groupByDay(rows, (r) => r.createdAt, now);
+
+  check("three days, three headings", groups.length === 3, `got ${groups.length}`);
+  check("headings in order", groups.map((g) => g.label).join("|") === "Today|Yesterday|20 Jul", groups.map((g) => g.label).join("|"));
+  check("today holds both of today's rows", groups[0].rows.length === 2);
+  check("row order preserved inside a group", groups[0].rows.map((r) => r.id).join("") === "ab");
+}
+
+// Out-of-order input must not produce the same heading twice — otherwise a list
+// that arrives unsorted grows a second "Today" halfway down.
+{
+  const rows: Row[] = [
+    { id: "a", createdAt: at(2026, 8, 3, 10) },
+    { id: "c", createdAt: at(2026, 8, 2, 16) },
+    { id: "b", createdAt: at(2026, 8, 3, 8) },
+  ];
+  const groups = groupByDay(rows, (r) => r.createdAt, now);
+  check("unsorted input still yields one heading per day", groups.length === 2, `got ${groups.length}`);
+  check("stray row joins its own day", groups[0].rows.map((r) => r.id).join("") === "ab");
+}
+
+{
+  const groups = groupByDay<{ id: string; createdAt: string | null }>(
+    [{ id: "a", createdAt: null }],
+    (r) => r.createdAt,
+    now
+  );
+  check("missing date gets its own heading, not a crash", groups[0]?.label === "Undated");
+}
+
+check("empty list yields no headings", groupByDay([], () => null, now).length === 0);
+
+if (failures > 0) throw new Error(`${failures} date-group failure(s)`);
+console.log("OK: day labels and grouping");

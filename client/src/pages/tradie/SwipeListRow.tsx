@@ -11,6 +11,13 @@ type SwipeListRowProps = {
   linkState?: unknown;
   onArchive: () => void;
   onDelete: () => void;
+  /**
+   * Locks *this* row only. Deliberately not wired to a shared "a mutation is in
+   * flight" flag: doing that meant one slow or stalled write froze every row on
+   * the screen, which is how a single hung offline queue write made swiping look
+   * like it only worked once. The row is removed from the list optimistically,
+   * so nothing needs a global lock to stop it being swiped twice.
+   */
   busy?: boolean;
 };
 

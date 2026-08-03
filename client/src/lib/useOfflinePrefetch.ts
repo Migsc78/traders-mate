@@ -13,8 +13,8 @@ function startOfDay(d: Date): Date {
  * is reactive — it only remembers a page once visited — which is exactly why
  * a device that had never opened Rates showed an empty price book with no
  * signal. This runs once per online stretch and fills in the fixed set that
- * should never be missing: price book, customers, jobs, quotes, and a 14-day
- * diary window (7 days each side of today).
+ * should never be missing: price book, customers, jobs, quotes, archived, and a
+ * 14-day diary window (7 days each side of today).
  *
  * Job *detail* (notes/photos + the message thread) is prefetched for every
  * job in the list, not just open ones — /jobs already excludes archived jobs
@@ -42,6 +42,9 @@ export function useOfflinePrefetch(enabled: boolean): void {
     void qc.prefetchQuery({ queryKey: ["tradie-price-book"], queryFn: () => tradieApi.priceBook() });
     void qc.prefetchQuery({ queryKey: ["tradie-customers"], queryFn: () => tradieApi.customers() });
     void qc.prefetchQuery({ queryKey: ["tradie-quotes"], queryFn: () => tradieApi.quotes() });
+    // The Archive tab on Jobs and Quotes reads this. One extra list, and without
+    // it a tab the tradie can see sits empty the moment they lose signal.
+    void qc.prefetchQuery({ queryKey: ["tradie-archived"], queryFn: () => tradieApi.archived() });
     // Templates and their contents, so a quote can be started from one with no signal.
     void qc
       .prefetchQuery({ queryKey: ["tradie-quote-templates"], queryFn: () => tradieApi.quoteTemplates() })

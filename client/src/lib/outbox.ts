@@ -17,8 +17,8 @@
  */
 import { apiUrl } from "../api/base";
 import { classifyFlushResponse } from "./outboxPolicy";
+import { idbAvailable, idbTx } from "./idb";
 
-const DB_NAME = "tm-offline";
 const STORE = "outbox";
 const SESSION_KEY = "tm_tradie_session"; // mirrors api/tradie, kept local to avoid a cycle
 
@@ -46,32 +46,8 @@ export function newOutboxId(): string {
 
 /* ------------------------------------------------------------------ storage */
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    // Version 2 — the offline read cache created this database at version 1.
-    const req = indexedDB.open(DB_NAME, 2);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
 function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  return openDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const transaction = db.transaction(STORE, mode);
-        const request = run(transaction.objectStore(STORE));
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-        transaction.onabort = () => reject(transaction.error);
-        transaction.oncomplete = () => db.close();
-      })
-  );
+  return idbTx<T>(STORE, mode, run);
 }
 
 /* ---------------------------------------------------------------- listeners */
@@ -102,7 +78,7 @@ async function refreshSnapshot(): Promise<OutboxItem[]> {
 
 /** Load what's already queued from a previous session. */
 export async function initOutbox(): Promise<void> {
-  if (typeof indexedDB === "undefined") return;
+  if (!idbAvailable()) return;
   try {
     await refreshSnapshot();
   } catch {
@@ -145,7 +121,7 @@ async function update(item: OutboxItem): Promise<void> {
 
 /** Wipe the queue — called on sign-out alongside the read cache. */
 export async function clearOutbox(): Promise<void> {
-  if (typeof indexedDB === "undefined") return;
+  if (!idbAvailable()) return;
   try {
     await tx("readwrite", (store) => store.clear());
     await refreshSnapshot();
@@ -170,7 +146,7 @@ export type FlushResult = { sent: number; failed: number; stoppedOffline: boolea
  */
 export async function flushOutbox(onItemSent?: (item: OutboxItem) => void): Promise<FlushResult> {
   const result: FlushResult = { sent: 0, failed: 0, stoppedOffline: false };
-  if (flushing || typeof indexedDB === "undefined") return result;
+  if (flushing || !idbAvailable()) return result;
   flushing = true;
 
   try {

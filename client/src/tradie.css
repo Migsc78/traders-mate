@@ -2517,3 +2517,80 @@ html.native-app .tradie-bottom-nav {
   border-color: var(--t-accent);
   box-shadow: inset 0 0 0 4px var(--t-surface), inset 0 0 0 10px var(--t-accent);
 }
+
+/* ---------- list search + status tabs (Jobs, Quotes) ---------- */
+
+.t-head-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+.tradie-shell .t-icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink-soft);
+}
+.tradie-shell .t-icon-btn.is-active {
+  background: var(--t-ink);
+  border-color: var(--t-ink);
+  color: #fff;
+}
+
+/* Underline tabs — scroll sideways rather than shrinking to unreadable */
+.t-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--t-hairline);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.t-tabs::-webkit-scrollbar { display: none; }
+.tradie-shell .t-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 11px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--t-ink-faint);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tradie-shell .t-tab.is-active {
+  color: var(--t-accent-ink);
+  border-bottom-color: var(--t-accent);
+  font-weight: 750;
+}
+.t-tab-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--t-slate-soft);
+  color: var(--t-ink-faint);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.t-tab.is-active .t-tab-count { background: var(--t-accent-soft); color: var(--t-accent-ink); }
+
+/* Day headings */
+.t-day-group { margin-bottom: 18px; }
+.t-day-group:last-of-type { margin-bottom: 0; }
+.t-day-head {
+  margin: 0 0 8px;
+  font-family: var(--t-font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--t-ink-faint);
+}

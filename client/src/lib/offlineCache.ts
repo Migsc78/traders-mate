@@ -11,8 +11,8 @@
  * never happened.
  */
 import type { PersistedClient, Persister } from "@tanstack/react-query-persist-client";
+import { idbAvailable, idbTx } from "./idb";
 
-const DB_NAME = "tm-offline";
 const STORE = "kv";
 const KEY = "tradie-query-cache";
 
@@ -62,33 +62,8 @@ function ownerFingerprint(): string {
   return `t${(hash >>> 0).toString(36)}`;
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    // Version 2 added the outbox store. Both modules must open the same version
-    // and create both stores, or whichever opens second throws a VersionError.
-    const req = indexedDB.open(DB_NAME, 2);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-      if (!db.objectStoreNames.contains("outbox")) db.createObjectStore("outbox", { keyPath: "id" });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
 function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  return openDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const transaction = db.transaction(STORE, mode);
-        const request = run(transaction.objectStore(STORE));
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-        transaction.onabort = () => reject(transaction.error);
-        transaction.oncomplete = () => db.close();
-      })
-  );
+  return idbTx<T>(STORE, mode, run);
 }
 
 type Envelope = { owner: string; client: PersistedClient };
@@ -101,7 +76,7 @@ type Envelope = { owner: string; client: PersistedClient };
  * locked-down WebView). Losing the offline cache must never break the app.
  */
 export function createOfflinePersister(): Persister {
-  const available = typeof indexedDB !== "undefined";
+  const available = idbAvailable();
 
   return {
     async persistClient(client: PersistedClient) {
@@ -138,7 +113,7 @@ export function createOfflinePersister(): Persister {
 
 /** Wipe the on-device cache. Called on sign-out and on account mismatch. */
 export async function clearOfflineCache(): Promise<void> {
-  if (typeof indexedDB === "undefined") return;
+  if (!idbAvailable()) return;
   try {
     await tx("readwrite", (store) => store.delete(KEY));
   } catch {
