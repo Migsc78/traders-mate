@@ -502,6 +502,7 @@ export async function uploadCustomerFile(
     category?: string;
     propertyId?: string | null;
     assetId?: string | null;
+    jobId?: string | null;
     issuedAt?: string | null;
     expiresAt?: string | null;
     visibility?: "INTERNAL" | "CUSTOMER";

@@ -44,6 +44,9 @@ export default function UploadFilePage() {
   const [category, setCategory] = useState<FileCategory>("CERTIFICATE");
   const [file, setFile] = useState<File | null>(null);
   const [propertyId, setPropertyId] = useState(params.get("propertyId") || "");
+  // Set when the upload was started from a job, so the file files itself there
+  // rather than landing in a general customer folder to be hunted for later.
+  const jobId = params.get("jobId");
   const [assetId, setAssetId] = useState("");
   const [issuedAt, setIssuedAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -63,6 +66,7 @@ export default function UploadFilePage() {
         dataBase64: await toBase64(file),
         category,
         propertyId: propertyId || null,
+        jobId,
         assetId: assetId || null,
         issuedAt: fromDateInput(issuedAt),
         expiresAt: fromDateInput(expiresAt),
@@ -72,6 +76,11 @@ export default function UploadFilePage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tradie-customer", customerId] });
       void qc.invalidateQueries({ queryKey: ["tradie-property", propertyId] });
+      if (jobId) {
+        void qc.invalidateQueries({ queryKey: ["tradie-job-files", jobId] });
+        navigate(`/t/jobs/${jobId}?tab=files`, { replace: true });
+        return;
+      }
       navigate(`/t/customers/${customerId}?tab=files`, { replace: true });
     },
     onError: (e: Error) => setError(e.message),

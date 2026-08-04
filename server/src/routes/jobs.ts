@@ -899,6 +899,54 @@ jobsRouter.get("/jobs/:jobId/briefing", requireClient, async (req, res, next) =>
 
 // ---------------------------------------------------------------- activity
 
+/**
+ * Photos, certificates and receipts filed against this job.
+ *
+ * Also picks up anything filed against the job's property or its enquiry —
+ * the gas certificate lives on the property, but the engineer standing in the
+ * kitchen is looking at the job, and making him go and find it is how it stops
+ * getting filed at all.
+ */
+jobsRouter.get("/jobs/:jobId/files", requireClient, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.jobId, clientId: cid },
+      select: { id: true, enquiryId: true, propertyId: true, customerId: true },
+    });
+    if (!job) throw new ApiError(404, "not_found", "Job not found");
+
+    const files = await prisma.customerFile.findMany({
+      where: {
+        clientId: cid,
+        OR: [
+          { jobId: job.id },
+          ...(job.enquiryId ? [{ enquiryId: job.enquiryId }] : []),
+          ...(job.propertyId ? [{ propertyId: job.propertyId }] : []),
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    res.json(
+      files.map((f) => ({
+        id: f.id,
+        filename: f.filename,
+        url: f.url,
+        category: f.category,
+        visibility: f.visibility,
+        createdAt: f.createdAt,
+        // So the UI can say where it came from rather than implying every file
+        // was taken on this job.
+        scope: f.jobId === job.id ? "job" : f.propertyId ? "property" : "customer",
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
 jobsRouter.get("/jobs/:jobId/events", requireClient, async (req, res, next) => {
   try {
     const cid = clientId(req);

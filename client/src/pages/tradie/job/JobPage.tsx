@@ -10,6 +10,8 @@ import VisitsTab from "./tabs/VisitsTab";
 import CostsTab from "./tabs/CostsTab";
 import QuoteTab from "./tabs/QuoteTab";
 import MessagesTab from "./tabs/MessagesTab";
+import FilesTab from "./tabs/FilesTab";
+import ActivityTab from "./tabs/ActivityTab";
 
 const TABS: readonly ListTab[] = [
   { id: "overview", label: "Overview" },
@@ -17,10 +19,12 @@ const TABS: readonly ListTab[] = [
   { id: "costs", label: "Costs" },
   { id: "quote", label: "Quote" },
   { id: "messages", label: "Messages" },
+  { id: "files", label: "Files" },
+  { id: "activity", label: "Activity" },
 ];
 
 /**
- * One job, six ways.
+ * One job, seven ways.
  *
  * The header carries both statuses and the single action that matters right
  * now — derived server-side so the button and the endpoint behind it can't
@@ -148,6 +152,8 @@ export default function JobPage() {
       {tab === "costs" && <CostsTab detail={d} />}
       {tab === "quote" && <QuoteTab detail={d} />}
       {tab === "messages" && <MessagesTab jobId={enquiryId} />}
+      {tab === "files" && <FilesTab detail={d} />}
+      {tab === "activity" && <ActivityTab jobId={enquiryId} />}
 
       {/* Sticky, because on site the tradie's thumb is already at the bottom of
           the screen and the next action shouldn't need a scroll to find. */}
