@@ -1,77 +1,51 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   formatGbp,
-  getTradieSession,
   sendOrQueue,
   tradieApi,
   type QuoteDto,
   type QuoteLineDto,
-} from "../../api/tradie";
-import { IconPhone, NeedsSignal, QueryError, StatusPill, initialsOf } from "./ui";
-import { MoneyInput, NumberInput } from "../../components/NumericInput";
-import { useOffline } from "../../lib/connectivity";
+} from "../../../../api/tradie";
+import type { JobDetail } from "../../../../api/jobs";
+import { NeedsSignal, QueryError, StatusPill } from "../../ui";
+import { MoneyInput, NumberInput } from "../../../../components/NumericInput";
+import { useOffline } from "../../../../lib/connectivity";
 
-function triageLabel(t: string): string {
-  switch (t) {
-    case "LIKELY_JOB":
-      return "Likely job";
-    case "QUOTE_SHOPPER":
-      return "Quote shopper";
-    case "SPAM":
-      return "Spam";
-    default:
-      return "Needs a look";
-  }
-}
-
-export default function TradieJobPage() {
-  const { enquiryId = "" } = useParams();
-  const session = getTradieSession();
-  const navigate = useNavigate();
+/**
+ * Drafting and pricing, moved wholesale from the old single-page job screen.
+ *
+ * Deliberately a move, not a rewrite: voice capture, the price-book provenance
+ * hints, the offline queueing and the deposit-on-accept field all work and had
+ * no reason to be re-derived. What's new is only that it lives behind a tab.
+ */
+export default function QuoteTab({ detail }: { detail: JobDetail }) {
   const qc = useQueryClient();
   const offline = useOffline();
+  const jobId = detail.id;
+  const who = detail.job.customer?.name || detail.name || "job";
+
   const [notes, setNotes] = useState("");
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState<QuoteDto | null>(null);
-  const [smsText, setSmsText] = useState("");
   const [depositPercent, setDepositPercent] = useState(0);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const depositSeeded = useRef(false);
-  const job = useQuery({
-    queryKey: ["tradie-job", enquiryId],
-    queryFn: () => tradieApi.job(enquiryId),
-    enabled: !!session && !!enquiryId,
-  });
 
-  const promote = useMutation({
-    mutationFn: () => tradieApi.promoteJob(enquiryId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
-      void qc.invalidateQueries({ queryKey: ["tradie-inbox"] });
-      void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
-      navigate(`/t/jobs/${enquiryId}`, { replace: true, state: { from: "/t", fromLabel: "Jobs" } });
-    },
-  });
+  const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
 
-  const kill = useMutation({
-    mutationFn: (reason: "dead" | "spam") => tradieApi.killJob(enquiryId, reason),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tradie-inbox"] });
-      void qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
-      navigate("/t/inbox", { replace: true });
-    },
-  });
+  useEffect(() => {
+    if (!me.data || depositSeeded.current) return;
+    depositSeeded.current = true;
+    if (me.data.defaultDepositPercent) setDepositPercent(me.data.defaultDepositPercent);
+  }, [me.data]);
 
   const activeQuote: QuoteDto | null = useMemo(() => {
     if (draft) return draft;
-    const quotes = (job.data?.quotes as QuoteDto[] | undefined) || [];
+    const quotes = (detail.quotes as unknown as QuoteDto[]) || [];
     return quotes.find((q) => q.status === "DRAFT") || quotes[0] || null;
-  }, [draft, job.data]);
-
-  const who = (job.data?.name as string | undefined) || "job";
+  }, [draft, detail.quotes]);
 
   // Drafting needs Claude/Whisper server-side, so with no signal the write is
   // queued instead: the tradie captures on site, the quote is built the moment
@@ -80,7 +54,7 @@ export default function TradieJobPage() {
     mutationFn: () =>
       sendOrQueue<QuoteDto>({
         label: `Quote from notes · ${who}`,
-        path: `/jobs/${enquiryId}/notes`,
+        path: `/jobs/${jobId}/notes`,
         method: "POST",
         body: { transcript: notes },
         invalidates: ["tradie-job", "tradie-quotes", "tradie-jobs"],
@@ -91,7 +65,7 @@ export default function TradieJobPage() {
         return;
       }
       setDraft(r.result);
-      qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+      void qc.invalidateQueries({ queryKey: ["tradie-job", jobId] });
     },
   });
 
@@ -99,7 +73,7 @@ export default function TradieJobPage() {
     mutationFn: (payload: { contentType: string; dataBase64: string; durationSec: number }) =>
       sendOrQueue<{ quote: QuoteDto }>({
         label: `Voice note · ${who}`,
-        path: `/jobs/${enquiryId}/voice`,
+        path: `/jobs/${jobId}/voice`,
         method: "POST",
         body: payload,
         invalidates: ["tradie-job", "tradie-quotes", "tradie-jobs"],
@@ -107,7 +81,7 @@ export default function TradieJobPage() {
     onSuccess: (r) => {
       if (r.queued) return;
       setDraft(r.result.quote);
-      qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+      void qc.invalidateQueries({ queryKey: ["tradie-job", jobId] });
     },
   });
 
@@ -138,16 +112,8 @@ export default function TradieJobPage() {
     onSuccess: (q: QuoteDto & { publicUrl: string }) => {
       setDraft(q);
       alert(`Quote sent.\n${q.publicUrl}`);
-      qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
-      qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
-    },
-  });
-
-  const sendSms = useMutation({
-    mutationFn: () => tradieApi.sendJobMessage(enquiryId, smsText.trim()),
-    onSuccess: () => {
-      setSmsText("");
-      qc.invalidateQueries({ queryKey: ["tradie-messages", enquiryId] });
+      void qc.invalidateQueries({ queryKey: ["tradie-job", jobId] });
+      void qc.invalidateQueries({ queryKey: ["tradie-quotes"] });
     },
   });
 
@@ -162,59 +128,32 @@ export default function TradieJobPage() {
       }),
     onSuccess: (r) => {
       setDraft(null);
-      if (!r.queued) qc.invalidateQueries({ queryKey: ["tradie-job", enquiryId] });
+      if (!r.queued) void qc.invalidateQueries({ queryKey: ["tradie-job", jobId] });
     },
   });
 
-  const messages = useQuery({
-    queryKey: ["tradie-messages", enquiryId],
-    queryFn: () => tradieApi.jobMessages(enquiryId),
-    enabled: !!session && !!enquiryId,
-  });
-
-  const me = useQuery({
-    queryKey: ["tradie-me"],
-    queryFn: () => tradieApi.me(),
-    enabled: !!session,
-  });
-
-  useEffect(() => {
-    if (!me.data || depositSeeded.current) return;
-    depositSeeded.current = true;
-    if (me.data.defaultDepositPercent) setDepositPercent(me.data.defaultDepositPercent);
-  }, [me.data]);
-
-  const makeInvoice = useMutation({
-    mutationFn: () => tradieApi.invoiceFromQuote(activeQuote!.id),
-    onSuccess: async (inv: { id: string }) => {
-      if (confirm("Invoice created. Send to customer by SMS now?")) {
-        await tradieApi.sendInvoice(inv.id);
+  /**
+   * Turn the accepted quote into the job's commercial baseline.
+   *
+   * Only offered once the customer has actually accepted — that is the moment
+   * the price stops being a proposal and starts being what the job is worth.
+   */
+  const buildJob = useMutation({
+    mutationFn: () =>
+      sendOrQueue({
+        label: `Create job · ${who}`,
+        path: `/jobs/from-quote/${activeQuote!.id}`,
+        method: "POST",
+        body: {},
+        invalidates: ["tradie-job", "tradie-jobs"],
+      }),
+    onSuccess: (r) => {
+      if (!r.queued) {
+        void qc.invalidateQueries({ queryKey: ["tradie-job", jobId] });
+        void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
       }
-      qc.invalidateQueries({ queryKey: ["tradie-invoices"] });
-      alert("Invoice ready — see Invoices tab.");
     },
   });
-
-  if (!session) return <Navigate to="/t/auth" replace />;
-  if (job.isLoading) return <p>Loading…</p>;
-  // With a cached copy we render the job card anyway — the address and contact
-  // number are the whole reason to open this page with no signal.
-  if (job.isError && !job.data) return <p className="error">{(job.error as Error).message}</p>;
-
-  const enquiry = job.data as {
-    id: string;
-    name: string;
-    phone: string;
-    message: string | null;
-    postcode: string | null;
-    distanceMiles: number | null;
-    photoUrls: string[];
-    pipeline?: string;
-    triage?: string;
-    summary?: string | null;
-  };
-
-  const isInbox = enquiry.pipeline === "INBOX";
 
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -273,87 +212,10 @@ export default function TradieJobPage() {
     return "Manual price";
   };
 
+  const alreadyBuilt = !!detail.job.latestQuote && detail.job.commercial !== "UNQUOTED";
+
   return (
-    <div className="t-job-page">
-      {isInbox && (
-        <div className="t-card t-inbox-banner">
-          <div className="t-row-top" style={{ marginBottom: 6 }}>
-            <strong>Inbox</strong>
-            <span className="t-pill t-pill--orange">{triageLabel(enquiry.triage || "UNKNOWN")}</span>
-          </div>
-          <p className="muted-text" style={{ margin: "0 0 12px" }}>
-            {enquiry.summary || enquiry.message || "Pre-qualified from a missed call."}
-          </p>
-          <div className="tradie-actions">
-            <a className="primary" href={`tel:${enquiry.phone}`}>
-              <IconPhone /> Call back
-            </a>
-            <button
-              type="button"
-              className="t-btn"
-              disabled={promote.isPending || kill.isPending}
-              onClick={() => promote.mutate()}
-            >
-              {promote.isPending ? "Saving…" : "Make job"}
-            </button>
-            <button
-              type="button"
-              className="danger"
-              disabled={promote.isPending || kill.isPending}
-              onClick={() => kill.mutate("spam")}
-            >
-              Spam
-            </button>
-            <button
-              type="button"
-              className="t-btn"
-              disabled={promote.isPending || kill.isPending}
-              onClick={() => kill.mutate("dead")}
-            >
-              Not interested
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="t-card t-contact-card">
-        <div className="t-contact-head">
-          <span className="t-avatar">{initialsOf(enquiry.name)}</span>
-          <div>
-            <h1>{enquiry.name}</h1>
-            <p className="t-contact-meta">
-              <a className="t-tel" href={`tel:${enquiry.phone}`}>
-                <IconPhone /> {enquiry.phone}
-              </a>
-              {enquiry.postcode && <span>· {enquiry.postcode}</span>}
-              {enquiry.distanceMiles != null && (
-                <span className="t-pill t-pill--slate">~{enquiry.distanceMiles} mi</span>
-              )}
-            </p>
-            {enquiry.phone ? (
-              <p style={{ margin: "8px 0 0" }}>
-                <Link
-                  className="linkish"
-                  to={`/t/customers/${encodeURIComponent(enquiry.phone.replace(/\D/g, "").slice(-10))}`}
-                >
-                  View customer record
-                </Link>
-              </p>
-            ) : null}
-          </div>
-        </div>
-        {enquiry.message && <blockquote className="t-quote-msg">{enquiry.message}</blockquote>}
-        {enquiry.photoUrls?.length > 0 && (
-          <div className="tradie-photos">
-            {enquiry.photoUrls.map((u) => (
-              <a key={u} href={u} target="_blank" rel="noreferrer">
-                <img src={u} alt="" />
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-
+    <section>
       <p className="t-section-label">Draft a quote</p>
       <div className="t-card">
         <textarea
@@ -434,10 +296,7 @@ export default function TradieJobPage() {
                 ))}
                 <div className="tradie-actions">
                   <button onClick={addLine}>+ Line</button>
-                  <button
-                    onClick={() => saveLines.mutate(activeQuote.lines)}
-                    disabled={saveLines.isPending}
-                  >
+                  <button onClick={() => saveLines.mutate(activeQuote.lines)} disabled={saveLines.isPending}>
                     {saveLines.isPending ? "Saving…" : "Save edits"}
                   </button>
                 </div>
@@ -480,79 +339,42 @@ export default function TradieJobPage() {
                   </button>
                 </div>
                 {offline && (
-                  <NeedsSignal>
-                    Edits are saved on your phone. Sending and deleting need signal.
-                  </NeedsSignal>
+                  <NeedsSignal>Edits are saved on your phone. Sending and deleting need signal.</NeedsSignal>
                 )}
                 <QueryError error={saveLines.error || approve.error || remove.error} />
               </div>
             )}
 
             {activeQuote.status === "SENT" && (
-              <p className="muted-text">Sent to customer. Waiting for accept/decline — follow-ups are scheduled.</p>
+              <p className="muted-text">
+                Sent to customer. Waiting for accept/decline — follow-ups are scheduled.
+              </p>
             )}
-            {(activeQuote.status === "ACCEPTED" || activeQuote.status === "SENT") && (
-              <div className="tradie-actions">
-                <button
-                  className="convert t-btn--block"
-                  onClick={() => makeInvoice.mutate()}
-                  disabled={offline || makeInvoice.isPending}
-                >
-                  {makeInvoice.isPending ? "Creating…" : "Create invoice"}
-                </button>
-                {offline && <NeedsSignal>Invoicing needs signal.</NeedsSignal>}
-                <QueryError error={makeInvoice.error} />
+
+            {activeQuote.status === "ACCEPTED" && (
+              <div className="tradie-actions" style={{ marginTop: 12 }}>
+                {alreadyBuilt ? (
+                  <p className="muted-text">
+                    This quote is the job&apos;s agreed price. Extras are added on the Costs tab so the
+                    accepted total stays readable.
+                  </p>
+                ) : (
+                  <>
+                    <button
+                      className="convert t-btn--block"
+                      onClick={() => buildJob.mutate()}
+                      disabled={buildJob.isPending}
+                    >
+                      {buildJob.isPending ? "Creating…" : "Create job from this quote"}
+                    </button>
+                    <QueryError error={buildJob.error} />
+                  </>
+                )}
               </div>
             )}
           </div>
         </>
       )}
-
-      <section>
-        <p className="t-section-label">Messages</p>
-        {messages.isLoading && <p className="muted-text">Loading…</p>}
-        <ul className="tradie-messages">
-          {(messages.data || []).map((m: { id: string; direction: string; channel: string; body: string; createdAt: string }) => (
-            <li key={m.id} className={m.direction === "INBOUND" ? "in" : "out"}>
-              <span className="muted-text">
-                {m.direction === "INBOUND" ? "Customer" : "You"} · {m.channel} ·{" "}
-                {new Date(m.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-              </span>
-              <p>{m.body}</p>
-            </li>
-          ))}
-        </ul>
-        {messages.data?.length === 0 && <p className="muted-text">No messages logged for this job yet.</p>}
-        <div className="t-card" style={{ marginTop: 12 }}>
-          <label>
-            Reply by SMS
-            <textarea
-              rows={3}
-              value={smsText}
-              onChange={(e) => setSmsText(e.target.value)}
-              placeholder="Type a message to the customer…"
-            />
-          </label>
-          <button
-            type="button"
-            className="primary t-btn--block"
-            disabled={offline || !smsText.trim() || sendSms.isPending}
-            onClick={() => sendSms.mutate()}
-          >
-            {sendSms.isPending ? "Sending…" : "Send SMS"}
-          </button>
-          {offline && <NeedsSignal>Texting the customer needs signal.</NeedsSignal>}
-          <QueryError error={sendSms.error} />
-        </div>
-        <div className="tradie-actions" style={{ marginTop: 12 }}>
-          <Link className="t-btn--block" to={`/t/diary/new?enquiryId=${enquiryId}`}>
-            Book in diary →
-          </Link>
-          <Link className="t-btn--block" to={`/t/certificates?enquiryId=${enquiryId}`}>
-            File certificate →
-          </Link>
-        </div>
-      </section>
-    </div>
+    </section>
   );
 }

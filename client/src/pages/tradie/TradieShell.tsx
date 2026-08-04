@@ -51,6 +51,17 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       subtitle: "New or existing customer",
     };
   }
+  // Screens reached from inside a job go back to that job, not to the list.
+  const jobSub = pathname.match(/^\/t\/jobs\/([^/]+)\/(schedule|briefing|complete)$/);
+  if (jobSub) {
+    const [, jobId, leaf] = jobSub;
+    const chrome: Record<string, { title: string; subtitle: string }> = {
+      schedule: { title: "Schedule", subtitle: "Books the diary at the same time" },
+      briefing: { title: "Before you arrive", subtitle: "Access, pets, parking and safety" },
+      complete: { title: "Complete job", subtitle: "Sign off and get it billed" },
+    };
+    return { backTo: `/t/jobs/${jobId}`, backLabel: "Job", ...chrome[leaf] };
+  }
   if (pathname.startsWith("/t/jobs/")) {
     const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
     const fromInboxQuery = params.get("from") === "inbox";

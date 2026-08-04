@@ -20,7 +20,9 @@ import TradieShell from "./pages/tradie/TradieShell";
 import TradieJobsPage from "./pages/tradie/TradieJobsPage";
 import TradieInboxPage from "./pages/tradie/TradieInboxPage";
 import TradieArchivedPage from "./pages/tradie/TradieArchivedPage";
-import TradieJobPage from "./pages/tradie/TradieJobPage";
+import JobPage from "./pages/tradie/job/JobPage";
+import ScheduleJobPage from "./pages/tradie/job/ScheduleJobPage";
+import ArrivalBriefingPage from "./pages/tradie/job/ArrivalBriefingPage";
 import TradieNewJobPage from "./pages/tradie/TradieNewJobPage";
 import TradiePriceBookPage from "./pages/tradie/TradiePriceBookPage";
 import TradieQuotesPage from "./pages/tradie/TradieQuotesPage";
@@ -165,7 +167,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="certificates" element={<TradieCertificatesPage />} />
             <Route path="settings" element={<TradieSettingsPage />} />
             <Route path="jobs/new" element={<TradieNewJobPage />} />
-            <Route path="jobs/:enquiryId" element={<TradieJobPage />} />
+            <Route path="jobs/:enquiryId" element={<JobPage />} />
+            <Route path="jobs/:enquiryId/schedule" element={<ScheduleJobPage />} />
+            <Route path="jobs/:enquiryId/briefing" element={<ArrivalBriefingPage />} />
           </Route>
           <Route path="/" element={<LandingPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />

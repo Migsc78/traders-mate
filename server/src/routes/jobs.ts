@@ -30,6 +30,7 @@ import {
 } from "../services/jobs/status.js";
 import { extractPostcode, normalizePostcode } from "../services/geo/postcode.js";
 import { toE164UK } from "../services/messaging/sender.js";
+import { accessSelect, maskAccess } from "../services/customers/record.js";
 
 /**
  * Everything under /jobs.
@@ -812,6 +813,64 @@ jobsRouter.patch(
     }
   })
 );
+
+// ---------------------------------------------------------------- arrival briefing
+
+/**
+ * What the tradie needs to know before knocking.
+ *
+ * The access code is *not* in this payload. It comes only from the deliberate
+ * reveal endpoint, which writes an audit row — a briefing screen is opened on
+ * every job, and a code that ships with it would be a code nobody chose to look
+ * at, logged as if they had.
+ */
+jobsRouter.get("/jobs/:jobId/briefing", requireClient, async (req, res, next) => {
+  try {
+    const cid = clientId(req);
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.jobId, clientId: cid },
+      include: {
+        property: {
+          include: {
+            access: { select: accessSelect },
+            assets: {
+              orderBy: { createdAt: "asc" },
+              select: { id: true, kind: true, name: true, model: true, location: true },
+            },
+          },
+        },
+        customer: { select: { id: true, name: true, preferredChannel: true, notes: true } },
+        siteContact: { select: { id: true, name: true, phone: true, role: true } },
+        enquiry: { select: { name: true, phone: true, postcode: true } },
+        visits: { orderBy: { startsAt: "asc" }, take: 1 },
+      },
+    });
+    if (!job) throw new ApiError(404, "not_found", "Job not found");
+
+    const access = job.property?.access ?? null;
+    res.json({
+      jobId: job.id,
+      title: job.title,
+      customer: job.customer,
+      siteContact: job.siteContact,
+      phone: job.siteContact?.phone || job.enquiry?.phone || null,
+      property: job.property
+        ? {
+            id: job.property.id,
+            nickname: job.property.nickname,
+            addressLine1: job.property.addressLine1,
+            town: job.property.town,
+            postcode: job.property.postcode,
+          }
+        : null,
+      access: maskAccess(access),
+      assets: job.property?.assets ?? [],
+      nextVisit: job.visits[0] ?? null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ---------------------------------------------------------------- activity
 

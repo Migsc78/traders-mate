@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { ApiError } from "../middleware/error.js";
 import { idempotent } from "../middleware/idempotency.js";
 import { requireClient, clientId } from "./tradie.js";
+import { appendJobEvent } from "../services/jobs/events.js";
 import { storeCertFile } from "../services/storage/store.js";
 import {
   accessSelect,
@@ -488,13 +489,56 @@ customerRouter.put("/properties/:id/access", requireClient, idempotent(async (re
  * audit row; today there is only one login, so there is nobody to attribute it to
  * and pretending otherwise would be theatre.
  */
+/**
+ * Hand over one access code, and write down that it happened.
+ *
+ * Separate from the property payload on purpose: the code is never sent with the
+ * record, so revealing it is a deliberate act rather than something anyone can
+ * scrape out of a response they were already getting. That is also what makes
+ * the audit meaningful — a row here means somebody asked, not that a screen
+ * happened to load.
+ */
 customerRouter.post("/properties/:id/access/reveal", requireClient, async (req, res, next) => {
   try {
+    const cid = clientId(req);
+    const body = z.object({ jobId: z.string().optional() }).parse(req.body ?? {});
     const owned = await prisma.property.findFirst({
-      where: { id: req.params.id, clientId: clientId(req) },
+      where: { id: req.params.id, clientId: cid },
       include: { access: { select: { accessCode: true } } },
     });
     if (!owned) throw new ApiError(404, "not_found", "Property not found");
+
+    // Only the job's own client can attribute a reveal to it.
+    const job = body.jobId
+      ? await prisma.job.findFirst({ where: { id: body.jobId, clientId: cid }, select: { id: true } })
+      : null;
+
+    const client = await prisma.client.findUnique({
+      where: { id: cid },
+      select: { businessName: true },
+    });
+
+    await prisma.accessReveal.create({
+      data: {
+        clientId: cid,
+        propertyId: owned.id,
+        jobId: job?.id ?? null,
+        // One login per account today, so this is the account. When engineer
+        // logins land it becomes the person, and the history already exists.
+        actorLabel: client?.businessName || "Account holder",
+      },
+    });
+
+    if (job) {
+      await appendJobEvent(prisma, {
+        clientId: cid,
+        jobId: job.id,
+        type: "access.revealed",
+        summary: "Access code revealed",
+        payload: { propertyId: owned.id },
+      });
+    }
+
     res.json({ accessCode: owned.access?.accessCode ?? null });
   } catch (err) {
     next(err);

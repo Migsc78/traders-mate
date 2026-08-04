@@ -280,9 +280,9 @@ export const customersApi = {
    * Never cached and never batched into the record: the whole point of masking is
    * that the code isn't sitting in a payload the moment anyone opens the record.
    */
-  revealAccessCode: (propertyId: string) =>
+  revealAccessCode: (propertyId: string, jobId?: string) =>
     tRequest<{ accessCode: string | null }>(`/properties/${encodeURIComponent(propertyId)}/access/reveal`, {
       method: "POST",
-      body: "{}",
+      body: JSON.stringify(jobId ? { jobId } : {}),
     }),
 };

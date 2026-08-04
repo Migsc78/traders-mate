@@ -15,16 +15,24 @@ const HIDE_AFTER_MS = 30_000;
  * It re-hides itself after half a minute. Phones get left on kitchen worktops,
  * and this is the code to somebody's front door.
  *
- * When staff logins land, this component and the endpoint behind it are the one
- * place that needs to write an audit row. Today there is a single login per
- * account, so there is nobody to attribute a reveal to and recording "the account
- * did it" would be theatre rather than an audit trail.
+ * Every reveal is recorded. There is one login per account today, so the "who"
+ * is not yet interesting — but the history starts now rather than on the day
+ * engineer logins ship, which is the day it starts to matter.
  */
-export function AccessCode({ propertyId, hasCode }: { propertyId: string; hasCode: boolean }) {
+export function AccessCode({
+  propertyId,
+  hasCode,
+  jobId,
+}: {
+  propertyId: string;
+  hasCode: boolean;
+  /** Set when revealed from a job, so the audit row says which one. */
+  jobId?: string;
+}) {
   const [code, setCode] = useState<string | null>(null);
 
   const reveal = useMutation({
-    mutationFn: () => customersApi.revealAccessCode(propertyId),
+    mutationFn: () => customersApi.revealAccessCode(propertyId, jobId),
     onSuccess: (r) => setCode(r.accessCode),
   });
 
