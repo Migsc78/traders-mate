@@ -94,5 +94,46 @@ type Row = { id: string; createdAt: Date };
 
 check("empty list yields no headings", groupByDay([], () => null, now).length === 0);
 
+/* ------------------------------------------------- future dates (booked visits)
+
+   Creation timestamps are never legitimately ahead of now, so a future one means
+   clock skew and still reads "Today". A booked visit is a different matter: the
+   Upcoming tab is answering "what am I doing next", and labelling tomorrow's
+   first call "Today" would send someone to the wrong house on the wrong day. */
+
+check("future creation date still reads Today (clock skew)", dayLabel(at(2026, 8, 4, 9), now) === "Today");
+check("tomorrow, when the future is allowed", dayLabel(at(2026, 8, 4, 9), now, true) === "Tomorrow");
+check("today is still today with future allowed", dayLabel(at(2026, 8, 3, 18), now, true) === "Today");
+check(
+  "later this week names the day",
+  dayLabel(at(2026, 8, 6, 9), now, true) === "Thursday",
+  dayLabel(at(2026, 8, 6, 9), now, true)
+);
+check(
+  "beyond a week falls back to a date",
+  dayLabel(at(2026, 8, 20, 9), now, true) === "20 Aug",
+  dayLabel(at(2026, 8, 20, 9), now, true)
+);
+check("yesterday unaffected by the flag", dayLabel(at(2026, 8, 2, 9), now, true) === "Yesterday");
+
+{
+  // Visits arriving out of order must still head up in date order once sorted,
+  // one heading per day.
+  type V = { id: string; startsAt: string };
+  const rows: V[] = [
+    { id: "later", startsAt: at(2026, 8, 6, 9).toISOString() },
+    { id: "tomorrow", startsAt: at(2026, 8, 4, 8).toISOString() },
+    { id: "tomorrow-pm", startsAt: at(2026, 8, 4, 15).toISOString() },
+  ];
+  const sorted = [...rows].sort(
+    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+  );
+  const groups = groupByDay(sorted, (r) => r.startsAt, now, { allowFuture: true });
+  check("two visit days", groups.length === 2, `got ${groups.length}`);
+  check("tomorrow first", groups[0].label === "Tomorrow", groups[0].label);
+  check("both of tomorrow's visits together", groups[0].rows.length === 2);
+  check("then Thursday", groups[1].label === "Thursday", groups[1].label);
+}
+
 if (failures > 0) throw new Error(`${failures} date-group failure(s)`);
 console.log("OK: day labels and grouping");

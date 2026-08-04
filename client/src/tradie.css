@@ -3203,3 +3203,34 @@ html.native-app .tradie-bottom-nav {
   line-height: 1.4;
   color: var(--t-ink-faint);
 }
+
+/* ---------- jobs pipeline (phase 1) ---------- */
+
+/* When the job has a visit booked, the time is the thing the tradie is
+   scanning for — it goes above the badges, not buried under them. */
+.t-row-when {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-ink-soft);
+}
+
+/* Operational and commercial, side by side, never merged into one. */
+.t-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+.t-badge-row .t-pill { font-size: 11.5px; }
+
+/* Unbilled work is the one count on this screen worth interrupting for. */
+.t-tab-count.is-accent {
+  background: var(--t-accent);
+  color: #fff;
+}
+.t-tab.is-active .t-tab-count.is-accent {
+  background: var(--t-accent);
+  color: #fff;
+}

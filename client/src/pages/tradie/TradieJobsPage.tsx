@@ -2,59 +2,59 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { formatGbp, sendOrQueue, tradieApi } from "../../api/tradie";
-import { EmptyState, QueryError, IconChevron, StatusPill } from "./ui";
+import {
+  commercialTone,
+  jobsApi,
+  operationalTone,
+  type JobBucket,
+  type JobCard,
+} from "../../api/jobs";
+import { EmptyState, QueryError, IconChevron } from "./ui";
 import { SwipeListRow } from "./SwipeListRow";
 import { IconSearch, ListToolbar, useListFilter, type ListTab } from "./ListToolbar";
 import { groupByDay } from "../../lib/dateGroups";
 
 type ArchivedData = Awaited<ReturnType<typeof tradieApi.archived>>;
 
-type JobRow = {
-  id: string;
-  name: string;
-  phone: string;
-  message: string | null;
-  postcode: string | null;
-  distanceMiles: number | null;
-  createdAt: string;
-  latestQuote: { id: string; status: string; totalPence: number } | null;
-};
-
+/**
+ * The pipeline, in the order work moves through it.
+ *
+ * Enquiries are deliberately absent: they live in the Inbox, where a missed call
+ * arrives already qualified. Jobs starts at the point something became work.
+ */
 const TABS: readonly ListTab[] = [
   { id: "all", label: "All" },
-  { id: "new", label: "New" },
-  { id: "quote", label: "Quote" },
-  { id: "won", label: "Won" },
+  { id: "to_schedule", label: "To schedule" },
+  { id: "upcoming", label: "Upcoming" },
+  { id: "in_progress", label: "In progress" },
+  { id: "to_invoice", label: "To invoice" },
+  { id: "done", label: "Done" },
   { id: "archive", label: "Archive" },
 ];
 
-/**
- * Which tab a job belongs under.
- *
- * Named for where the job is in the tradie's head, not for the quote status enum:
- * nobody thinks "this enquiry has an ACCEPTED quote", they think they won it.
- */
-function tabOf(job: JobRow): "new" | "quote" | "won" {
-  const status = job.latestQuote?.status;
-  if (!status) return "new";
-  if (status === "ACCEPTED") return "won";
-  return "quote";
-}
-
-function matches(job: JobRow, needle: string): boolean {
+function matches(job: { name: string; postcode: string | null; phone: string; title?: string; message: string | null }, needle: string): boolean {
   if (!needle) return true;
-  return [job.name, job.postcode, job.phone, job.message]
+  return [job.title, job.name, job.postcode, job.phone, job.message]
     .filter(Boolean)
     .some((field) => String(field).toLowerCase().includes(needle));
+}
+
+/** "Thu 6 Aug, 09:00–11:00" — what the tradie told the customer, where there is one. */
+function visitLine(job: JobCard): string | null {
+  const v = job.nextVisit;
+  if (!v) return null;
+  const start = new Date(v.arrivalWindowStart || v.startsAt);
+  const end = new Date(v.arrivalWindowEnd || v.endsAt);
+  const day = start.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const from = start.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const to = end.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return `${day}, ${from}–${to}`;
 }
 
 export default function TradieJobsPage() {
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ["tradie-me"], queryFn: () => tradieApi.me() });
-  const jobs = useQuery({
-    queryKey: ["tradie-jobs"],
-    queryFn: () => tradieApi.jobs(),
-  });
+  const jobs = useQuery({ queryKey: ["tradie-jobs"], queryFn: () => jobsApi.list() });
 
   const { tab, setTab, query, setQuery, searchOpen, toggleSearch } = useListFilter("all");
   const onArchiveTab = tab === "archive";
@@ -78,20 +78,20 @@ export default function TradieJobsPage() {
    * rather than leaving the tradie a row short and none the wiser.
    */
   const dropRow = (id: string) => {
-    const previous = qc.getQueryData<JobRow[]>(["tradie-jobs"]);
-    qc.setQueryData<JobRow[]>(["tradie-jobs"], (rows) => (rows || []).filter((r) => r.id !== id));
+    const previous = qc.getQueryData<JobCard[]>(["tradie-jobs"]);
+    qc.setQueryData<JobCard[]>(["tradie-jobs"], (rows) => (rows || []).filter((r) => r.id !== id));
     return { previous };
   };
 
-  const putBack = (ctx: { previous?: JobRow[] } | undefined) => {
-    if (ctx?.previous) qc.setQueryData<JobRow[]>(["tradie-jobs"], ctx.previous);
+  const putBack = (ctx: { previous?: JobCard[] } | undefined) => {
+    if (ctx?.previous) qc.setQueryData<JobCard[]>(["tradie-jobs"], ctx.previous);
     setActionError("That didn’t save — the job is still here. Try again.");
   };
 
   const archive = useMutation({
-    mutationFn: (job: JobRow) =>
+    mutationFn: (job: JobCard) =>
       sendOrQueue({
-        label: `Archive job · ${job.name}`,
+        label: `Archive job · ${job.title}`,
         path: `/jobs/${job.id}/archive`,
         method: "POST",
         body: {},
@@ -106,9 +106,9 @@ export default function TradieJobsPage() {
   });
 
   const remove = useMutation({
-    mutationFn: (job: JobRow) =>
+    mutationFn: (job: JobCard) =>
       sendOrQueue({
-        label: `Delete job · ${job.name}`,
+        label: `Delete job · ${job.title}`,
         path: `/jobs/${job.id}`,
         method: "DELETE",
         body: {},
@@ -123,9 +123,9 @@ export default function TradieJobsPage() {
   });
 
   const restore = useMutation({
-    mutationFn: (job: JobRow) =>
+    mutationFn: (job: { id: string; title?: string; name: string }) =>
       sendOrQueue({
-        label: `Restore job · ${job.name}`,
+        label: `Restore job · ${job.title || job.name}`,
         path: `/jobs/${job.id}/unarchive`,
         method: "POST",
         body: {},
@@ -136,16 +136,13 @@ export default function TradieJobsPage() {
     // happen is the exact complaint that got the offline work started.
     onMutate: (job) => {
       const previousArchived = qc.getQueryData<ArchivedData>(["tradie-archived"]);
-      const previousJobs = qc.getQueryData<JobRow[]>(["tradie-jobs"]);
       qc.setQueryData<ArchivedData>(["tradie-archived"], (prev) =>
         prev ? { ...prev, jobs: prev.jobs.filter((j) => j.id !== job.id) } : prev
       );
-      qc.setQueryData<JobRow[]>(["tradie-jobs"], (rows) => [job, ...(rows || [])]);
-      return { previousArchived, previousJobs };
+      return { previousArchived };
     },
     onError: (_err, _job, ctx) => {
       if (ctx?.previousArchived) qc.setQueryData(["tradie-archived"], ctx.previousArchived);
-      if (ctx?.previousJobs) qc.setQueryData(["tradie-jobs"], ctx.previousJobs);
       setActionError("Couldn’t restore that one. Try again.");
     },
     onSuccess: (r) => {
@@ -158,33 +155,59 @@ export default function TradieJobsPage() {
   });
 
   const needle = query.trim().toLowerCase();
+  const all = useMemo(() => jobs.data || [], [jobs.data]);
 
   const counts = useMemo(() => {
-    const all = jobs.data || [];
-    const tally = { all: all.length, new: 0, quote: 0, won: 0, archive: 0 };
-    for (const j of all) tally[tabOf(j as JobRow)] += 1;
+    const tally: Record<string, number> = {
+      all: all.length,
+      to_schedule: 0,
+      upcoming: 0,
+      in_progress: 0,
+      to_invoice: 0,
+      done: 0,
+    };
+    for (const j of all) tally[j.bucket] += 1;
     return tally;
-  }, [jobs.data]);
+  }, [all]);
 
   const groups = useMemo(() => {
-    const rows = ((jobs.data || []) as JobRow[])
-      .filter((j) => (tab === "all" ? true : tabOf(j) === tab))
+    const rows = all
+      .filter((j) => (tab === "all" ? true : j.bucket === (tab as JobBucket)))
       .filter((j) => matches(j, needle));
+
+    /**
+     * Upcoming is the one tab that answers "what am I doing next", so it's
+     * ordered and headed by when the tradie is due on site. Grouping it by when
+     * the enquiry happened to arrive would put next Tuesday's boiler above
+     * tomorrow morning's leak.
+     */
+    if (tab === "upcoming") {
+      const byVisit = [...rows].sort(
+        (a, b) =>
+          new Date(a.nextVisit?.startsAt || a.createdAt).getTime() -
+          new Date(b.nextVisit?.startsAt || b.createdAt).getTime()
+      );
+      return groupByDay(byVisit, (j) => j.nextVisit?.startsAt || j.createdAt, new Date(), {
+        allowFuture: true,
+      });
+    }
+
     return groupByDay(rows, (j) => j.createdAt);
-  }, [jobs.data, tab, needle]);
+  }, [all, tab, needle]);
 
   const archivedRows = useMemo(() => {
-    const rows = ((archived.data?.jobs || []) as JobRow[]).filter((j) => matches(j, needle));
+    const rows = (archived.data?.jobs || []).filter((j) => matches(j, needle));
     return groupByDay(rows, (j) => j.createdAt);
   }, [archived.data, needle]);
 
-  const confirmDelete = (job: JobRow) => {
-    if (!window.confirm(`Delete job for ${job.name}? This can’t be undone.`)) return;
+  const confirmDelete = (job: JobCard) => {
+    if (!window.confirm(`Delete “${job.title}”? This can’t be undone.`)) return;
     remove.mutate(job);
   };
 
-  const shown = onArchiveTab ? archivedRows : groups;
-  const total = shown.reduce((n, g) => n + g.rows.length, 0);
+  const total = onArchiveTab
+    ? archivedRows.reduce((n, g) => n + g.rows.length, 0)
+    : groups.reduce((n, g) => n + g.rows.length, 0);
   const loading = onArchiveTab ? archived.isLoading : jobs.isLoading;
 
   return (
@@ -217,8 +240,11 @@ export default function TradieJobsPage() {
         query={query}
         onQuery={setQuery}
         searchOpen={searchOpen}
-        placeholder="Search name, postcode or notes"
+        placeholder="Search job, name or postcode"
         counts={counts}
+        // Work that's done and not billed is the only count here that costs
+        // money to ignore, so it's the only one that gets colour.
+        accentTabs={["to_invoice"]}
       />
 
       {me.data && !me.data.caps.claude && (
@@ -229,85 +255,111 @@ export default function TradieJobsPage() {
       <QueryError error={onArchiveTab ? archived.error : jobs.error} />
       {actionError && <p className="error">{actionError}</p>}
 
-      {shown.map((group) => (
-        <section key={group.key} className="t-day-group">
-          <h3 className="t-day-head">{group.label}</h3>
-          <ul className="t-list">
-            {group.rows.map((j) =>
-              onArchiveTab ? (
-                <li key={j.id}>
-                  <div className="t-row t-row--static">
-                    <Link
-                      className="t-row-main t-row-main--link"
-                      to={`/t/jobs/${j.id}`}
-                      state={{ from: "/t", fromLabel: "Jobs" }}
-                    >
-                      <div className="t-row-top">
-                        <strong>{j.name}</strong>
-                        {j.latestQuote ? (
-                          <StatusPill status={j.latestQuote.status} />
-                        ) : (
-                          <span className="t-pill t-pill--grey">Archived</span>
-                        )}
-                      </div>
-                      <span className="t-row-sub">{j.postcode || j.phone}</span>
-                      {j.message && <span className="t-row-snip">{j.message}</span>}
-                    </Link>
-                    <div className="t-row-side t-row-side--stack">
-                      {j.latestQuote && <span className="t-money">{formatGbp(j.latestQuote.totalPence)}</span>}
-                      <button
-                        type="button"
-                        className="t-btn"
-                        disabled={restore.isPending}
-                        onClick={() => restore.mutate(j)}
+      {onArchiveTab
+        ? archivedRows.map((group) => (
+            <section key={group.key} className="t-day-group">
+              <h3 className="t-day-head">{group.label}</h3>
+              <ul className="t-list">
+                {group.rows.map((j) => (
+                  <li key={j.id}>
+                    <div className="t-row t-row--static">
+                      <Link
+                        className="t-row-main t-row-main--link"
+                        to={`/t/jobs/${j.id}`}
+                        state={{ from: "/t", fromLabel: "Jobs" }}
                       >
-                        Restore
-                      </button>
+                        <div className="t-row-top">
+                          <strong>{j.title || j.name}</strong>
+                          <span className="t-pill t-pill--grey">Archived</span>
+                        </div>
+                        <span className="t-row-sub">
+                          {[j.name, j.postcode].filter(Boolean).join(" · ")}
+                        </span>
+                      </Link>
+                      <div className="t-row-side t-row-side--stack">
+                        {j.latestQuote && <span className="t-money">{formatGbp(j.latestQuote.totalPence)}</span>}
+                        <button
+                          type="button"
+                          className="t-btn"
+                          disabled={restore.isPending}
+                          onClick={() => restore.mutate(j)}
+                        >
+                          Restore
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ) : (
-                <SwipeListRow
-                  key={j.id}
-                  to={`/t/jobs/${j.id}`}
-                  onArchive={() => archive.mutate(j)}
-                  onDelete={() => confirmDelete(j)}
-                >
-                  <div className="t-row-main">
-                    <div className="t-row-top">
-                      <strong>{j.name}</strong>
-                      {j.latestQuote ? (
-                        <StatusPill status={j.latestQuote.status} />
-                      ) : (
-                        <span className="t-pill t-pill--orange">New</span>
-                      )}
-                    </div>
-                    <span className="t-row-sub">
-                      {j.postcode || j.phone}
-                      {j.distanceMiles != null ? ` · ~${j.distanceMiles} mi` : ""}
-                    </span>
-                    {j.message && <span className="t-row-snip">{j.message}</span>}
-                  </div>
-                  <div className="t-row-side">
-                    {j.latestQuote && <span className="t-money">{formatGbp(j.latestQuote.totalPence)}</span>}
-                    <IconChevron />
-                  </div>
-                </SwipeListRow>
-              )
-            )}
-          </ul>
-        </section>
-      ))}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        : groups.map((group) => (
+            <section key={group.key} className="t-day-group">
+              <h3 className="t-day-head">{group.label}</h3>
+              <ul className="t-list">
+                {group.rows.map((j) => {
+                  const when = visitLine(j);
+                  return (
+                    <SwipeListRow
+                      key={j.id}
+                      to={`/t/jobs/${j.id}`}
+                      onArchive={() => archive.mutate(j)}
+                      onDelete={() => confirmDelete(j)}
+                    >
+                      <div className="t-row-main">
+                        {/* Work title leads, customer second — a tradie looking
+                            down this list is looking for the job, not the name. */}
+                        <div className="t-row-top">
+                          <strong>{j.title}</strong>
+                        </div>
+                        <span className="t-row-sub">
+                          {[j.customer?.name || j.name, j.property?.postcode || j.postcode]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                        {when && <span className="t-row-when">🕑 {when}</span>}
+                        <div className="t-badge-row">
+                          {/* Two badges, never merged. One saying both is what
+                              made unbilled work invisible in the first place. */}
+                          <span className={`t-pill ${operationalTone(j.operational)}`}>
+                            {j.operationalLabel}
+                          </span>
+                          <span className={`t-pill ${commercialTone(j.commercial)}`}>
+                            {j.commercialLabel}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="t-row-side">
+                        {j.quotedTotalPence > 0 ? (
+                          <span className="t-money">{formatGbp(j.quotedTotalPence)}</span>
+                        ) : j.latestQuote ? (
+                          <span className="t-money">{formatGbp(j.latestQuote.totalPence)}</span>
+                        ) : null}
+                        <IconChevron />
+                      </div>
+                    </SwipeListRow>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
 
       {!loading && total === 0 && needle && (
-        <EmptyState title={`No jobs match “${query.trim()}”`} hint="Try a name, postcode or phone number." />
+        <EmptyState title={`No jobs match “${query.trim()}”`} hint="Try a job title, name or postcode." />
       )}
 
       {!loading && total === 0 && !needle && onArchiveTab && (
         <EmptyState title="No archived jobs" hint="Swipe right on a job to archive it." />
       )}
 
-      {!loading && total === 0 && !needle && !onArchiveTab && tab !== "all" && (
+      {!loading && total === 0 && !needle && !onArchiveTab && tab === "to_invoice" && (
+        <EmptyState
+          title="Nothing waiting to be billed"
+          hint="Completed jobs land here until you invoice them."
+        />
+      )}
+
+      {!loading && total === 0 && !needle && !onArchiveTab && tab !== "all" && tab !== "to_invoice" && (
         <EmptyState
           title={`Nothing under ${TABS.find((t) => t.id === tab)?.label}`}
           hint="Tap All to see every job."

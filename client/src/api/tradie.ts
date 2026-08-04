@@ -723,6 +723,10 @@ export const tradieApi = {
         postcode: string | null;
         distanceMiles: number | null;
         createdAt: string;
+        title: string;
+        operational: string;
+        commercial: string;
+        archivedAt: string | null;
         latestQuote: { id: string; status: string; totalPence: number } | null;
       }[];
       quotes: {

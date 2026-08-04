@@ -51,6 +51,7 @@ export function ListToolbar({
   searchOpen,
   placeholder,
   counts,
+  accentTabs,
 }: {
   tabs: readonly ListTab[];
   tab: string;
@@ -61,13 +62,28 @@ export function ListToolbar({
   placeholder: string;
   /** Rows per tab, so the tradie can see where things are without tapping through. */
   counts?: Record<string, number>;
+  /** Tabs whose count is worth noticing — money owed, not just a total. */
+  accentTabs?: readonly string[];
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
 
   // Opening search with nowhere to type is a wasted tap.
   useEffect(() => {
     if (searchOpen) inputRef.current?.focus();
   }, [searchOpen]);
+
+  /**
+   * Keep the selected tab on screen.
+   *
+   * With enough tabs to need scrolling, arriving on a deep-linked filter — or
+   * coming back from a job — can leave the active tab off the right-hand edge,
+   * so the list looks unfiltered for no visible reason.
+   */
+  useEffect(() => {
+    const active = stripRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    active?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [tab]);
 
   return (
     <>
@@ -85,10 +101,11 @@ export function ListToolbar({
         </div>
       )}
 
-      <div className="t-tabs" role="tablist">
+      <div className="t-tabs" role="tablist" ref={stripRef}>
         {tabs.map((t) => {
           const on = t.id === tab;
           const count = counts?.[t.id];
+          const accent = !!count && accentTabs?.includes(t.id);
           return (
             <button
               key={t.id}
@@ -99,7 +116,9 @@ export function ListToolbar({
               onClick={() => onTab(t.id)}
             >
               {t.label}
-              {count ? <span className="t-tab-count">{count}</span> : null}
+              {count ? (
+                <span className={`t-tab-count${accent ? " is-accent" : ""}`}>{count}</span>
+              ) : null}
             </button>
           );
         })}

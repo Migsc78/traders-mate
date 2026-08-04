@@ -26,18 +26,28 @@ export function dayKey(value: string | Date): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-export function dayLabel(value: string | Date, now: Date = new Date()): string {
+/**
+ * @param allowFuture true when the date can legitimately be ahead of now — a
+ *   booked visit, say. Left false for creation timestamps, where a date in the
+ *   future means the phone's clock disagrees with the server's rather than
+ *   anything real, and "Today" beats "Tomorrow" for something that just
+ *   happened a minute either side of midnight.
+ */
+export function dayLabel(value: string | Date, now: Date = new Date(), allowFuture = false): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "Undated";
 
   const ago = daysAgo(d, now);
 
-  // Nothing here is legitimately in the future — these are creation timestamps —
-  // so a negative value means clock skew between the phone and the server. Showing
-  // "Today" beats showing a date for something that just happened.
-  if (ago <= 0) return "Today";
-  if (ago === 1) return "Yesterday";
-  if (ago < 7) return d.toLocaleDateString("en-GB", { weekday: "long" });
+  if (ago === 0) return "Today";
+  if (ago < 0) {
+    if (!allowFuture) return "Today";
+    if (ago === -1) return "Tomorrow";
+    if (ago > -7) return d.toLocaleDateString("en-GB", { weekday: "long" });
+  } else {
+    if (ago === 1) return "Yesterday";
+    if (ago < 7) return d.toLocaleDateString("en-GB", { weekday: "long" });
+  }
 
   const sameYear = d.getFullYear() === now.getFullYear();
   return d.toLocaleDateString(
@@ -57,7 +67,8 @@ export type DayGroup<T> = { key: string; label: string; rows: T[] };
 export function groupByDay<T>(
   rows: T[],
   getDate: (row: T) => string | Date | null | undefined,
-  now: Date = new Date()
+  now: Date = new Date(),
+  opts?: { allowFuture?: boolean }
 ): DayGroup<T>[] {
   const groups = new Map<string, DayGroup<T>>();
 
@@ -66,7 +77,11 @@ export function groupByDay<T>(
     const key = raw ? dayKey(raw) : "unknown";
     let group = groups.get(key);
     if (!group) {
-      group = { key, label: raw ? dayLabel(raw, now) : "Undated", rows: [] };
+      group = {
+        key,
+        label: raw ? dayLabel(raw, now, opts?.allowFuture) : "Undated",
+        rows: [],
+      };
       groups.set(key, group);
     }
     group.rows.push(row);
