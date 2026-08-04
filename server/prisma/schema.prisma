@@ -239,6 +239,14 @@ model Client {
   defaultDepositPercent Int @default(0)
   /// Default terms text prefilled on Deposit & terms (quotes)
   defaultTermsNote String?
+  /// What an hour of labour costs the business, for job profit.
+  ///
+  /// Null on purpose, and null is the right answer for a sole trader: he doesn't
+  /// invoice himself, so charging his own time against a job would show every job
+  /// at roughly zero margin and make the number worthless. Left unset, job profit
+  /// reads as money in his pocket. The day someone else is on the van, set this
+  /// and the same arithmetic keeps working.
+  labourCostPerHourPence Int?
   allowedOrigins   String[]     @default([]) // domains permitted to POST via the widget
   tradieNotifyTpl  String? // custom message the tradie receives
   customerAckTpl   String? // custom auto-reply the customer sees
@@ -262,6 +270,10 @@ model Client {
   quoteTemplates   QuoteTemplate[]
   customers        Customer[]
   assetTypes       AssetType[]
+  jobs             Job[]
+  jobCosts         JobCost[]
+  jobEvents        JobEvent[]
+  accessReveals    AccessReveal[]
 
   @@index([status])
   @@index([destPhone])
@@ -366,6 +378,7 @@ model Customer {
   reminders          Reminder[]
   enquiries          Enquiry[]
   invoices           Invoice[]
+  jobs               Job[]
   /// Properties billed to this customer but owned by another record.
   billedProperties   Property[]     @relation("PropertyBillTo")
 
@@ -403,6 +416,7 @@ model Contact {
   updatedAt            DateTime    @updatedAt
 
   siteFor              Property[]  @relation("PropertySiteContact")
+  siteForJobs          Job[]       @relation("JobSiteContact")
 
   @@index([customerId, sort])
 }
@@ -441,6 +455,8 @@ model Property {
   files             CustomerFile[]
   propertyNotes     CustomerNote[]
   reminders         Reminder[]
+  jobs              Job[]
+  accessReveals     AccessReveal[]
 
   @@index([customerId, sort])
   @@index([clientId, postcode])
@@ -573,6 +589,8 @@ model CustomerFile {
   asset       Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
   enquiryId   String?
   enquiry     Enquiry?         @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  jobId       String?
+  job         Job?             @relation(fields: [jobId], references: [id], onDelete: SetNull)
   category    FileCategory     @default(OTHER)
   filename    String
   url         String
@@ -584,8 +602,12 @@ model CustomerFile {
   visibility  RecordVisibility @default(INTERNAL)
   createdAt   DateTime         @default(now())
 
+  /// Receipts attached to a cost line — the merchant docket behind "paid £1,012".
+  receiptFor  JobCost[]        @relation("JobCostReceipt")
+
   @@index([clientId, customerId, createdAt])
   @@index([clientId, expiresAt])
+  @@index([clientId, jobId, createdAt])
 }
 
 enum NoteType {
@@ -606,6 +628,8 @@ model CustomerNote {
   asset      Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
   enquiryId  String?
   enquiry    Enquiry?         @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  jobId      String?
+  job        Job?             @relation(fields: [jobId], references: [id], onDelete: SetNull)
   type       NoteType         @default(CUSTOMER)
   body       String
   pinned     Boolean          @default(false)
@@ -701,11 +725,190 @@ model Enquiry {
   certificates Certificate[]
   files        CustomerFile[]
   notes        CustomerNote[]
+  jobs         Job[]
 
   @@index([clientId, createdAt])
   @@index([clientId, phone])
   @@index([clientId, pipeline, createdAt])
   @@index([clientId, customerId])
+}
+
+/// Where the work has got to on the ground.
+enum JobOperational {
+  UNSCHEDULED
+  SCHEDULED
+  ON_THE_WAY
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+/// Where the money has got to. Deliberately separate from JobOperational.
+///
+/// One badge cannot say both, and trying made a job that was finished last Tuesday
+/// but never billed look identical to one quoted this morning and not started. That
+/// is unbilled work made invisible, which is the most expensive bug in a trade app.
+enum JobCommercial {
+  UNQUOTED
+  QUOTED
+  DEPOSIT_DUE
+  DEPOSIT_PAID
+  READY_TO_INVOICE
+  INVOICE_SENT
+  PAID
+}
+
+/// The operational container for agreed work.
+///
+/// Before this existed a "job" was an Enquiry row with pipeline flipped to JOB, and
+/// its status was read off whichever quote happened to be newest — which is why a
+/// DECLINED quote could show up as a job state. A job now owns its own two states.
+model Job {
+  id               String         @id @default(cuid())
+  clientId         String
+  client           Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// The enquiry this came from, kept for provenance. Null for a job booked direct.
+  enquiryId        String?
+  enquiry          Enquiry?       @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  /// The accepted commercial baseline. Never mutated once work starts — extras are
+  /// JobCost rows, so the original agreed price stays auditable.
+  quoteId          String?
+  quote            Quote?         @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  customerId       String?
+  customer         Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  propertyId       String?
+  property         Property?      @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  siteContactId    String?
+  siteContact      Contact?       @relation("JobSiteContact", fields: [siteContactId], references: [id], onDelete: SetNull)
+  /// Human-facing ref — "J-1042". Assigned per client.
+  reference        String?
+  title            String
+  scope            String?
+  operational      JobOperational @default(UNSCHEDULED)
+  /// UNQUOTED by default because a call-out has no quote. The PRD's list starts at
+  /// QUOTED and has no state for the emergency-leak path it also specifies.
+  commercial       JobCommercial  @default(UNQUOTED)
+  /// Ex-VAT accepted total. VAT is not the tradie's money and must not reach profit.
+  quotedTotalPence Int            @default(0)
+  depositPaidPence Int            @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  archivedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  visits           Appointment[]
+  costs            JobCost[]
+  events           JobEvent[]
+  files            CustomerFile[]
+  notes            CustomerNote[]
+  accessReveals    AccessReveal[]
+
+  @@index([clientId, operational, createdAt])
+  @@index([clientId, commercial, createdAt])
+  @@index([clientId, archivedAt])
+  @@index([customerId])
+  @@index([propertyId])
+  @@index([quoteId])
+  @@index([enquiryId])
+}
+
+enum JobCostType {
+  MATERIAL
+  LABOUR
+  EXPENSE
+  SUBCONTRACTOR
+}
+
+/// What a job actually cost, and what it's charged out at.
+///
+/// Both numbers on one row on purpose: the gap between them is the job's profit,
+/// and splitting them across tables would mean joining to answer the only question
+/// anyone asks of this data.
+model JobCost {
+  id              String      @id @default(cuid())
+  clientId        String
+  client          Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  jobId           String
+  job             Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  type            JobCostType @default(MATERIAL)
+  label           String
+  qty             Float       @default(1)
+  unit            PriceUnit   @default(JOB)
+  /// What it cost the tradie. Zero is a real answer for own labour; see
+  /// Client.labourCostPerHourPence.
+  unitCostPence   Int         @default(0)
+  /// What the customer is charged, ex VAT.
+  sellPricePence  Int         @default(0)
+  vatRate         Float       @default(20)
+  billable        Boolean     @default(true)
+  priceBookItemId String?
+  priceBookItem   PriceBookItem? @relation(fields: [priceBookItemId], references: [id], onDelete: SetNull)
+  /// Work beyond the accepted quote. This plus agreedAt is the whole of
+  /// "variations" — recording that the customer said yes is the part with value;
+  /// a Draft/Sent/Approved/Declined state machine is one nobody would drive.
+  isExtra         Boolean     @default(false)
+  agreedAt        DateTime?
+  /// phone | in person | message
+  agreedVia       String?
+  receiptFileId   String?
+  receiptFile     CustomerFile? @relation("JobCostReceipt", fields: [receiptFileId], references: [id], onDelete: SetNull)
+  invoicedAt      DateTime?
+  /// QUOTE | BOOK | MANUAL — where the line came from.
+  source          String      @default("MANUAL")
+  sort            Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([jobId, sort])
+  @@index([clientId, invoicedAt])
+}
+
+/// Job history, stored rather than derived.
+///
+/// This reverses the call made for the customer timeline, and the reason matters:
+/// job history is commercially meaningful — when you arrived, when the customer
+/// approved the extra, when it was signed off. A derived timeline that quietly
+/// changes when an underlying record is edited is worse than none if a job is ever
+/// disputed. Customer activity stays derived; this does not.
+model JobEvent {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// job.created, job.scheduled, visit.on_my_way, job.started, job.completed,
+  /// cost.added, cost.extra_agreed, invoice.created, invoice.paid, access.revealed
+  type      String
+  summary   String
+  payload   Json?
+  /// Account holder for now; a real user id once staff logins exist.
+  actor     String?
+  createdAt DateTime @default(now())
+
+  @@index([jobId, createdAt])
+}
+
+/// Who looked at a property's access code, and when.
+///
+/// Its own table rather than a JobEvent because a code can be revealed from the
+/// property record with no job in sight. Written from day one even though there is
+/// currently one user per account, so the history isn't starting from zero on the
+/// day engineer logins ship — which is the day it starts to matter.
+model AccessReveal {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  jobId      String?
+  job        Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  actorLabel String
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([propertyId, createdAt])
 }
 
 enum QuoteStatus {
@@ -764,6 +967,12 @@ model PriceBookItem {
   category       String?
   unit           PriceUnit @default(JOB)
   unitPricePence Int
+  /// What this costs the tradie, for job profit. Nullable, and stays nullable.
+  ///
+  /// An item with no cost must read as "cost not set", never as 100% margin — a
+  /// confidently wrong profit figure is worse than an absent one, because it's the
+  /// one a tradie would act on.
+  costPricePence Int?
   vatRate        Float     @default(20)
   isCallout      Boolean   @default(false)
   active         Boolean   @default(true)
@@ -771,6 +980,7 @@ model PriceBookItem {
   updatedAt      DateTime  @updatedAt
 
   quoteLines     QuoteLine[]
+  jobCosts       JobCost[]
 
   @@index([clientId, active])
 }
@@ -839,6 +1049,7 @@ model Quote {
   lines           QuoteLine[]
   followUps       FollowUp[]
   invoices        Invoice[]
+  jobs            Job[]
 
   @@index([clientId, status, createdAt])
   @@index([enquiryId])
@@ -910,6 +1121,12 @@ model QuoteLine {
   qty             Float          @default(1)
   unit            PriceUnit      @default(JOB)
   unitPricePence  Int
+  /// Cost snapshotted when the line was priced.
+  ///
+  /// Copied off the price book rather than read through it, because merchant prices
+  /// move. The margin worth seeing is the one expected when the job was priced, not
+  /// one that silently rewrites itself when copper goes up in June.
+  costPricePence  Int?
   vatRate         Float          @default(20)
   priceBookItemId String?
   priceBookItem   PriceBookItem? @relation(fields: [priceBookItemId], references: [id], onDelete: SetNull)
@@ -1132,17 +1349,34 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+/// An appointment is also the job's visit.
+///
+/// The PRD models Visit as a separate entity, but this table already carries
+/// start/end, ON_THE_WAY and the whole Diary. Making the visit a second record
+/// pointing at the same slot would mean two sources of truth for "when am I
+/// there", kept in sync by hand. Extending this instead means scheduling a visit
+/// *is* creating the diary entry — there is nothing left to drift.
 model Appointment {
   id          String            @id @default(cuid())
   clientId    String
   client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   enquiryId   String?
   enquiry     Enquiry?          @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  jobId       String?
+  job         Job?              @relation(fields: [jobId], references: [id], onDelete: Cascade)
   title       String
   notes       String?
+  /// Survey | First fix | Return with part | Final | Service — free text, shown as
+  /// a chip once a job has more than one visit.
+  kind        String?
   startsAt    DateTime
   endsAt      DateTime
+  /// What the customer was told — "between 9 and 11" — as opposed to the slot the
+  /// tradie blocked out. Nullable: most jobs are booked to a time, not a window.
+  arrivalWindowStart DateTime?
+  arrivalWindowEnd   DateTime?
   status      AppointmentStatus @default(SCHEDULED)
+  completedAt DateTime?
   address     String?
   customerName String?
   customerPhone String?
@@ -1153,6 +1387,7 @@ model Appointment {
 
   @@index([clientId, startsAt])
   @@index([enquiryId])
+  @@index([jobId, startsAt])
 }
 
 enum CertificateKind {
