@@ -14,6 +14,7 @@ import { sendMessage, toE164UK, twilioConfigured } from "../services/messaging/s
 import { storeAudio, storeImage } from "../services/storage/store.js";
 import { createMagicLogin, createClientSession, resolveSession, appPublicUrl } from "../services/quotes/magicAuth.js";
 import {
+  attachCostPrices,
   createPriceBookItem,
   deactivatePriceBookItem,
   ensurePriceBook,
@@ -225,6 +226,7 @@ tradieRouter.get("/me", requireClient, async (req, res, next) => {
       googleReviewUrl: client.googleReviewUrl,
       defaultDepositPercent: client.defaultDepositPercent,
       defaultTermsNote: client.defaultTermsNote,
+      labourCostPerHourPence: client.labourCostPerHourPence,
       logoUrl: (
         await prisma.clientAsset.findFirst({
           where: { clientId: client.id, kind: "LOGO" },
@@ -272,6 +274,9 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
         googleReviewUrl: z.string().url().max(500).nullable().optional().or(z.literal("")),
         defaultDepositPercent: z.number().int().min(0).max(100).optional(),
         defaultTermsNote: z.string().max(2000).nullable().optional(),
+        // Null clears it back to "my own time", which is the honest default for
+        // a sole trader and must stay reachable once it has been set.
+        labourCostPerHourPence: z.number().int().min(0).max(100000).nullable().optional(),
       })
       .parse(req.body ?? {});
 
@@ -315,6 +320,9 @@ tradieRouter.patch("/me", requireClient, async (req, res, next) => {
           : {}),
         ...(body.defaultDepositPercent !== undefined
           ? { defaultDepositPercent: body.defaultDepositPercent }
+          : {}),
+        ...(body.labourCostPerHourPence !== undefined
+          ? { labourCostPerHourPence: body.labourCostPerHourPence }
           : {}),
         ...(body.defaultTermsNote !== undefined
           ? { defaultTermsNote: body.defaultTermsNote?.trim() || null }
@@ -623,6 +631,7 @@ tradieRouter.get("/onboarding", requireClient, async (req, res, next) => {
       ),
       defaultDepositPercent: client.defaultDepositPercent,
       defaultTermsNote: client.defaultTermsNote,
+      labourCostPerHourPence: client.labourCostPerHourPence,
     });
   } catch (err) {
     next(err);
@@ -994,6 +1003,9 @@ const priceBookItemSchema = z.object({
   category: z.string().nullable().optional(),
   unit: z.enum(["EACH", "HOUR", "DAY", "JOB", "METRE"]),
   unitPricePence: z.number().int().min(0),
+  // Optional with no default, like category: an app build that predates cost
+  // prices must not blank a tradie's costs simply by not knowing about them.
+  costPricePence: z.number().int().min(0).nullable().optional(),
   vatRate: z.number().min(0).max(100).default(20),
   isCallout: z.boolean().optional(),
   active: z.boolean().optional(),
@@ -1006,6 +1018,8 @@ const importRowSchema = z.object({
   unit: z.string().optional(),
   unitPriceGbp: z.number().optional(),
   unitPricePence: z.number().int().min(0).optional(),
+  costPriceGbp: z.number().optional(),
+  costPricePence: z.number().int().min(0).optional(),
   vatRate: z.number().min(0).max(100).optional(),
   isCallout: z.boolean().optional(),
   active: z.boolean().optional(),
@@ -1097,16 +1111,19 @@ tradieRouter.put("/quotes/:id/lines", requireClient, idempotent(async (req, res,
     if (!existing) throw new ApiError(404, "not_found", "Quote not found");
     if (existing.status !== "DRAFT") throw new ApiError(400, "not_draft", "Only draft quotes can be edited");
 
+    const pricedLines = await attachCostPrices(clientId(req), body.lines);
     await prisma.quoteLine.deleteMany({ where: { quoteId: existing.id } });
     await prisma.quoteLine.createMany({
-      data: body.lines.map((l, i) => ({
+      data: pricedLines.map((l, i) => ({
         quoteId: existing.id,
         sort: i,
         label: l.label,
         qty: l.qty,
         unit: l.unit,
         unitPricePence: l.unitPricePence,
+        costPricePence: l.costPricePence,
         vatRate: l.vatRate,
+        priceBookItemId: l.priceBookItemId,
         source: l.source || "MANUAL",
       })),
     });

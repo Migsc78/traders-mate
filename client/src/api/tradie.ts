@@ -193,6 +193,8 @@ export interface TradieMe {
   googleReviewUrl: string | null;
   defaultDepositPercent: number;
   defaultTermsNote: string | null;
+  /** What an hour costs the business. Null = own time, and job profit reads as take-home. */
+  labourCostPerHourPence: number | null;
   logoUrl: string | null;
   stripeConnectOnboarded: boolean;
   stripeConnectAccountId: string | null;
@@ -957,6 +959,12 @@ export interface PriceBookItem {
   category: string | null;
   unit: string;
   unitPricePence: number;
+  /**
+   * What it costs the tradie, ex VAT. Null means not recorded — which is not
+   * the same as free, and is why job profit reports itself as provisional
+   * rather than claiming an unpriced part as pure margin.
+   */
+  costPricePence: number | null;
   vatRate: number;
   isCallout: boolean;
   active: boolean;

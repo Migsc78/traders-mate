@@ -11,6 +11,8 @@ export interface PriceBookRow {
   category?: string | null;
   unit: string;
   unitPricePence: number;
+  /** What it costs the tradie. Null is "not recorded", never "free". */
+  costPricePence?: number | null;
   vatRate: number;
   isCallout: boolean;
   active: boolean;
@@ -22,6 +24,7 @@ export interface PriceBookImportRow {
   category?: string | null;
   unit?: string;
   unitPriceGbp?: number;
+  costPriceGbp?: number;
   vatRate?: number;
   isCallout?: boolean;
   active?: boolean;
@@ -33,6 +36,7 @@ export const TEMPLATE_HEADERS = [
   "category",
   "unit",
   "price_gbp",
+  "cost_gbp",
   "vat_pct",
   "callout",
   "active",
@@ -45,6 +49,7 @@ export const TEMPLATE_SAMPLE: PriceBookImportRow[] = [
     category: "CALLOUT",
     unit: "JOB",
     unitPriceGbp: 85,
+    costPriceGbp: 0,
     vatRate: 20,
     isCallout: true,
     active: true,
@@ -55,6 +60,7 @@ export const TEMPLATE_SAMPLE: PriceBookImportRow[] = [
     category: "LABOUR",
     unit: "HOUR",
     unitPriceGbp: 55,
+    costPriceGbp: 0,
     vatRate: 20,
     isCallout: false,
     active: true,
@@ -94,6 +100,9 @@ export function rowsFromSheet(data: ArrayBuffer | string): PriceBookImportRow[] 
       const label = String(pick(row, "label", "name", "description") ?? "").trim();
       if (!label) return null;
       const priceRaw = Number(pick(row, "price_gbp", "price", "unit_price", "unit_price_gbp") ?? 0);
+      // Absent cost column stays undefined so an old spreadsheet re-imported
+      // can't wipe costs the tradie has since filled in by hand.
+      const costRaw = pick(row, "cost_gbp", "cost", "cost_price", "buy_price");
       const skuVal = pick(row, "sku", "code");
       const catVal = pick(row, "category", "group", "section");
       return {
@@ -103,6 +112,7 @@ export function rowsFromSheet(data: ArrayBuffer | string): PriceBookImportRow[] 
         category: catVal != null ? String(catVal).trim() || null : undefined,
         unit: String(pick(row, "unit") ?? "JOB"),
         unitPriceGbp: Number.isFinite(priceRaw) ? priceRaw : 0,
+        costPriceGbp: costRaw === undefined ? undefined : Number(costRaw) || 0,
         vatRate: Number(pick(row, "vat_pct", "vat", "vat_rate") ?? 20),
         isCallout: truthy(pick(row, "callout", "is_callout")),
         active: (() => {
@@ -131,12 +141,16 @@ function toSheetRows(items: PriceBookRow[] | PriceBookImportRow[]) {
       "unitPricePence" in i && typeof i.unitPricePence === "number"
         ? i.unitPricePence / 100
         : Number((i as PriceBookImportRow).unitPriceGbp ?? 0);
+    const costPence = "costPricePence" in i ? i.costPricePence : undefined;
+    const costGbp =
+      costPence != null ? costPence / 100 : ((i as PriceBookImportRow).costPriceGbp ?? "");
     return {
       sku: i.sku ?? "",
       label: i.label,
       category: i.category ?? "",
       unit: i.unit || "JOB",
       price_gbp: priceGbp,
+      cost_gbp: costGbp,
       vat_pct: i.vatRate ?? 20,
       callout: i.isCallout ? "yes" : "no",
       active: i.active === false ? "no" : "yes",

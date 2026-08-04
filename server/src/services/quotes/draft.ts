@@ -1,7 +1,7 @@
 import { prisma } from "../../db.js";
 import { extractJobLinesWithHaiku } from "./claudeExtract.js";
 import { mergeTemplateWithHeard } from "./templateMatch.js";
-import { matchPriceBook, quoteLineInclude } from "./priceBook.js";
+import { attachCostPrices, matchPriceBook, quoteLineInclude } from "./priceBook.js";
 import { totalsFromLines, type LineInput } from "./money.js";
 import { newPublicToken } from "./magicAuth.js";
 import type { PriceUnit } from "@prisma/client";
@@ -122,14 +122,18 @@ export async function buildDraftQuoteFromTranscript(opts: {
   const totals = totalsFromLines(lines, vatInclusive);
   const validUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-  const lineData = lines.map((l, i) => ({
+  // Snapshot what each line costs at the moment it's priced, so the job it
+  // becomes can show the margin that was actually expected.
+  const priced = await attachCostPrices(opts.clientId, lines);
+  const lineData = priced.map((l, i) => ({
     sort: i,
     label: l.label,
     qty: l.qty,
     unit: l.unit,
     unitPricePence: l.unitPricePence,
+    costPricePence: l.costPricePence,
     vatRate: l.vatRate,
-    priceBookItemId: l.priceBookItemId || null,
+    priceBookItemId: l.priceBookItemId,
     source: l.source || "MANUAL",
   }));
 

@@ -35,6 +35,7 @@ export default function TradieSettingsPage() {
   const [googleReviewUrl, setGoogleReviewUrl] = useState("");
   const [defaultDepositPercent, setDefaultDepositPercent] = useState(0);
   const [defaultTermsNote, setDefaultTermsNote] = useState("");
+  const [labourCostPerHour, setLabourCostPerHour] = useState("");
   const [logoMsg, setLogoMsg] = useState("");
 
   const [twilioMsg, setTwilioMsg] = useState("");
@@ -62,6 +63,9 @@ export default function TradieSettingsPage() {
     setGoogleReviewUrl(me.data.googleReviewUrl || "");
     setDefaultDepositPercent(me.data.defaultDepositPercent || 0);
     setDefaultTermsNote(me.data.defaultTermsNote || "");
+    setLabourCostPerHour(
+      me.data.labourCostPerHourPence != null ? String(me.data.labourCostPerHourPence / 100) : ""
+    );
   }, [me.data]);
 
   useEffect(() => {
@@ -101,6 +105,11 @@ export default function TradieSettingsPage() {
         googleReviewUrl: googleReviewUrl || null,
         defaultDepositPercent,
         defaultTermsNote: defaultTermsNote.trim() || null,
+        // Blank means "my own time", which is the honest answer for a sole
+        // trader — so it has to clear back to null, not fall through to zero.
+        labourCostPerHourPence: labourCostPerHour.trim()
+          ? Math.max(0, Math.round(Number(labourCostPerHour) * 100))
+          : null,
       }),
     onSuccess: (r: {
       ok: boolean;
@@ -548,6 +557,21 @@ export default function TradieSettingsPage() {
               <span className="muted-text" style={{ fontWeight: 400 }}>
                 0 = off. Whole number 1–100. Requires Pay Now (Stripe Connect) so customers can pay the
                 deposit on accept.
+              </span>
+            </label>
+            <label>
+              My cost per hour (£)
+              <input
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={labourCostPerHour}
+                placeholder="Leave blank"
+                onChange={(e) => setLabourCostPerHour(e.target.value.replace(/[^0-9.]/g, ""))}
+              />
+              <span className="muted-text" style={{ fontWeight: 400 }}>
+                Leave blank if it&apos;s your own time — job profit then reads as money in your
+                pocket. Set it when someone else is on the van and the same sums keep working.
               </span>
             </label>
             <label>

@@ -8,6 +8,7 @@ export type RateDraft = {
   category: string;
   unit: string;
   unitPricePence: number;
+  costPricePence: number | null;
   vatRate: number;
   isCallout: boolean;
   active: boolean;
@@ -31,6 +32,7 @@ export async function createRate(qc: QueryClient, draft: RateDraft): Promise<str
     category: draft.category,
     unit: draft.unit,
     unitPricePence: draft.unitPricePence,
+    costPricePence: draft.costPricePence,
     vatRate: draft.vatRate,
     isCallout: draft.isCallout,
     active: draft.active,

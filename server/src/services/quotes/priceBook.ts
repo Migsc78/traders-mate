@@ -151,6 +151,8 @@ export interface PriceBookUpsertRow {
   unit?: string;
   unitPriceGbp?: number;
   unitPricePence?: number;
+  costPriceGbp?: number;
+  costPricePence?: number;
   vatRate?: number;
   isCallout?: boolean;
   active?: boolean;
@@ -220,6 +222,14 @@ export async function upsertPriceBookRows(
         ? Math.max(0, Math.round(Number(row.unitPricePence) || 0))
         : gbpToPence(Number(row.unitPriceGbp ?? 0));
     const vatRate = Math.min(100, Math.max(0, Number(row.vatRate ?? 20)));
+    // A sheet with no cost column leaves existing costs alone rather than
+    // blanking a book the tradie may have spent an evening filling in.
+    const cost =
+      row.costPricePence != null
+        ? Math.max(0, Math.round(Number(row.costPricePence) || 0))
+        : row.costPriceGbp != null
+          ? gbpToPence(Number(row.costPriceGbp))
+          : undefined;
     const isCallout = Boolean(row.isCallout);
     const active = row.active !== false;
     const skuRaw = row.sku != null ? String(row.sku).trim() : "";
@@ -234,7 +244,7 @@ export async function upsertPriceBookRows(
     if (match) {
       const updatedRow = await prisma.priceBookItem.update({
         where: { id: match.id },
-        data: { sku, label, unit, unitPricePence, vatRate, isCallout, active, ...categoryPatch },
+        data: { sku, label, unit, unitPricePence, vatRate, isCallout, active, ...categoryPatch, ...costPatch(cost) },
       });
       bySku.set(skuKey!, updatedRow);
       updated += 1;
@@ -250,6 +260,7 @@ export async function upsertPriceBookRows(
           isCallout,
           active,
           category: category ?? (isCallout ? "CALLOUT" : "OTHER"),
+          ...costPatch(cost),
         },
       });
       if (skuKey) bySku.set(skuKey, createdRow);
@@ -267,9 +278,17 @@ export interface PriceBookItemInput {
   category?: string | null;
   unit: PriceUnit;
   unitPricePence: number;
+  /** What it costs the tradie, ex VAT. Absent leaves it alone; null clears it. */
+  costPricePence?: number | null;
   vatRate: number;
   isCallout?: boolean;
   active?: boolean;
+}
+
+/** Same rule as category: an absent key must not wipe what's already stored. */
+function costPatch(cost: number | null | undefined) {
+  if (cost === undefined) return {};
+  return { costPricePence: cost === null ? null : Math.max(0, Math.round(cost)) };
 }
 
 export async function savePriceBookItems(clientId: string, items: PriceBookItemInput[]) {
@@ -279,6 +298,9 @@ export async function savePriceBookItems(clientId: string, items: PriceBookItemI
      * Older app builds don't send category at all. Writing `null` for them would
      * silently empty the tradie's categories every time they saved from a phone
      * that hadn't updated yet, so an absent key leaves the column alone.
+     *
+     * costPricePence is newer still and gets exactly the same treatment — a phone
+     * on the previous build saving a rate must not erase the cost behind it.
      */
     const categoryPatch =
       item.category === undefined ? {} : { category: parsePriceBookCategory(item.category) };
@@ -298,6 +320,7 @@ export async function savePriceBookItems(clientId: string, items: PriceBookItemI
             isCallout: item.isCallout ?? false,
             active: item.active ?? true,
             ...categoryPatch,
+            ...costPatch(item.costPricePence),
           },
         })
       );
@@ -314,6 +337,7 @@ export async function savePriceBookItems(clientId: string, items: PriceBookItemI
             isCallout: item.isCallout ?? false,
             active: item.active ?? true,
             category: parsePriceBookCategory(item.category) ?? "OTHER",
+            ...costPatch(item.costPricePence),
           },
         })
       );
@@ -340,6 +364,7 @@ export async function createPriceBookItem(clientId: string, item: PriceBookItemI
     isCallout: item.isCallout ?? false,
     active: item.active ?? true,
     category: parsePriceBookCategory(item.category) ?? "OTHER",
+    ...costPatch(item.costPricePence),
   };
 
   if (item.id) {
@@ -350,10 +375,44 @@ export async function createPriceBookItem(clientId: string, item: PriceBookItemI
   return prisma.priceBookItem.create({ data: { clientId, ...data } });
 }
 
+/**
+ * Fill in price-book provenance and the cost snapshot for a set of quote lines.
+ *
+ * Two reasons this exists. The obvious one: job profit needs to know what each
+ * line costs, and reading it through the price book later would give the price
+ * as it is *now*, not as it was when the job was priced — which is the wrong
+ * number the moment copper moves.
+ *
+ * The second is a bug it happens to fix. The quote editor saved lines with no
+ * priceBookItemId at all, so a line typed as "Radiator swap" lost its link to
+ * the rate it came from. Matching on label restores it.
+ */
+export async function attachCostPrices<
+  T extends { label: string; unitPricePence: number; priceBookItemId?: string | null },
+>(clientId: string, lines: T[]): Promise<(T & { priceBookItemId: string | null; costPricePence: number | null })[]> {
+  const items = await prisma.priceBookItem.findMany({
+    where: { clientId },
+    select: { id: true, label: true, costPricePence: true },
+  });
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const byLabel = new Map(items.map((i) => [i.label.trim().toLowerCase(), i]));
+
+  return lines.map((line) => {
+    const match =
+      (line.priceBookItemId ? byId.get(line.priceBookItemId) : undefined) ??
+      byLabel.get(line.label.trim().toLowerCase());
+    return {
+      ...line,
+      priceBookItemId: match?.id ?? line.priceBookItemId ?? null,
+      costPricePence: match?.costPricePence ?? null,
+    };
+  });
+}
+
 /** Include shape for quote lines so the UI can show price-book provenance. */
 export const quoteLineInclude = {
   orderBy: { sort: "asc" as const },
   include: {
-    priceBookItem: { select: { id: true, sku: true, label: true } },
+    priceBookItem: { select: { id: true, sku: true, label: true, costPricePence: true } },
   },
 };

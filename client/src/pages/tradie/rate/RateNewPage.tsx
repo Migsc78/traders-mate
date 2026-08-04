@@ -5,6 +5,7 @@ import { MoneyInput } from "../../../components/NumericInput";
 import { PRICE_UNITS } from "../../../lib/priceBookFile";
 import { categoryLabel } from "../../../lib/rateCategories";
 import { createRate, type RateDraft } from "../../../lib/newRate";
+import { marginLabel } from "../../../lib/margin";
 import { IconChevron, QueryError } from "../ui";
 
 /** What survives the trip to the category picker and back. */
@@ -14,6 +15,7 @@ export type RateFormState = {
   category: string;
   unit: string;
   unitPricePence: number;
+  costPricePence: number | null;
   vatRate: number;
   active: boolean;
   isCallout: boolean;
@@ -25,6 +27,7 @@ export const EMPTY_RATE_FORM: RateFormState = {
   category: "",
   unit: "JOB",
   unitPricePence: 0,
+  costPricePence: null,
   vatRate: 20,
   active: true,
   isCallout: false,
@@ -77,6 +80,7 @@ export default function RateNewPage() {
         category: form.category || "OTHER",
         unit: form.unit,
         unitPricePence: form.unitPricePence,
+        costPricePence: form.costPricePence,
         vatRate: form.vatRate,
         isCallout: form.isCallout,
         active: form.active,
@@ -158,6 +162,20 @@ export default function RateNewPage() {
           </select>
         </label>
       </div>
+
+      <label className="t-field">
+        What it costs me £
+        <MoneyInput
+          pence={form.costPricePence ?? 0}
+          onPence={(p) => set("costPricePence", p || null)}
+        />
+        <span className="t-field-hint">
+          {/* Optional, and it says so. Half a price book with costs is still
+              useful; nagging for it is how a tradie stops adding rates at all. */}
+          {marginLabel(form.unitPricePence, form.costPricePence) ??
+            "Optional — add it and every job using this rate shows what you made."}
+        </span>
+      </label>
 
       <label className="t-toggle-row">
         <span>

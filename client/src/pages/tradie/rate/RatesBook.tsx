@@ -11,6 +11,7 @@ import {
   type PriceBookRow,
 } from "../../../lib/priceBookFile";
 import { categoryOf, RATE_CATEGORIES, type RateCategoryId } from "../../../lib/rateCategories";
+import { marginLabel, marginPct, marginTone } from "../../../lib/margin";
 import { formatGbp, sendOrQueue, tradieApi } from "../../../api/tradie";
 import { useOffline } from "../../../lib/connectivity";
 import { QueryError } from "../../../components/QueryError";
@@ -63,6 +64,9 @@ export default function RatesBook() {
             sku: r.sku?.trim() ? r.sku.trim() : null,
             label: r.label.trim(),
             unitPricePence: Math.max(0, Math.round(Number(r.unitPricePence) || 0)),
+            // A cost left at zero is treated as never entered, so an untouched
+            // rate doesn't come back claiming a 100% margin.
+            costPricePence: r.costPricePence ? Math.max(0, Math.round(r.costPricePence)) : null,
             vatRate: Number(r.vatRate) || 20,
           }))
       ),
@@ -177,6 +181,9 @@ export default function RatesBook() {
         category,
         unit: "JOB",
         unitPricePence: 0,
+        // Null, not zero: a brand-new rate has no cost recorded yet, and zero
+        // would read as "this is free" and quietly claim full margin.
+        costPricePence: null,
         vatRate: 20,
         isCallout: category === "CALLOUT",
         active: true,
@@ -298,9 +305,15 @@ export default function RatesBook() {
                         </span>
                         <span className="t-rate-item-side">
                           <span className="t-money">{formatGbp(row.unitPricePence)}</span>
-                          <span className={`t-pill ${row.active ? "t-pill--green" : "t-pill--grey"}`}>
-                            {row.active ? "Active" : "Off"}
-                          </span>
+                          {/* Margin only where a cost is actually recorded. A rate
+                              with no cost says so rather than implying 100%. */}
+                          {marginLabel(row.unitPricePence, row.costPricePence) ? (
+                            <span className={`t-margin t-margin--${marginTone(row.unitPricePence, row.costPricePence) || "ok"}`}>
+                              {marginPct(row.unitPricePence, row.costPricePence)}%
+                            </span>
+                          ) : (
+                            <span className="t-margin t-margin--unset">cost not set</span>
+                          )}
                         </span>
                       </button>
 
@@ -355,6 +368,17 @@ export default function RatesBook() {
                               />
                             </label>
                           </div>
+                          <label>
+                            What it costs me £
+                            <MoneyInput
+                              pence={row.costPricePence ?? 0}
+                              onPence={(costPricePence) => update(idx, { costPricePence })}
+                            />
+                            <span className="t-field-hint">
+                              {marginLabel(row.unitPricePence, row.costPricePence) ??
+                                "Optional. Fill it in and every job using this rate shows what you made."}
+                            </span>
+                          </label>
                           <label>
                             Category
                             <select
