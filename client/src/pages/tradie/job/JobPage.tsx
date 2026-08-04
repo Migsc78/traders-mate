@@ -8,12 +8,14 @@ import { ListToolbar, useListFilter, type ListTab } from "../ListToolbar";
 import { useOffline } from "../../../lib/connectivity";
 import OverviewTab from "./tabs/OverviewTab";
 import VisitsTab from "./tabs/VisitsTab";
+import CostsTab from "./tabs/CostsTab";
 import QuoteTab from "./tabs/QuoteTab";
 import MessagesTab from "./tabs/MessagesTab";
 
 const TABS: readonly ListTab[] = [
   { id: "overview", label: "Overview" },
   { id: "visits", label: "Visits" },
+  { id: "costs", label: "Costs" },
   { id: "quote", label: "Quote" },
   { id: "messages", label: "Messages" },
 ];
@@ -115,12 +117,12 @@ export default function JobPage() {
   };
 
   const cta = job.primaryAction;
-  // An invoice with nothing to build it from is the one action that can't work
-  // yet. It says so rather than failing when tapped — slice 7 gives it a Costs
-  // tab to bill from.
+  // Invoicing straight from recorded costs isn't wired yet, so a job with no
+  // quote has nothing to build an invoice from. It says so rather than failing
+  // when tapped.
   const ctaBlocked =
     cta.action === "invoice" && !job.latestQuote
-      ? "This job has no quote — bill it from the Costs tab once that lands."
+      ? "No quote on this job yet — billing straight from the Costs tab is coming next."
       : cta.action === "invoice" && offline
         ? "Invoicing needs signal."
         : null;
@@ -157,6 +159,7 @@ export default function JobPage() {
 
       {tab === "overview" && <OverviewTab detail={d} />}
       {tab === "visits" && <VisitsTab detail={d} />}
+      {tab === "costs" && <CostsTab detail={d} />}
       {tab === "quote" && <QuoteTab detail={d} />}
       {tab === "messages" && <MessagesTab jobId={enquiryId} />}
 

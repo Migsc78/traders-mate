@@ -23,6 +23,7 @@ import TradieArchivedPage from "./pages/tradie/TradieArchivedPage";
 import JobPage from "./pages/tradie/job/JobPage";
 import ScheduleJobPage from "./pages/tradie/job/ScheduleJobPage";
 import ArrivalBriefingPage from "./pages/tradie/job/ArrivalBriefingPage";
+import CostFormPage from "./pages/tradie/job/CostFormPage";
 import TradieNewJobPage from "./pages/tradie/TradieNewJobPage";
 import TradiePriceBookPage from "./pages/tradie/TradiePriceBookPage";
 import TradieQuotesPage from "./pages/tradie/TradieQuotesPage";
@@ -170,6 +171,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="jobs/:enquiryId" element={<JobPage />} />
             <Route path="jobs/:enquiryId/schedule" element={<ScheduleJobPage />} />
             <Route path="jobs/:enquiryId/briefing" element={<ArrivalBriefingPage />} />
+            <Route path="jobs/:enquiryId/costs/new" element={<CostFormPage />} />
+            <Route path="jobs/:enquiryId/costs/:costId" element={<CostFormPage />} />
           </Route>
           <Route path="/" element={<LandingPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />

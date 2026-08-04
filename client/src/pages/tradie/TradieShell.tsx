@@ -51,6 +51,16 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       subtitle: "New or existing customer",
     };
   }
+  const costSub = pathname.match(/^\/t\/jobs\/([^/]+)\/costs\/([^/]+)$/);
+  if (costSub) {
+    const [, jobId, leaf] = costSub;
+    return {
+      backTo: `/t/jobs/${jobId}?tab=costs`,
+      backLabel: "Costs",
+      title: leaf === "new" ? "Add cost" : "Edit cost",
+      subtitle: "What you charged, and what it cost you",
+    };
+  }
   // Screens reached from inside a job go back to that job, not to the list.
   const jobSub = pathname.match(/^\/t\/jobs\/([^/]+)\/(schedule|briefing|complete)$/);
   if (jobSub) {

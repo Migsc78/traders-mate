@@ -135,6 +135,25 @@ const direct = { quoteId: null, quotedTotalPence: 0 };
   eq("cost scales with qty", p.materialsPence, 5600);
 }
 
+/* --------------------------------- provisional means ceiling, not answer */
+{
+  // The exact shape a job arrives in from an accepted quote whose rates have no
+  // costs filled in yet. The arithmetic says 100% margin. It is not 100% margin;
+  // it is "we don't know". Callers must not print the bare figure.
+  const p = computeProfit(quoted, [material(145000, null), material(58400, null)], null);
+
+  eq("every cost missing", p.missingCostCount, 2);
+  check("flagged provisional", p.provisional === true);
+  eq("computed profit equals revenue — the giveaway", p.profitPence, p.revenuePence);
+  eq("which is a bare 100%", p.marginPct, 100);
+  // Adding one real cost can only bring it down, never up: that is what makes
+  // the provisional figure a safe upper bound rather than a guess.
+  const better = computeProfit(quoted, [material(145000, 98000), material(58400, null)], null);
+  check("filling a cost in only reduces it", better.profitPence < p.profitPence);
+  check("still provisional while one is missing", better.provisional === true);
+  eq("one left", better.missingCostCount, 1);
+}
+
 /* ------------------------------------------------------------ edge cases */
 {
   const p = computeProfit(direct, [], null);
@@ -160,4 +179,4 @@ if (failures) {
   console.error(`\n${failures} assertion(s) failed`);
   process.exit(1);
 }
-console.log("OK: job profit (24 assertions)");
+console.log("OK: job profit (30 assertions)");

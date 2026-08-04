@@ -3287,3 +3287,61 @@ html.native-app .tradie-bottom-nav {
   color: var(--t-ink-faint);
   text-align: center;
 }
+
+/* ---------- job costs & profit (phase 1) ---------- */
+
+.t-profit { margin-bottom: 16px; }
+.t-profit .t-kv dd { font-variant-numeric: tabular-nums; }
+
+.t-profit-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 2px solid var(--t-hairline);
+}
+.t-profit-total > div { display: flex; flex-direction: column; gap: 2px; }
+.t-profit-total .muted-text { font-size: 12.5px; }
+.t-profit-total .t-money { font-size: 26px; font-variant-numeric: tabular-nums; }
+
+/* The figure is honest about not being finished. Amber, not red: nothing is
+   wrong, there's just a number nobody has typed in yet. */
+.t-provisional {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-amber-soft);
+  color: var(--t-amber);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.t-cost-group { margin-bottom: 6px; }
+.tradie-shell .t-cost-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+}
+.t-cost-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.t-cost-money {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  font-size: 12px;
+}
+.t-cost-money .t-money { font-size: 15px; }
+
+.t-book-matches { margin-bottom: 14px; }
+
+/* Provisional profit is a ceiling, not an answer — it reads muted so the eye
+   doesn't take it for a settled figure. */
+.t-money--provisional { color: var(--t-ink-soft); }

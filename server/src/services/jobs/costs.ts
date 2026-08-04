@@ -26,10 +26,19 @@ export type JobProfit = {
   materialsPence: number;
   labourPence: number;
   expensesPence: number;
+  /**
+   * Revenue less every cost we know about.
+   *
+   * When `provisional` is true this is an **upper bound**, not the answer: the
+   * costs nobody has entered can only be zero or more, so real profit is at most
+   * this. Callers must present it that way — a job whose costs are all unknown
+   * computes to 100% margin, and shown bare that is the most misleading number
+   * the app could print.
+   */
   profitPence: number;
   /** Null when there's no revenue to take a percentage of. */
   marginPct: number | null;
-  /** True when at least one cost is unset, so the figure can't be trusted yet. */
+  /** True when at least one cost is unset, so the figure is a ceiling. */
   provisional: boolean;
   missingCostCount: number;
 };
