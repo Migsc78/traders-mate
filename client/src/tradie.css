@@ -2882,3 +2882,296 @@ html.native-app .tradie-bottom-nav {
   letter-spacing: 0.02em;
   color: var(--t-ink-faint);
 }
+
+/* ---------- customer record (wireframes 01-03) ---------- */
+
+.t-crecord-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+.t-crecord-id { min-width: 0; }
+.t-crecord-id h2 { margin: 0 0 2px; font-size: 22px; }
+.t-crecord-id .muted-text { display: block; font-size: 13px; margin: 0 0 4px; }
+.tradie-shell .t-crecord-id .t-tel { font-size: 15px; font-weight: 700; color: var(--t-accent-ink); }
+
+/* Action-first row — the wireframe's own note */
+.t-crecord-actions {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.tradie-shell .t-act {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 58px;
+  padding: 8px 4px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  color: var(--t-ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+.tradie-shell .t-act span { font-size: 17px; line-height: 1; }
+.tradie-shell .t-act--primary {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+  color: #fff;
+}
+.tradie-shell .t-act[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
+
+/* Balance summary + flags */
+.t-balance {
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: var(--t-radius);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+}
+.t-balance-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.t-balance-total { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.t-balance-total .t-money { font-size: 24px; }
+.t-flag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.t-flag {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--t-slate-soft);
+  color: var(--t-ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.t-flag--warn { background: var(--t-amber-soft); color: var(--t-amber); }
+.t-flag--alert { background: var(--t-red-soft); color: var(--t-red); }
+.t-mini-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--t-slate-soft);
+  color: var(--t-ink-faint);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.t-mini-pill.is-shared { background: var(--t-green-soft); color: var(--t-green); }
+.t-money--alert { color: var(--t-red); }
+
+/* Overview */
+.t-note-card strong { display: block; margin-bottom: 6px; font-size: 14px; }
+.t-note-body { margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: var(--t-ink-soft); }
+.tradie-shell .t-next-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.t-next-card strong { font-size: 14px; }
+.t-next-card .muted-text { display: block; font-size: 12.5px; margin: 2px 0; }
+.t-next-title { margin: 0; font-size: 14.5px; font-weight: 600; }
+.t-stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.t-stat {
+  padding: 12px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.t-stat .muted-text { font-size: 11.5px; line-height: 1.3; }
+.t-stat strong { font-family: var(--t-font-display); font-size: 22px; font-weight: 800; }
+.t-stat-sub { font-size: 12.5px; font-weight: 600; color: var(--t-ink-soft); }
+.t-stat-sub.is-alert { color: var(--t-red); }
+.t-kv { margin: 0; }
+.t-kv > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--t-hairline-2);
+}
+.t-kv > div:last-child { border-bottom: none; }
+.t-kv dt { margin: 0; color: var(--t-ink-faint); font-size: 13px; }
+.t-kv dd { margin: 0; font-size: 14px; font-weight: 600; text-align: right; }
+
+/* Contacts */
+.t-contact-row {
+  display: flex;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: var(--t-radius);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+}
+.t-contact-row.is-primary { border-color: var(--t-accent); }
+.t-contact-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.t-contact-gets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.t-contact-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.t-contact-comms { display: flex; gap: 6px; }
+.tradie-shell .t-comm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  font-size: 14px;
+  text-decoration: none;
+}
+.tradie-shell .t-primary-dot {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--t-hairline);
+  background: var(--t-surface);
+}
+.tradie-shell .t-primary-dot.is-on {
+  border-color: var(--t-accent);
+  box-shadow: inset 0 0 0 3px var(--t-surface), inset 0 0 0 10px var(--t-accent);
+}
+
+/* Properties */
+.tradie-shell .t-property-card { display: block; text-decoration: none; color: inherit; }
+.t-property-head { display: flex; align-items: flex-start; gap: 10px; }
+.t-property-icon { font-size: 18px; }
+.t-property-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t-property-counts {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--t-hairline-2);
+  font-size: 13px;
+  color: var(--t-ink-faint);
+}
+.t-property-counts strong { color: var(--t-ink); font-size: 14px; }
+
+/* Access and safety */
+.t-access-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  border-radius: var(--t-radius);
+  border: 1px solid var(--t-hairline);
+  background: var(--t-surface);
+  overflow: hidden;
+}
+.t-access-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--t-hairline-2);
+  font-size: 14px;
+}
+.t-access-list li:last-child { border-bottom: none; }
+.t-access-label { color: var(--t-ink-soft); }
+.t-access-value { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.t-yesno {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--t-slate-soft);
+  color: var(--t-ink-faint);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.t-yesno.is-yes { background: var(--t-green-soft); color: var(--t-green); }
+.t-code { font-family: var(--t-font-display); letter-spacing: 0.14em; font-size: 15px; }
+.t-code--masked { color: var(--t-ink-faint); }
+.tradie-shell .t-reveal { min-height: 0; padding: 0; font-size: 13px; color: var(--t-accent-ink); font-weight: 700; }
+
+/* Assets */
+.t-asset-group { margin-bottom: 18px; }
+.tradie-shell .t-asset-card { display: block; text-decoration: none; color: inherit; }
+.t-asset-top { display: flex; align-items: flex-start; gap: 12px; }
+.t-asset-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.t-asset-when { display: flex; flex-direction: column; align-items: flex-end; font-size: 12.5px; }
+.t-asset-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--t-hairline-2);
+  font-size: 12.5px;
+}
+.t-due--soon { color: var(--t-amber); font-weight: 700; }
+.t-due--overdue { color: var(--t-red); font-weight: 700; }
+.t-type-grid { display: grid; gap: 10px; margin-bottom: 8px; }
+.t-type-group-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--t-ink-faint);
+  text-transform: uppercase;
+}
+
+/* Billing */
+.t-billing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.t-billing-total { display: block; font-size: 26px; margin: 2px 0; }
+.t-billing-alert { color: var(--t-red); font-size: 13px; font-weight: 700; }
+.t-billing-actions { display: flex; gap: 8px; }
+.tradie-shell .t-billing-actions > * {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Files */
+.tradie-shell .t-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--t-hairline-2);
+  color: inherit;
+  text-decoration: none;
+}
+.t-file-row:last-child { border-bottom: none; }
+.t-file-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.t-file-main .muted-text { font-size: 12px; }
+
+/* Activity timeline */
+.t-timeline { list-style: none; margin: 0; padding: 0; }
+.tradie-shell .t-timeline-link {
+  display: flex;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--t-hairline-2);
+  color: inherit;
+  text-decoration: none;
+}
+.t-timeline-item:last-child .t-timeline-link { border-bottom: none; }
+.t-dot { flex: none; width: 9px; height: 9px; margin-top: 6px; border-radius: 50%; background: var(--t-slate); }
+.t-dot--good { background: var(--t-green); }
+.t-dot--alert { background: var(--t-red); }
+.t-timeline-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.t-timeline-body strong { font-size: 14px; }
+.t-timeline-body .muted-text { font-size: 12px; }
+
+/* Review */
+.t-review-block { padding: 14px; }
+.t-review-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.t-review-line { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.t-review-line .muted-text { font-weight: 500; font-size: 13px; }
+
+/* Forms shared by add and edit */
+.t-customer-form .t-field { margin-bottom: 16px; }
+.t-banner--ok { background: var(--t-green-soft); color: var(--t-green); border: 1px solid #bfe6d0; }
+
+@media (max-width: 420px) {
+  .t-crecord-actions { grid-template-columns: repeat(3, 1fr); }
+  .t-stat-row { grid-template-columns: 1fr; }
+}

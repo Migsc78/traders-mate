@@ -36,7 +36,7 @@ export function setTradieSession(token: string | null) {
   }
 }
 
-async function tRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export async function tRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getTradieSession();
   let res: Response;
   try {

@@ -13,6 +13,7 @@ import { billingRouter } from "./routes/billing.js";
 import { stripeWebhookRouter } from "./routes/stripeWebhook.js";
 import { widgetRouter } from "./routes/widget.js";
 import { tradieRouter } from "./routes/tradie.js";
+import { customerRouter } from "./routes/customers.js";
 import { quotePublicRouter, followupsRouter } from "./routes/quotePublic.js";
 import { UPLOADS_DIR } from "./services/storage/store.js";
 import { getGooglePlacesApiKey, twilioConfigured, claudeConfigured, openaiConfigured } from "./settings.js";
@@ -73,6 +74,9 @@ app.use("/webhooks/stripe", express.raw({ type: "application/json" }), stripeWeb
 // lead intake + photo uploads from any client site, the gated redirects, and the widget.
 app.use("/api/intake", cors(), express.json({ limit: "1mb" }), intakeRouter);
 app.use("/api/upload", cors(), express.json({ limit: "12mb" }), uploadRouter);
+// customerRouter first: it owns /customers now, and its routes must win over
+// anything left in the older router.
+app.use("/api/t", cors({ origin: true, credentials: true }), express.json({ limit: "20mb" }), customerRouter);
 app.use("/api/t", cors({ origin: true, credentials: true }), express.json({ limit: "20mb" }), tradieRouter);
 app.use("/api/signup", cors({ origin: true }), express.json(), signupRouter);
 app.use("/q", cors(), express.urlencoded({ extended: true }), express.json(), quotePublicRouter);

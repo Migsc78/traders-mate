@@ -224,8 +224,70 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       backTo: "/t/customers",
       backLabel: "Customers",
       title: "Add customer",
-      subtitle: "Save a contact",
+      subtitle: "Essentials only — the rest can wait",
     };
+  }
+
+  // Property screens, reached from a customer record.
+  if (pathname.startsWith("/t/properties/")) {
+    const id = pathname.match(/^\/t\/properties\/([^/]+)/)?.[1] ?? "";
+    if (pathname.endsWith("/access")) {
+      return {
+        backTo: `/t/properties/${id}`,
+        backLabel: "Property",
+        title: "Access & safety",
+        subtitle: "Keeps engineers safe and visits efficient",
+      };
+    }
+    if (pathname.endsWith("/edit")) {
+      return {
+        backTo: `/t/properties/${id}`,
+        backLabel: "Property",
+        title: "Edit property",
+        subtitle: "Address, type and site contact",
+      };
+    }
+    if (/\/assets\/[^/]+\/edit$/.test(pathname)) {
+      return {
+        backTo: `/t/properties/${id}?tab=assets`,
+        backLabel: "Property",
+        title: "Edit asset",
+        subtitle: "Serial, service dates and warranty",
+      };
+    }
+    if (pathname.endsWith("/assets/new")) {
+      return {
+        backTo: `/t/properties/${id}?tab=assets`,
+        backLabel: "Property",
+        title: "Add asset",
+        subtitle: "Kit you'll come back to",
+      };
+    }
+    return {
+      backTo: "/t/customers",
+      backLabel: "Customers",
+      title: "Property",
+      subtitle: "Access, assets and jobs",
+    };
+  }
+
+  // Customer sub-screens. The record itself keeps the tab bar, so it isn't here.
+  const customerSub = pathname.match(/^\/t\/customers\/([^/]+)\/(.+)$/);
+  if (customerSub) {
+    const [, id, rest] = customerSub;
+    const back = { backTo: `/t/customers/${id}`, backLabel: "Customer" };
+    const screens: Record<string, { title: string; subtitle: string }> = {
+      edit: { title: "Edit customer", subtitle: "Name, billing, tags and terms" },
+      contacts: { title: "Edit contacts", subtitle: "Roles, primary and what they receive" },
+      "contacts/new": { title: "Add contact", subtitle: "Who they are and what they get" },
+      "properties/new": { title: "Add property", subtitle: "Where the work happens" },
+      reminders: { title: "Reminders", subtitle: "What brings you back next year" },
+      review: { title: "Review & save", subtitle: "Check it before you finish" },
+      "notes/new": { title: "Add note", subtitle: "Typed, linked and internal by default" },
+      "files/new": { title: "Upload file", subtitle: "Certificates, manuals and photos" },
+    };
+    const found = screens[rest];
+    if (found) return { ...back, ...found };
   }
   if (pathname === "/t/diary/new") {
     return {
@@ -240,7 +302,7 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       backTo: "/t/customers",
       backLabel: "Customers",
       title: "Customer",
-      subtitle: "Jobs, notes & plant",
+      subtitle: "Contacts, properties, assets & jobs",
     };
   }
   return null;

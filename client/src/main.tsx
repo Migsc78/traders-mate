@@ -42,8 +42,20 @@ import TemplateEditPage from "./pages/tradie/template/TemplateEditPage";
 import TemplateSavedPage from "./pages/tradie/template/TemplateSavedPage";
 import TradieInvoicesPage from "./pages/tradie/TradieInvoicesPage";
 import TradieCustomersPage from "./pages/tradie/TradieCustomersPage";
-import TradieCustomerPage from "./pages/tradie/TradieCustomerPage";
-import TradieNewCustomerPage from "./pages/tradie/TradieNewCustomerPage";
+import CustomerRecordPage from "./pages/tradie/customer/CustomerRecordPage";
+import PropertyDetailPage from "./pages/tradie/customer/PropertyDetailPage";
+import AccessSafetyPage from "./pages/tradie/customer/AccessSafetyPage";
+import AssetFormPage from "./pages/tradie/customer/AssetFormPage";
+import AddCustomerPage from "./pages/tradie/customer/add/AddCustomerPage";
+import AddContactPage from "./pages/tradie/customer/add/AddContactPage";
+import AddPropertyPage from "./pages/tradie/customer/add/AddPropertyPage";
+import RemindersPage from "./pages/tradie/customer/add/RemindersPage";
+import ReviewPage from "./pages/tradie/customer/add/ReviewPage";
+import EditCustomerPage from "./pages/tradie/customer/edit/EditCustomerPage";
+import EditContactsPage from "./pages/tradie/customer/edit/EditContactsPage";
+import EditPropertyPage from "./pages/tradie/customer/edit/EditPropertyPage";
+import AddNotePage from "./pages/tradie/customer/edit/AddNotePage";
+import UploadFilePage from "./pages/tradie/customer/edit/UploadFilePage";
 import TradieSettingsPage from "./pages/tradie/TradieSettingsPage";
 import TradieDiaryPage from "./pages/tradie/TradieDiaryPage";
 import TradieNewBookingPage from "./pages/tradie/TradieNewBookingPage";
@@ -124,8 +136,22 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="quotes/:quoteId/preview" element={<QuotePreviewPage />} />
             <Route path="invoices" element={<TradieInvoicesPage />} />
             <Route path="customers" element={<TradieCustomersPage />} />
-            <Route path="customers/new" element={<TradieNewCustomerPage />} />
-            <Route path="customers/:phoneKey" element={<TradieCustomerPage />} />
+            <Route path="customers/new" element={<AddCustomerPage />} />
+            {/* :customerId also resolves a legacy phoneKey, so old links still work. */}
+            <Route path="customers/:customerId" element={<CustomerRecordPage />} />
+            <Route path="customers/:customerId/edit" element={<EditCustomerPage />} />
+            <Route path="customers/:customerId/contacts" element={<EditContactsPage />} />
+            <Route path="customers/:customerId/contacts/new" element={<AddContactPage />} />
+            <Route path="customers/:customerId/properties/new" element={<AddPropertyPage />} />
+            <Route path="customers/:customerId/reminders" element={<RemindersPage />} />
+            <Route path="customers/:customerId/review" element={<ReviewPage />} />
+            <Route path="customers/:customerId/notes/new" element={<AddNotePage />} />
+            <Route path="customers/:customerId/files/new" element={<UploadFilePage />} />
+            <Route path="properties/:propertyId" element={<PropertyDetailPage />} />
+            <Route path="properties/:propertyId/edit" element={<EditPropertyPage />} />
+            <Route path="properties/:propertyId/access" element={<AccessSafetyPage />} />
+            <Route path="properties/:propertyId/assets/new" element={<AssetFormPage mode="create" />} />
+            <Route path="properties/:propertyId/assets/:assetId/edit" element={<AssetFormPage mode="edit" />} />
             <Route path="price-book" element={<TradiePriceBookPage />} />
             <Route path="rates/new" element={<RateNewPage />} />
             <Route path="rates/new/category" element={<RateCategoryPage />} />

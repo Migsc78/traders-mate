@@ -43,6 +43,16 @@ export async function wipeSeedData(): Promise<{
     await prisma.clientAsset.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.clientSession.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.otpChallenge.deleteMany({ where: { clientId: { in: clientIds } } });
+    // Customer records cascade from Customer, but files/notes/reminders can also
+    // hang off a property or asset with no customer, so clear them by client first.
+    await prisma.reminder.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.customerFile.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.customerNote.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.asset.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.propertyAccess.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.property.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.contact.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.customer.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.enquiry.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.client.deleteMany({ where: { id: { in: clientIds } } });
   }

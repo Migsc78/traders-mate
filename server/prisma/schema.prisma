@@ -260,6 +260,8 @@ model Client {
   customerContacts CustomerContact[]
   idempotencyKeys  IdempotencyKey[]
   quoteTemplates   QuoteTemplate[]
+  customers        Customer[]
+  assetTypes       AssetType[]
 
   @@index([status])
   @@index([destPhone])
@@ -307,6 +309,337 @@ model CustomerContact {
   @@index([clientId, updatedAt])
 }
 
+// ---------------------------------------------------------------------------
+// Customer record
+//
+// Before this, a "customer" was not a record at all: the list was built by
+// grouping enquiries on the last ten digits of a phone number. That made the
+// phone number the identity, so a customer who changed mobile became a second
+// customer, and there was nowhere to hang an address, a tenant, or a boiler.
+//
+// The split below is the one the wireframes are built on, and it is the whole
+// point: a customer is who pays, a property is where the work happens, an asset
+// is the kit being worked on. A landlord with four flats is one customer, four
+// properties, and however many boilers.
+// ---------------------------------------------------------------------------
+
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
+}
+
+/// How the customer prefers to be contacted.
+enum ContactChannel {
+  CALL
+  SMS
+  EMAIL
+  WHATSAPP
+}
+
+model Customer {
+  id                 String         @id @default(cuid())
+  clientId           String
+  client             Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type               CustomerType   @default(INDIVIDUAL)
+  /// Person or company name — what shows at the top of the record.
+  name               String
+  phone              String?
+  /// Legacy match key. Kept so old /t/customers/:phoneKey links and the enquiry
+  /// grouping still resolve while everything moves across to real ids.
+  phoneKey           String?
+  email              String?
+  preferredChannel   ContactChannel @default(CALL)
+  billingAddress     String?
+  billingPostcode    String?
+  /// Free chips: Preferred, Long term, Trade …
+  tags               String[]       @default([])
+  paymentTerms       String?
+  /// Carried over from the old free-text customer notes.
+  notes              String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  contacts           Contact[]
+  properties         Property[]
+  files              CustomerFile[]
+  customerNotes      CustomerNote[]
+  reminders          Reminder[]
+  enquiries          Enquiry[]
+  invoices           Invoice[]
+  /// Properties billed to this customer but owned by another record.
+  billedProperties   Property[]     @relation("PropertyBillTo")
+
+  @@unique([clientId, phoneKey])
+  @@index([clientId, name])
+}
+
+enum ContactRole {
+  OWNER
+  TENANT
+  SITE_CONTACT
+  ACCOUNTS
+  PROPERTY_MANAGER
+}
+
+model Contact {
+  id                   String      @id @default(cuid())
+  clientId             String
+  customerId           String
+  customer             Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name                 String
+  role                 ContactRole @default(OWNER)
+  phone                String?
+  email                String?
+  /// Exactly one per customer should be primary — enforced in the service layer,
+  /// not the schema, because setting a new primary has to clear the old one and a
+  /// partial unique index would reject the intermediate state.
+  isPrimary            Boolean     @default(false)
+  receivesQuotes       Boolean     @default(true)
+  receivesInvoices     Boolean     @default(true)
+  receivesAppointments Boolean     @default(true)
+  notes                String?
+  sort                 Int         @default(0)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  siteFor              Property[]  @relation("PropertySiteContact")
+
+  @@index([customerId, sort])
+}
+
+enum Occupancy {
+  OWNER_OCCUPIED
+  TENANTED
+  EMPTY
+}
+
+model Property {
+  id                String          @id @default(cuid())
+  clientId          String
+  customerId        String
+  customer          Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  /// "Main Home", "Riverside Flat" — what the tradie calls it.
+  nickname          String?
+  addressLine1      String?
+  addressLine2      String?
+  town              String?
+  postcode          String?
+  propertyType      String?
+  occupancy         Occupancy?
+  siteContactId     String?
+  siteContact       Contact?        @relation("PropertySiteContact", fields: [siteContactId], references: [id], onDelete: SetNull)
+  /// Bill someone other than the owner — a managing agent, say.
+  billToCustomerId  String?
+  billToCustomer    Customer?       @relation("PropertyBillTo", fields: [billToCustomerId], references: [id], onDelete: SetNull)
+  sort              Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  access            PropertyAccess?
+  assets            Asset[]
+  enquiries         Enquiry[]
+  files             CustomerFile[]
+  propertyNotes     CustomerNote[]
+  reminders         Reminder[]
+
+  @@index([customerId, sort])
+  @@index([clientId, postcode])
+}
+
+/// Structured access and safety for one property.
+///
+/// Split from Property deliberately: this is the sensitive half. Access codes and
+/// key-safe locations are the keys to a stranger's house, and keeping them in
+/// their own row means they can be masked, permissioned and — once staff logins
+/// exist — audited, without dragging the whole property record along.
+model PropertyAccess {
+  id                String   @id @default(cuid())
+  clientId          String
+  propertyId        String   @unique
+  property          Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  /// Key safe / Meet on site / Tenant lets in …
+  accessMethod      String?
+  keySafe           Boolean  @default(false)
+  keySafeLocation   String?
+  /// Sensitive — masked in the UI until deliberately revealed.
+  accessCode        String?
+  alarm             Boolean  @default(false)
+  parking           String?
+  permitRequired    Boolean  @default(false)
+  /// "08:00" / "17:00" — stored as text because they're display hints, not instants.
+  workingHoursFrom  String?
+  workingHoursTo    String?
+  callBeforeArrival Boolean  @default(false)
+  dogOnSite         Boolean  @default(false)
+  asbestosKnown     Boolean  @default(false)
+  /// Asbestos, Confined space, Gas …
+  safetyFlags       String[] @default([])
+  /// Internal only — never shown to the customer.
+  engineerNotes     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// The catalogue of asset types a tradie can pick from.
+///
+/// A fixed enum was the wrong shape here. UK trades don't share a vocabulary —
+/// a gas engineer services unvented cylinders and flues, a sparky inspects
+/// consumer units and EV chargers, a roofer records a covering with a warranty on
+/// it — and no list written up front survives contact with the next trade that
+/// signs up. So each account gets a researched starter set for its trade, seeded
+/// on first use exactly like the price book, and adds its own from there.
+model AssetType {
+  id                   String   @id @default(cuid())
+  clientId             String
+  client               Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  label                String
+  /// Picker grouping: HEATING | WATER | ELECTRICAL | RENEWABLE | FABRIC | OTHER
+  group                String   @default("OTHER")
+  /// Typical service/inspection interval, in months. An unvented cylinder is 12,
+  /// a domestic EICR is 120. Seeds the next-due date so a reminder exists without
+  /// the tradie doing the arithmetic on a doorstep.
+  defaultServiceMonths Int?
+  /// Seeded types are hidden rather than deleted — a plumber who never touches
+  /// LPG shouldn't have to scroll past it, but assets already filed under it must
+  /// keep their label.
+  active               Boolean  @default(true)
+  sort                 Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([clientId, label])
+  @@index([clientId, active, sort])
+}
+
+/// A piece of kit at a property. Replaces the free-text "plant notes" box.
+///
+/// The service dates are the commercial point: a boiler with a next-due date is
+/// next year's work already on the books.
+model Asset {
+  id            String         @id @default(cuid())
+  clientId      String
+  propertyId    String
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  /// The AssetType label, stored on the row rather than referenced. An asset must
+  /// keep saying "Unvented cylinder" even if that type is later renamed or hidden.
+  kind          String         @default("Other")
+  name          String?
+  manufacturer  String?
+  model         String?
+  serial        String?
+  installDate   DateTime?
+  /// Where in the property — "Kitchen cupboard", "Loft".
+  location      String?
+  warrantyUntil DateTime?
+  lastServiceAt DateTime?
+  nextDueAt     DateTime?
+  notes         String?
+  sort          Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  files         CustomerFile[]
+  assetNotes    CustomerNote[]
+  reminders     Reminder[]
+
+  @@index([propertyId, sort])
+  @@index([clientId, nextDueAt])
+}
+
+enum FileCategory {
+  CERTIFICATE
+  MANUAL
+  WARRANTY
+  PHOTO
+  INVOICE
+  OTHER
+}
+
+/// Internal by default. Costs, engineer notes and access details must never leak
+/// to a customer just because someone attached them to the wrong record.
+enum RecordVisibility {
+  INTERNAL
+  CUSTOMER
+}
+
+model CustomerFile {
+  id          String           @id @default(cuid())
+  clientId    String
+  customerId  String?
+  customer    Customer?        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  propertyId  String?
+  property    Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  assetId     String?
+  asset       Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  enquiryId   String?
+  enquiry     Enquiry?         @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  category    FileCategory     @default(OTHER)
+  filename    String
+  url         String
+  contentType String?
+  sizeBytes   Int?
+  issuedAt    DateTime?
+  /// Drives the expiry reminder — a gas cert that lapses is a job.
+  expiresAt   DateTime?
+  visibility  RecordVisibility @default(INTERNAL)
+  createdAt   DateTime         @default(now())
+
+  @@index([clientId, customerId, createdAt])
+  @@index([clientId, expiresAt])
+}
+
+enum NoteType {
+  CUSTOMER
+  PROPERTY
+  JOB
+  PRIVATE
+}
+
+model CustomerNote {
+  id         String           @id @default(cuid())
+  clientId   String
+  customerId String?
+  customer   Customer?        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  propertyId String?
+  property   Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  assetId    String?
+  asset      Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  enquiryId  String?
+  enquiry    Enquiry?         @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+  type       NoteType         @default(CUSTOMER)
+  body       String
+  pinned     Boolean          @default(false)
+  visibility RecordVisibility @default(INTERNAL)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([clientId, customerId, createdAt])
+}
+
+/// Service dates, certificate expiries and inspections — the repeat-business engine.
+model Reminder {
+  id          String    @id @default(cuid())
+  clientId    String
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  assetId     String?
+  asset       Asset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  /// ANNUAL_SERVICE | CERT_EXPIRY | INSPECTION | OTHER
+  kind        String    @default("OTHER")
+  label       String
+  dueAt       DateTime
+  /// Repeat interval; null for one-offs.
+  everyMonths Int?
+  active      Boolean   @default(true)
+  lastFiredAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([clientId, active, dueAt])
+}
+
 enum TwilioPoolStatus {
   AVAILABLE
   ASSIGNED
@@ -351,6 +684,14 @@ model Enquiry {
   deliveryInfo String?
   createdAt    DateTime        @default(now())
 
+  /// Nullable on purpose. An enquiry arrives from a stranger off the website
+  /// before anyone has decided they're a customer, so the link is made when the
+  /// record is created — not required at the door.
+  customerId   String?
+  customer     Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  propertyId   String?
+  property     Property?       @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
   quotes       Quote[]
   voiceNotes   VoiceNote[]
   invoices     Invoice[]
@@ -358,10 +699,13 @@ model Enquiry {
   missedCalls  MissedCall[]
   appointments Appointment[]
   certificates Certificate[]
+  files        CustomerFile[]
+  notes        CustomerNote[]
 
   @@index([clientId, createdAt])
   @@index([clientId, phone])
   @@index([clientId, pipeline, createdAt])
+  @@index([clientId, customerId])
 }
 
 enum QuoteStatus {
@@ -644,6 +988,10 @@ model Invoice {
   enquiry           Enquiry?      @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
   quoteId           String?
   quote             Quote?        @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  /// Who is actually billed. Set from the property's billTo where one exists, so a
+  /// managing agent's invoices don't file under the tenant.
+  customerId        String?
+  customer          Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
   status            InvoiceStatus @default(DRAFT)
   publicToken       String        @unique
   customerName      String?
