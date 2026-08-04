@@ -33,6 +33,7 @@ import { loadEnv } from "./loadEnv.js";
 import { SEED, SEED_PHONES, SEED_ROUTE_KEYS } from "./markers.js";
 import { wipeSeedData } from "./wipe.js";
 import { seedCustomerRecords } from "./customers.js";
+import { seedJobs } from "./jobs.js";
 
 loadEnv();
 
@@ -905,6 +906,17 @@ async function main() {
 
   console.log("Seeding customer records (contacts, properties, access, assets)…");
   await seedCustomerRecords(prisma, {
+    demoClientId: demo.id,
+    enquiryIds: {
+      alice: enqAlice.id,
+      bob: enqBob.id,
+      cara: enqCara.id,
+      dan: enqDan.id,
+    },
+  });
+
+  console.log("Seeding jobs (pipeline, costs, visits and history)…");
+  await seedJobs(prisma, {
     demoClientId: demo.id,
     enquiryIds: {
       alice: enqAlice.id,

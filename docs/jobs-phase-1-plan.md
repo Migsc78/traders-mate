@@ -437,7 +437,45 @@ one job sitting in **To invoice** so the tab isn't empty on first run.
 - **A release is required.** Local-bundle Capacitor means none of this reaches the phone without
   `npm run release` in `client/`.
 
-## 9. Deferred, explicitly
+## 9. What actually happened
+
+All nine slices shipped. Where the build differed from this plan:
+
+| Planned | Actual |
+|---|---|
+| `JobCost.unitCostPence` NOT NULL | Made nullable mid-slice-2 — with a default of 0 there was no way to tell "cost not set" from "genuinely free", and an unpriced boiler read as pure profit |
+| Access-reveal audit in slice 8 | Landed in slice 5, which changed the reveal call signature anyway |
+| Files tab unassigned to a slice | Built in slice 8 (§6.2 listed it; no slice claimed it) |
+| — | `Invoice.jobId` added in slice 7; without it, sending or being paid couldn't move the job's state |
+
+Bugs found by building and running it, not by reading it:
+
+- **Quote-raised-on-site created no Job.** `PATCH /quotes/:id/customer` marked an
+  enquiry `pipeline: "JOB"`, which used to be enough to appear in the list. After
+  the cutover it needed a real Job or the work silently vanished. (Slice 2.)
+- **The quote editor dropped price-book provenance.** Lines saved with
+  `priceBookItemId: null`, invisible until costs started flowing through it.
+  (Slice 3.)
+- **`dayLabel` called tomorrow "Today".** Correct for creation timestamps, wrong
+  the moment Upcoming was grouped by visit date. (Slice 4.)
+- **Provisional profit still printed 100%.** The flag was set and the banner
+  shown, but the headline read as a settled figure. Now presented as a ceiling
+  with the percentage withheld. (Slice 6.)
+- **The transition guard blocked finishing a call-out.** `Unscheduled →
+  Completed` was refused, so a tradie who never tapped "on my way" couldn't mark
+  his own job done. (Slice 7.)
+- **`nextVisit` showed a completed visit.** A job with a done first fix and a
+  booked second fix displayed last week's date as what was coming up. (Slice 9.)
+
+Final state, verified against a freshly seeded database: five jobs, one in each
+pipeline tab; the quoted path bills £2,424 less a £500 deposit; the call-out
+path bills £100.60 from cost lines with no quote; `accessCode` appears zero
+times across all six job endpoints and only via the deliberate reveal.
+
+**Still unverified: none of it has been looked at in a browser.** Layout is the
+one thing typechecks and HTTP tests cannot cover.
+
+## 10. Deferred, explicitly
 
 Checklists and tasks · multi-engineer assignment · staff logins, roles and permissions ·
 profit-by-job-type report · formal variation approval workflow · overheads and net P&L ·

@@ -53,6 +53,14 @@ export async function wipeSeedData(): Promise<{
     await prisma.property.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.contact.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.customer.deleteMany({ where: { clientId: { in: clientIds } } });
+    // Jobs cascade from Client, but the wipe deletes explicitly wherever a row
+    // could also be reached by another path — an AccessReveal outlives its job,
+    // and an Appointment can exist with no job at all.
+    await prisma.accessReveal.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.jobEvent.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.jobCost.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.appointment.deleteMany({ where: { clientId: { in: clientIds } } });
+    await prisma.job.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.enquiry.deleteMany({ where: { clientId: { in: clientIds } } });
     await prisma.client.deleteMany({ where: { id: { in: clientIds } } });
   }

@@ -204,7 +204,11 @@ export const jobCardInclude = {
   enquiry: { select: { id: true, name: true, phone: true, postcode: true } },
   quote: { select: { id: true, status: true, totalPence: true, reference: true } },
   visits: {
-    where: { status: { notIn: ["CANCELLED"] } },
+    // The *next* visit, which means one that hasn't happened. A job with a
+    // completed first fix and a second fix booked for Thursday must not show
+    // last week's date as what's coming up — on a job with two visits that is
+    // the difference between turning up and not.
+    where: { status: { notIn: ["CANCELLED", "DONE", "NO_SHOW"] } },
     orderBy: { startsAt: "asc" },
     take: 1,
     select: {
