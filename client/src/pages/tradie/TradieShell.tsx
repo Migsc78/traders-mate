@@ -62,13 +62,14 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
     };
   }
   // Screens reached from inside a job go back to that job, not to the list.
-  const jobSub = pathname.match(/^\/t\/jobs\/([^/]+)\/(schedule|briefing|complete)$/);
+  const jobSub = pathname.match(/^\/t\/jobs\/([^/]+)\/(schedule|briefing|complete|invoice)$/);
   if (jobSub) {
     const [, jobId, leaf] = jobSub;
     const chrome: Record<string, { title: string; subtitle: string }> = {
       schedule: { title: "Schedule", subtitle: "Books the diary at the same time" },
       briefing: { title: "Before you arrive", subtitle: "Access, pets, parking and safety" },
       complete: { title: "Complete job", subtitle: "Sign off and get it billed" },
+      invoice: { title: "Invoice review", subtitle: "Check it before the customer sees it" },
     };
     return { backTo: `/t/jobs/${jobId}`, backLabel: "Job", ...chrome[leaf] };
   }

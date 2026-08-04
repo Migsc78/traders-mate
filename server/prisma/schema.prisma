@@ -804,6 +804,7 @@ model Job {
   files            CustomerFile[]
   notes            CustomerNote[]
   accessReveals    AccessReveal[]
+  invoices         Invoice[]
 
   @@index([clientId, operational, createdAt])
   @@index([clientId, commercial, createdAt])
@@ -1207,6 +1208,10 @@ model Invoice {
   enquiry           Enquiry?      @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
   quoteId           String?
   quote             Quote?        @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  /// The job this bills. Without it, sending or being paid can't move the job's
+  /// commercial state, and completed work would sit in "To invoice" forever.
+  jobId             String?
+  job               Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
   /// Who is actually billed. Set from the property's billTo where one exists, so a
   /// managing agent's invoices don't file under the tenant.
   customerId        String?

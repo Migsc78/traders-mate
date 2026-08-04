@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getTradieSession, sendOrQueue, tradieApi } from "../../../api/tradie";
+import { getTradieSession, sendOrQueue } from "../../../api/tradie";
 import { commercialTone, jobsApi, operationalTone, type PrimaryAction } from "../../../api/jobs";
 import { QueryError } from "../ui";
 import { ListToolbar, useListFilter, type ListTab } from "../ListToolbar";
-import { useOffline } from "../../../lib/connectivity";
 import OverviewTab from "./tabs/OverviewTab";
 import VisitsTab from "./tabs/VisitsTab";
 import CostsTab from "./tabs/CostsTab";
@@ -33,7 +32,6 @@ export default function JobPage() {
   const session = getTradieSession();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const offline = useOffline();
   const { tab, setTab, query, setQuery, searchOpen } = useListFilter("overview");
   const [actionError, setActionError] = useState("");
 
@@ -72,16 +70,6 @@ export default function JobPage() {
     onError: (err: Error) => setActionError(err.message),
   });
 
-  const makeInvoice = useMutation({
-    mutationFn: (quoteId: string) => tradieApi.invoiceFromQuote(quoteId),
-    onSuccess: () => {
-      setActionError("");
-      void qc.invalidateQueries({ queryKey: ["tradie-invoices"] });
-      navigate("/t/invoices");
-    },
-    onError: (err: Error) => setActionError(err.message),
-  });
-
   if (!session) return <Navigate to="/t/auth" replace />;
   if (detail.isLoading && !detail.data) return <p>Loading…</p>;
   // With a cached copy we render anyway — the address and the contact number are
@@ -104,11 +92,11 @@ export default function JobPage() {
       case "complete":
         navigate(`/t/jobs/${enquiryId}/complete`);
         return;
-      case "invoice": {
-        const quoteId = job.latestQuote?.id;
-        if (quoteId) makeInvoice.mutate(quoteId);
+      case "invoice":
+        // Always via the review screen — the deposit coming off is the fact
+        // that gets forgotten between the quote and the bill.
+        navigate(`/t/jobs/${enquiryId}/invoice`);
         return;
-      }
       case "record-payment":
         navigate("/t/invoices");
         return;
@@ -117,15 +105,13 @@ export default function JobPage() {
   };
 
   const cta = job.primaryAction;
-  // Invoicing straight from recorded costs isn't wired yet, so a job with no
-  // quote has nothing to build an invoice from. It says so rather than failing
-  // when tapped.
-  const ctaBlocked =
-    cta.action === "invoice" && !job.latestQuote
-      ? "No quote on this job yet — billing straight from the Costs tab is coming next."
-      : cta.action === "invoice" && offline
-        ? "Invoicing needs signal."
-        : null;
+  // A time-and-materials job bills from its cost lines, so the only thing that
+  // can genuinely stop an invoice now is having nothing recorded to charge for.
+  const nothingToBill =
+    cta.action === "invoice" && !job.latestQuote && job.costs.filter((c) => c.billable).length === 0;
+  const ctaBlocked = nothingToBill
+    ? "Nothing to bill yet — add what you're charging on the Costs tab."
+    : null;
 
   return (
     <div className="t-job-page">
@@ -170,10 +156,10 @@ export default function JobPage() {
           <button
             type="button"
             className="primary t-btn--block"
-            disabled={!cta.enabled || !!ctaBlocked || move.isPending || makeInvoice.isPending}
+            disabled={!cta.enabled || !!ctaBlocked || move.isPending}
             onClick={() => runAction(cta.action)}
           >
-            {move.isPending || makeInvoice.isPending ? "Saving…" : cta.label}
+            {move.isPending ? "Saving…" : cta.label}
           </button>
           {(ctaBlocked || cta.hint) && <p className="t-cta-hint">{ctaBlocked || cta.hint}</p>}
         </div>

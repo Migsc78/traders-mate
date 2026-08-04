@@ -3345,3 +3345,19 @@ html.native-app .tradie-bottom-nav {
 /* Provisional profit is a ceiling, not an answer — it reads muted so the eye
    doesn't take it for a settled figure. */
 .t-money--provisional { color: var(--t-ink-soft); }
+
+/* ---------- invoice review (phase 1) ---------- */
+
+.t-invoice-lines { list-style: none; margin: 0; padding: 0; }
+.t-invoice-lines li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--t-hairline-2);
+  font-size: 14px;
+}
+.t-invoice-lines li:last-child { border-bottom: none; }
+.t-invoice-label { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.t-invoice-lines .t-money { font-variant-numeric: tabular-nums; white-space: nowrap; }

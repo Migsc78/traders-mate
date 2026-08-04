@@ -113,13 +113,22 @@ export function primaryAction(job: Pick<Job, "operational" | "commercial">): Pri
  *
  * Guarded server-side because the phone can be hours out of date: a job started
  * in a cellar and synced later must not be able to un-complete itself.
+ *
+ * Finishing is reachable from every live state on purpose. An emergency
+ * call-out gets done before anyone opens the app — no "on my way", no "start",
+ * just a tradie in a kitchen at nine at night marking it done. Refusing that
+ * because the ceremony was skipped would block someone from finishing their own
+ * job, and the only thing it would protect is the tidiness of the state graph.
  */
+const FINISH: JobOperational[] = ["COMPLETED", "CANCELLED"];
+
 const ALLOWED: Record<JobOperational, JobOperational[]> = {
-  UNSCHEDULED: ["SCHEDULED", "IN_PROGRESS", "CANCELLED"],
-  SCHEDULED: ["ON_THE_WAY", "IN_PROGRESS", "UNSCHEDULED", "CANCELLED"],
-  ON_THE_WAY: ["IN_PROGRESS", "SCHEDULED", "CANCELLED"],
-  IN_PROGRESS: ["PAUSED", "COMPLETED", "CANCELLED"],
-  PAUSED: ["IN_PROGRESS", "COMPLETED", "CANCELLED"],
+  UNSCHEDULED: ["SCHEDULED", "ON_THE_WAY", "IN_PROGRESS", ...FINISH],
+  SCHEDULED: ["ON_THE_WAY", "IN_PROGRESS", "UNSCHEDULED", ...FINISH],
+  ON_THE_WAY: ["IN_PROGRESS", "SCHEDULED", ...FINISH],
+  IN_PROGRESS: ["PAUSED", ...FINISH],
+  PAUSED: ["IN_PROGRESS", ...FINISH],
+  // Reopening is the one move back, for a job signed off too early.
   COMPLETED: ["IN_PROGRESS"],
   CANCELLED: ["UNSCHEDULED"],
 };

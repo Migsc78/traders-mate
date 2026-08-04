@@ -8,6 +8,7 @@ import { ApiError } from "../../middleware/error.js";
 import { renderMoneyPdf } from "../docs/pdf.js";
 import { scheduleReviewAsk } from "../reviews/reviews.js";
 import { createConnectPaymentCheckout } from "../billing/connect.js";
+import { appendJobEvent } from "../jobs/events.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -141,6 +142,11 @@ export async function sendInvoice(clientId: string, invoiceId: string) {
     include: { lines: { orderBy: { sort: "asc" } } },
   });
 
+  // The bill has gone out, so the work is no longer "to invoice". Without this
+  // completed jobs would sit in that tab having already been charged for, which
+  // is exactly the confusion the two-status split exists to remove.
+  await moveJobCommercial(invoice.jobId, clientId, "INVOICE_SENT", `Invoice ${invoice.reference || ""} sent`, "invoice.sent");
+
   await prisma.followUp.deleteMany({ where: { invoiceId: invoice.id, status: "PENDING" } });
   const sentAt = new Date();
   await prisma.followUp.createMany({
@@ -175,10 +181,35 @@ export async function markInvoicePaid(
     },
     include: { lines: { orderBy: { sort: "asc" } } },
   });
+  await moveJobCommercial(invoice.jobId, clientId, "PAID", `Invoice ${invoice.reference || ""} paid`, "invoice.paid");
+
   void scheduleReviewAsk(invoiceId).catch((e) =>
     console.warn("[review] schedule failed", e instanceof Error ? e.message : e)
   );
   return updated;
+}
+
+/**
+ * Carry an invoice's fate back to the job it bills.
+ *
+ * Best-effort on purpose: an invoice that was sent to the customer has been
+ * sent whether or not we manage to update the job beside it, and throwing here
+ * would turn a bookkeeping miss into a failed send.
+ */
+async function moveJobCommercial(
+  jobId: string | null,
+  clientId: string,
+  commercial: "INVOICE_SENT" | "PAID",
+  summary: string,
+  event: "invoice.sent" | "invoice.paid"
+) {
+  if (!jobId) return;
+  try {
+    await prisma.job.update({ where: { id: jobId }, data: { commercial } });
+    await appendJobEvent(prisma, { clientId, jobId, type: event, summary });
+  } catch (e) {
+    console.warn("[invoice] could not update job state", e instanceof Error ? e.message : e);
+  }
 }
 
 /** Create Stripe Checkout Pay Now URL for an invoice (Connect destination charge). */

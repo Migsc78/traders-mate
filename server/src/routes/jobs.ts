@@ -31,6 +31,7 @@ import {
 import { extractPostcode, normalizePostcode } from "../services/geo/postcode.js";
 import { toE164UK } from "../services/messaging/sender.js";
 import { accessSelect, maskAccess } from "../services/customers/record.js";
+import { createInvoiceFromJob, previewJobInvoice } from "../services/jobs/invoice.js";
 
 /**
  * Everything under /jobs.
@@ -808,6 +809,30 @@ jobsRouter.patch(
       }
 
       res.json(updated);
+    } catch (err) {
+      next(err);
+    }
+  })
+);
+
+// ---------------------------------------------------------------- invoicing
+
+jobsRouter.get("/jobs/:jobId/invoice/preview", requireClient, async (req, res, next) => {
+  try {
+    res.json(await previewJobInvoice(clientId(req), req.params.jobId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+jobsRouter.post(
+  "/jobs/:jobId/invoice",
+  requireClient,
+  requireActiveAccount,
+  idempotent(async (req, res, next) => {
+    try {
+      const invoice = await createInvoiceFromJob(clientId(req), req.params.jobId);
+      res.status(201).json(invoice);
     } catch (err) {
       next(err);
     }
