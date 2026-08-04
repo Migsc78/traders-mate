@@ -836,9 +836,11 @@ model JobCost {
   label           String
   qty             Float       @default(1)
   unit            PriceUnit   @default(JOB)
-  /// What it cost the tradie. Zero is a real answer for own labour; see
-  /// Client.labourCostPerHourPence.
-  unitCostPence   Int         @default(0)
+  /// What it cost the tradie. Null means "not set yet", which is not the same as
+  /// zero — zero is a real answer (own labour, a part the customer supplied).
+  /// Collapsing the two would let an unpriced material read as pure profit, which
+  /// is the one wrong number this feature must never show.
+  unitCostPence   Int?
   /// What the customer is charged, ex VAT.
   sellPricePence  Int         @default(0)
   vatRate         Float       @default(20)

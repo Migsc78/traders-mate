@@ -33,6 +33,7 @@ import { createInvoiceFromQuote, sendInvoice, markInvoicePaid } from "../service
 import { env } from "../env.js";
 import { configureNumberWebhooks, getNumberWebhookStatus } from "../services/twilio/numbers.js";
 import { extractPostcode, normalizePostcode } from "../services/geo/postcode.js";
+import { createDirectJob } from "../services/jobs/create.js";
 
 export const tradieRouter = Router();
 
@@ -909,49 +910,11 @@ tradieRouter.post("/onboarding/complete", requireClient, async (req, res, next) 
   }
 });
 
-// ---- Jobs (enquiries) ----
-function customerPhoneKey(phone: string): string {
+export function customerPhoneKey(phone: string): string {
   return phone.replace(/\D/g, "").slice(-10);
 }
 
-tradieRouter.get("/jobs", requireClient, async (req, res, next) => {
-  try {
-    const cid = clientId(req);
-    const enquiries = await prisma.enquiry.findMany({
-      where: { clientId: cid, pipeline: "JOB" },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      include: {
-        quotes: {
-          where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { id: true, status: true, totalPence: true },
-        },
-      },
-    });
-    res.json(
-      enquiries.map((e) => ({
-        id: e.id,
-        name: e.name,
-        phone: e.phone,
-        message: e.message,
-        postcode: e.postcode,
-        distanceMiles: e.distanceMiles,
-        photoUrls: e.photoUrls,
-        status: e.status,
-        pipeline: e.pipeline,
-        triage: e.triage,
-        summary: e.summary,
-        source: e.source,
-        createdAt: e.createdAt,
-        latestQuote: e.quotes[0] || null,
-      }))
-    );
-  } catch (err) {
-    next(err);
-  }
-});
+
 
 tradieRouter.get("/inbox", requireClient, async (req, res, next) => {
   try {
@@ -1003,293 +966,24 @@ tradieRouter.get("/inbox", requireClient, async (req, res, next) => {
 });
 
 /** POST /jobs — tradie-created job (walk-up / WhatsApp / returning customer) */
-tradieRouter.post("/jobs", requireClient, requireActiveAccount, async (req, res, next) => {
-  try {
-    const cid = clientId(req);
-    const body = z
-      .object({
-        name: z.string().trim().min(1).max(120),
-        phone: z.string().trim().min(7).max(40),
-        message: z.string().trim().max(2000).nullable().optional(),
-        postcode: z.string().trim().max(16).nullable().optional(),
-      })
-      .parse(req.body ?? {});
 
-    const phone = toE164UK(body.phone);
-    const phoneKey = customerPhoneKey(phone);
-    if (phoneKey.length < 8) throw new ApiError(400, "bad_phone", "Enter a valid UK mobile or landline");
 
-    const rawPc = body.postcode?.trim() || extractPostcode(body.message || "") || null;
-    const postcode = rawPc ? normalizePostcode(rawPc) || rawPc.toUpperCase() : null;
 
-    const enquiry = await prisma.enquiry.create({
-      data: {
-        clientId: cid,
-        name: body.name.trim(),
-        phone,
-        message: body.message?.trim() || null,
-        postcode,
-        source: "manual",
-        status: "ROUTED",
-        pipeline: "JOB",
-        triage: "LIKELY_JOB",
-        summary: body.message?.trim()?.slice(0, 160) || "Manual job",
-        deliveredAt: new Date(),
-        deliveryInfo: "Created manually in TradiesMate",
-        promotedAt: new Date(),
-      },
-    });
 
-    await prisma.customerContact.upsert({
-      where: { clientId_phoneKey: { clientId: cid, phoneKey } },
-      create: {
-        clientId: cid,
-        phoneKey,
-        phone,
-        name: body.name.trim(),
-      },
-      update: {
-        phone,
-        name: body.name.trim(),
-      },
-    });
 
-    res.json({
-      id: enquiry.id,
-      name: enquiry.name,
-      phone: enquiry.phone,
-      message: enquiry.message,
-      postcode: enquiry.postcode,
-      distanceMiles: enquiry.distanceMiles,
-      photoUrls: enquiry.photoUrls,
-      status: enquiry.status,
-      pipeline: enquiry.pipeline,
-      triage: enquiry.triage,
-      source: enquiry.source,
-      createdAt: enquiry.createdAt,
-      latestQuote: null,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
-tradieRouter.post("/jobs/:enquiryId/promote", requireClient, requireActiveAccount, async (req, res, next) => {
-  try {
-    const cid = clientId(req);
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: cid },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Not found");
-    const updated = await prisma.enquiry.update({
-      where: { id: enquiry.id },
-      data: {
-        pipeline: "JOB",
-        promotedAt: enquiry.promotedAt || new Date(),
-        killedAt: null,
-        triage: enquiry.triage === "SPAM" ? "LIKELY_JOB" : enquiry.triage,
-      },
-    });
-    res.json({
-      id: updated.id,
-      pipeline: updated.pipeline,
-      triage: updated.triage,
-      promotedAt: updated.promotedAt,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
-tradieRouter.post("/jobs/:enquiryId/archive", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
-  try {
-    const cid = clientId(req);
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: cid, pipeline: "JOB" },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
-    const updated = await prisma.enquiry.update({
-      where: { id: enquiry.id },
-      data: { pipeline: "ARCHIVED" },
-    });
-    res.json({ id: updated.id, pipeline: updated.pipeline });
-  } catch (err) {
-    next(err);
-  }
-}));
 
-tradieRouter.post("/jobs/:enquiryId/unarchive", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
-  try {
-    const cid = clientId(req);
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: cid, pipeline: "ARCHIVED" },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Archived job not found");
-    const updated = await prisma.enquiry.update({
-      where: { id: enquiry.id },
-      data: { pipeline: "JOB", promotedAt: enquiry.promotedAt || new Date() },
-    });
-    res.json({ id: updated.id, pipeline: updated.pipeline });
-  } catch (err) {
-    next(err);
-  }
-}));
 
-tradieRouter.delete("/jobs/:enquiryId", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
-  try {
-    const cid = clientId(req);
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: cid },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
-    await prisma.enquiry.delete({ where: { id: enquiry.id } });
-    res.json({ ok: true, id: enquiry.id });
-  } catch (err) {
-    next(err);
-  }
-}));
 
-tradieRouter.post("/jobs/:enquiryId/kill", requireClient, requireActiveAccount, async (req, res, next) => {
-  try {
-    const cid = clientId(req);
-    const body = z.object({ reason: z.enum(["dead", "spam"]) }).parse(req.body ?? {});
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: cid },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Not found");
 
-    const updated = await prisma.enquiry.update({
-      where: { id: enquiry.id },
-      data: {
-        pipeline: "KILLED",
-        killedAt: new Date(),
-        triage: body.reason === "spam" ? "SPAM" : enquiry.triage,
-        summary:
-          body.reason === "spam"
-            ? enquiry.summary || "Marked spam by tradie"
-            : enquiry.summary || "Marked not interested",
-      },
-    });
 
-    if (body.reason === "spam") {
-      await prisma.missedCall.updateMany({
-        where: { enquiryId: enquiry.id, clientId: cid },
-        data: { status: "SPAM" },
-      });
-    }
 
-    res.json({
-      id: updated.id,
-      pipeline: updated.pipeline,
-      triage: updated.triage,
-      killedAt: updated.killedAt,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-tradieRouter.get("/jobs/:enquiryId", requireClient, async (req, res, next) => {
-  try {
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: clientId(req) },
-      include: {
-        quotes: {
-          where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
-          orderBy: { createdAt: "desc" },
-          include: { lines: quoteLineInclude },
-        },
-      },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
-    res.json(enquiry);
-  } catch (err) {
-    next(err);
-  }
-});
 
 // ---- Voice / notes → draft ----
-tradieRouter.post("/jobs/:enquiryId/notes", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
-  try {
-    const body = z.object({ transcript: z.string().min(3).max(8000) }).parse(req.body ?? {});
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: clientId(req) },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
-    await ensurePriceBook(clientId(req));
 
-    const voice = await prisma.voiceNote.create({
-      data: {
-        clientId: clientId(req),
-        enquiryId: enquiry.id,
-        transcript: body.transcript,
-        status: "READY",
-      },
-    });
-    const quote = await buildDraftQuoteFromTranscript({
-      clientId: clientId(req),
-      enquiryId: enquiry.id,
-      voiceNoteId: voice.id,
-      transcript: body.transcript,
-    });
-    res.status(201).json(quote);
-  } catch (err) {
-    next(err);
-  }
-}));
 
-tradieRouter.post("/jobs/:enquiryId/voice", requireClient, requireActiveAccount, idempotent(async (req, res, next) => {
-  try {
-    const body = z
-      .object({
-        contentType: z.string().min(3).max(40),
-        dataBase64: z.string().min(10),
-        durationSec: z.number().optional(),
-      })
-      .parse(req.body ?? {});
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: clientId(req) },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
 
-    const b64 = body.dataBase64.includes(",") ? body.dataBase64.slice(body.dataBase64.indexOf(",") + 1) : body.dataBase64;
-    const buf = Buffer.from(b64, "base64");
-    const stored = await storeAudio(body.contentType, buf);
-
-    const voice = await prisma.voiceNote.create({
-      data: {
-        clientId: clientId(req),
-        enquiryId: enquiry.id,
-        audioUrl: stored.url,
-        status: "TRANSCRIBING",
-        durationSec: body.durationSec ?? null,
-      },
-    });
-
-    try {
-      const filename = path.basename(stored.path || "job.webm");
-      const fileBuf = stored.path ? await fs.readFile(stored.path) : buf;
-      const transcript = await transcribeWithWhisper(fileBuf, filename, body.contentType);
-      await ensurePriceBook(clientId(req));
-      const quote = await buildDraftQuoteFromTranscript({
-        clientId: clientId(req),
-        enquiryId: enquiry.id,
-        voiceNoteId: voice.id,
-        transcript,
-      });
-      res.status(201).json({ voiceNoteId: voice.id, transcript, quote });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Voice processing failed";
-      await prisma.voiceNote.update({
-        where: { id: voice.id },
-        data: { status: "FAILED", error: msg.slice(0, 400) },
-      });
-      throw new ApiError(400, "voice_failed", msg);
-    }
-  } catch (err) {
-    next(err);
-  }
-}));
 
 const priceBookItemSchema = z.object({
   id: z.string().optional(),
@@ -1613,17 +1307,15 @@ tradieRouter.get("/archived", requireClient, async (req, res, next) => {
   try {
     const cid = clientId(req);
     const [jobs, quotes] = await Promise.all([
-      prisma.enquiry.findMany({
-        where: { clientId: cid, pipeline: "ARCHIVED" },
-        orderBy: { createdAt: "desc" },
+      prisma.job.findMany({
+        where: { clientId: cid, archivedAt: { not: null } },
+        orderBy: { archivedAt: "desc" },
         take: 80,
         include: {
-          quotes: {
-            where: { status: { notIn: ["DELETED", "ARCHIVED"] } },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { id: true, status: true, totalPence: true },
-          },
+          enquiry: { select: { name: true, phone: true, message: true, postcode: true, distanceMiles: true } },
+          customer: { select: { name: true } },
+          property: { select: { postcode: true } },
+          quote: { select: { id: true, status: true, totalPence: true } },
         },
       }),
       prisma.quote.findMany({
@@ -1636,15 +1328,19 @@ tradieRouter.get("/archived", requireClient, async (req, res, next) => {
       }),
     ]);
     res.json({
-      jobs: jobs.map((e) => ({
-        id: e.id,
-        name: e.name,
-        phone: e.phone,
-        message: e.message,
-        postcode: e.postcode,
-        distanceMiles: e.distanceMiles,
-        createdAt: e.createdAt,
-        latestQuote: e.quotes[0] || null,
+      jobs: jobs.map((j) => ({
+        id: j.id,
+        name: j.enquiry?.name || j.customer?.name || "Customer",
+        phone: j.enquiry?.phone || "",
+        message: j.scope || j.enquiry?.message || null,
+        postcode: j.enquiry?.postcode || j.property?.postcode || null,
+        distanceMiles: j.enquiry?.distanceMiles ?? null,
+        createdAt: j.createdAt,
+        title: j.title,
+        operational: j.operational,
+        commercial: j.commercial,
+        archivedAt: j.archivedAt,
+        latestQuote: j.quote,
       })),
       quotes: quotes.map((q) => ({
         id: q.id,
@@ -2263,6 +1959,17 @@ tradieRouter.patch("/quotes/:id/customer", requireClient, requireActiveAccount, 
             pipeline: "JOB",
           },
         });
+        // A quote raised on site for a new customer is work in the pipeline, and
+        // used to appear in the Jobs list by virtue of pipeline=JOB. Now that the
+        // list reads real Job rows, it needs one — without this the quote would
+        // save and the job would silently never show up.
+        await createDirectJob({
+          clientId: clientId(req),
+          id: created.id,
+          enquiryId: created.id,
+          title: body.name.trim() ? `Quote for ${body.name.trim()}` : "Quote raised on site",
+          scope: "Quote raised on site",
+        });
         enquiryId = created.id;
       }
     } else {
@@ -2360,22 +2067,7 @@ tradieRouter.post("/invoices/:id/mark-paid", requireClient, async (req, res, nex
 });
 
 // ---- Messages (conversation on a job) ----
-tradieRouter.get("/jobs/:enquiryId/messages", requireClient, async (req, res, next) => {
-  try {
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: clientId(req) },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
-    const messages = await prisma.message.findMany({
-      where: { enquiryId: enquiry.id },
-      orderBy: { createdAt: "asc" },
-      take: 200,
-    });
-    res.json(messages);
-  } catch (err) {
-    next(err);
-  }
-});
+
 
 // ---- Customers (enquiries + manual contacts) ----
 // ---- Customers ----
@@ -2385,28 +2077,7 @@ tradieRouter.get("/jobs/:enquiryId/messages", requireClient, async (req, res, ne
 
 
 // ---- Two-way SMS composer ----
-tradieRouter.post("/jobs/:enquiryId/messages", requireClient, requireActiveAccount, async (req, res, next) => {
-  try {
-    const body = z.object({ text: z.string().min(1).max(1200) }).parse(req.body ?? {});
-    const enquiry = await prisma.enquiry.findFirst({
-      where: { id: req.params.enquiryId, clientId: clientId(req) },
-      include: { client: true },
-    });
-    if (!enquiry) throw new ApiError(404, "not_found", "Job not found");
-    const results = await sendMessage({ to: enquiry.phone, channel: "SMS", body: body.text });
-    const logged = await logMessage({
-      clientId: enquiry.clientId,
-      enquiryId: enquiry.id,
-      direction: "OUTBOUND",
-      toAddr: enquiry.phone,
-      body: body.text,
-      twilioSid: results[0]?.id,
-    });
-    res.json({ ok: true, message: logged, deliverOk: results.some((r) => r.ok) });
-  } catch (err) {
-    next(err);
-  }
-});
+
 
 // ---- Stripe Connect (Pay Now) ----
 tradieRouter.post("/connect/onboard", requireClient, async (req, res, next) => {
