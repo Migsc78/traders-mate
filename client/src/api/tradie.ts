@@ -457,13 +457,19 @@ export const tradieApi = {
         id: string;
         name: string;
         phone: string;
+        email: string | null;
         message: string | null;
+        addressLine: string | null;
         postcode: string | null;
+        urgency: string | null;
         distanceMiles: number | null;
         source: string;
         triage: "LIKELY_JOB" | "QUOTE_SHOPPER" | "SPAM" | "UNKNOWN";
         summary: string | null;
+        /** The whole missed-call exchange, oldest turn first. */
+        conversation: { role: "assistant" | "user"; text: string; at: string | null }[];
         conversationSnippet: string | null;
+        photoUrls: string[];
         createdAt: string;
       }[];
     }>("/inbox"),

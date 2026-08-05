@@ -947,10 +947,21 @@ tradieRouter.get("/inbox", requireClient, async (req, res, next) => {
       caughtSpamCount: caughtSpam,
       items: enquiries.map((e) => {
         const missed = e.missedCalls[0];
-        const convo = Array.isArray(missed?.conversation) ? missed.conversation : [];
-        const snippet = (convo as { role?: string; text?: string }[])
-          .filter((t) => t.role === "user" && t.text)
-          .map((t) => String(t.text))
+        const raw = Array.isArray(missed?.conversation) ? missed.conversation : [];
+        // The whole exchange, not a précis of it. What the customer actually
+        // typed — "it's coming through the ceiling", "I'm in all afternoon" —
+        // is the bit worth reading before ringing back, and a summary is where
+        // that detail goes to die.
+        const conversation = (raw as { role?: string; text?: string; at?: string }[])
+          .filter((t) => t?.text)
+          .map((t) => ({
+            role: t.role === "assistant" ? "assistant" : "user",
+            text: String(t.text),
+            at: typeof t.at === "string" ? t.at : null,
+          }));
+        const snippet = conversation
+          .filter((t) => t.role === "user")
+          .map((t) => t.text)
           .slice(-2)
           .join(" · ")
           .slice(0, 220);
@@ -958,13 +969,18 @@ tradieRouter.get("/inbox", requireClient, async (req, res, next) => {
           id: e.id,
           name: e.name,
           phone: e.phone,
+          email: e.email,
           message: e.message,
+          addressLine: e.addressLine,
           postcode: e.postcode,
+          urgency: e.urgency,
           distanceMiles: e.distanceMiles,
           source: e.source,
           triage: e.triage,
           summary: e.summary || e.message,
+          conversation,
           conversationSnippet: snippet || null,
+          photoUrls: e.photoUrls,
           createdAt: e.createdAt,
         };
       }),

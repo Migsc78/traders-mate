@@ -11,23 +11,42 @@ import {
   IconQuoteFirst,
   IconSiteVisit,
 } from "./ui";
+import { IconSearch, ListToolbar, useListFilter, type ListTab } from "./ListToolbar";
+import { groupByDay } from "../../lib/dateGroups";
+import { ageLabel, ageTone, stampLabel } from "../../lib/age";
+
+type ConvoTurn = { role: "assistant" | "user"; text: string; at: string | null };
 
 type InboxItem = {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
   message: string | null;
+  addressLine: string | null;
   postcode: string | null;
+  urgency: string | null;
   distanceMiles: number | null;
   source: string;
   triage: "LIKELY_JOB" | "QUOTE_SHOPPER" | "SPAM" | "UNKNOWN";
   summary: string | null;
+  conversation: ConvoTurn[];
   conversationSnippet: string | null;
+  photoUrls: string[];
   createdAt: string;
 };
 
-function triageLabel(t: InboxItem["triage"]): string {
-  switch (t) {
+/**
+ * What the badge says about where this lead came from.
+ *
+ * A lead the tradie typed in himself hasn't been through the qualifier, so
+ * calling it a "likely job" would be the app taking credit for his judgement —
+ * and worse, it would look identical to a guess the app actually made. Saying
+ * how it arrived is both more honest and more useful.
+ */
+function originLabel(item: InboxItem): string {
+  if (item.source === "manual") return "Manually entered";
+  switch (item.triage) {
     case "LIKELY_JOB":
       return "Likely job";
     case "QUOTE_SHOPPER":
@@ -39,8 +58,9 @@ function triageLabel(t: InboxItem["triage"]): string {
   }
 }
 
-function triagePill(t: InboxItem["triage"]): string {
-  switch (t) {
+function originPill(item: InboxItem): string {
+  if (item.source === "manual") return "t-pill t-pill--slate";
+  switch (item.triage) {
     case "LIKELY_JOB":
       return "t-pill t-pill--green";
     case "QUOTE_SHOPPER":
@@ -51,6 +71,12 @@ function triagePill(t: InboxItem["triage"]): string {
       return "t-pill t-pill--orange";
   }
 }
+
+const URGENCY_LABEL: Record<string, string> = {
+  ASAP: "ASAP",
+  THIS_WEEK: "This week",
+  FLEXIBLE: "Flexible",
+};
 
 type PathId = "visit" | "quote" | "book";
 
@@ -79,26 +105,25 @@ const PATHS: { id: PathId; label: string; hint: string; Icon: (p: { size?: numbe
   },
 ];
 
-function whenLabel(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) {
-    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const TABS: readonly ListTab[] = [
+  { id: "all", label: "All" },
+  { id: "needs", label: "Needs you" },
+  { id: "manual", label: "Added by you" },
+  { id: "spam", label: "Spam" },
+];
+
+function matches(item: InboxItem, needle: string): boolean {
+  if (!needle) return true;
+  return [item.name, item.phone, item.postcode, item.addressLine, item.summary, item.message]
+    .filter(Boolean)
+    .some((f) => String(f).toLowerCase().includes(needle));
 }
 
 export default function TradieInboxPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [sheetFor, setSheetFor] = useState<InboxItem | null>(null);
+  const { tab, setTab, query, setQuery, searchOpen, toggleSearch } = useListFilter("all");
 
   const inbox = useQuery({
     queryKey: ["tradie-inbox"],
@@ -136,14 +161,40 @@ export default function TradieInboxPage() {
     },
   });
 
-  const { needsYou, caught } = useMemo(() => {
-    const items: InboxItem[] = inbox.data?.items || [];
-    return {
-      needsYou: items.filter((i: InboxItem) => i.triage !== "SPAM"),
-      caught: items.filter((i: InboxItem) => i.triage === "SPAM"),
-    };
-  }, [inbox.data]);
+  const all: InboxItem[] = useMemo(() => inbox.data?.items || [], [inbox.data]);
+  const needle = query.trim().toLowerCase();
 
+  const counts = useMemo(
+    () => ({
+      all: all.filter((i) => i.triage !== "SPAM").length,
+      needs: all.filter((i) => i.triage !== "SPAM").length,
+      manual: all.filter((i) => i.source === "manual").length,
+      spam: all.filter((i) => i.triage === "SPAM").length,
+    }),
+    [all]
+  );
+
+  /**
+   * Newest first, split by the day it came in.
+   *
+   * Spam is kept out of All rather than sorted below it — a caught telesales
+   * call isn't something the tradie should have to scroll past to reach a real
+   * one, and it has its own tab for when he wants to check nothing was caught
+   * by mistake.
+   */
+  const groups = useMemo(() => {
+    const rows = all
+      .filter((i) => {
+        if (tab === "spam") return i.triage === "SPAM";
+        if (tab === "manual") return i.source === "manual";
+        return i.triage !== "SPAM";
+      })
+      .filter((i) => matches(i, needle))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return groupByDay(rows, (i) => i.createdAt);
+  }, [all, tab, needle]);
+
+  const total = groups.reduce((n, g) => n + g.rows.length, 0);
   const busy = promote.isPending || kill.isPending;
 
   return (
@@ -154,18 +205,94 @@ export default function TradieInboxPage() {
           <p>Missed calls and new leads — call back, make a job, or kill</p>
         </div>
         <div className="t-head-actions">
+          <button
+            type="button"
+            className={`t-icon-btn${searchOpen ? " is-active" : ""}`}
+            aria-label={searchOpen ? "Close search" : "Search inbox"}
+            aria-pressed={searchOpen}
+            onClick={toggleSearch}
+          >
+            <IconSearch />
+          </button>
           <Link className="t-add-btn" to="/t/inbox/new" aria-label="Add enquiry">
             +
           </Link>
         </div>
       </header>
 
+      <ListToolbar
+        tabs={TABS}
+        tab={tab}
+        onTab={setTab}
+        query={query}
+        onQuery={setQuery}
+        searchOpen={searchOpen}
+        placeholder="Search name, number or postcode"
+        counts={counts}
+        // Leads waiting on a reply are the only count worth interrupting for.
+        accentTabs={["needs"]}
+      />
+
       {inbox.isLoading && <p className="muted-text">Loading inbox…</p>}
       <QueryError error={inbox.error} />
 
+      {groups.map((group) => (
+        <section key={group.key} className="t-day-group">
+          <h3 className="t-day-head">{group.label}</h3>
+          <ul className="t-list">
+            {group.rows.map((item) => {
+              const tone = ageTone(item.createdAt);
+              return (
+                <li key={item.id}>
+                  <button type="button" className="t-row t-row--btn" onClick={() => setSheetFor(item)}>
+                    <div className="t-row-main">
+                      <div className="t-row-top">
+                        <strong>{item.name}</strong>
+                        <span className={originPill(item)}>{originLabel(item)}</span>
+                        {item.urgency === "ASAP" && <span className="t-pill t-pill--red">ASAP</span>}
+                      </div>
+                      <span className="t-row-sub">
+                        {[
+                          item.phone,
+                          item.postcode,
+                          item.distanceMiles != null ? `~${item.distanceMiles} mi` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                      {(item.summary || item.message) && (
+                        <span className="t-row-snip">{item.summary || item.message}</span>
+                      )}
+                    </div>
+                    <div className="t-row-side t-row-side--stack">
+                      {/* Age leads. How long it's been waiting is what decides
+                          whether to ring now; the clock time is reference. */}
+                      <span className={`t-age${tone ? ` t-age--${tone}` : ""}`}>{ageLabel(item.createdAt)}</span>
+                      <IconChevron />
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+
       {/* Require real data (even stale/cached), not just "no error yet" — otherwise a
           failed fetch with no cache reads as a reassuring "Inbox is clear". */}
-      {inbox.data && needsYou.length === 0 && caught.length === 0 && (
+      {inbox.data && total === 0 && needle && (
+        <EmptyState title={`Nothing matches “${query.trim()}”`} hint="Try a name, number or postcode." />
+      )}
+
+      {inbox.data && total === 0 && !needle && tab === "spam" && (
+        <EmptyState title="Nothing caught" hint="Telesales and obvious junk end up here." />
+      )}
+
+      {inbox.data && total === 0 && !needle && tab === "manual" && (
+        <EmptyState title="Nothing added by hand" hint="Tap + when a call comes straight to your mobile." />
+      )}
+
+      {inbox.data && total === 0 && !needle && (tab === "all" || tab === "needs") && (
         <>
           <EmptyState
             title="Inbox is clear"
@@ -175,70 +302,6 @@ export default function TradieInboxPage() {
             Add a lead yourself
           </Link>
         </>
-      )}
-
-      {needsYou.length > 0 && (
-        <section className="t-inbox-section">
-          <p className="t-section-label">Needs you · {needsYou.length}</p>
-          <ul className="t-list">
-            {needsYou.map((item) => (
-              <li key={item.id}>
-                <button type="button" className="t-row t-row--btn" onClick={() => setSheetFor(item)}>
-                  <div className="t-row-main">
-                    <div className="t-row-top">
-                      <strong>{item.name}</strong>
-                      <span className={triagePill(item.triage)}>{triageLabel(item.triage)}</span>
-                    </div>
-                    <span className="t-row-sub">
-                      {item.phone}
-                      {item.postcode ? ` · ${item.postcode}` : ""}
-                      {item.distanceMiles != null ? ` · ~${item.distanceMiles} mi` : ""}
-                      {` · ${whenLabel(item.createdAt)}`}
-                    </span>
-                    {(item.summary || item.message) && (
-                      <span className="t-row-snip">{item.summary || item.message}</span>
-                    )}
-                  </div>
-                  <div className="t-row-side">
-                    <IconChevron />
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {caught.length > 0 && (
-        <section className="t-inbox-section">
-          <p className="t-section-label">Caught for you · {caught.length}</p>
-          <p className="muted-text t-inbox-caught-note">
-            Pre-tagged as spam / telesales. Open any to call back or kill for good.
-          </p>
-          <ul className="t-list">
-            {caught.map((item) => (
-              <li key={item.id}>
-                <button type="button" className="t-row t-row--btn" onClick={() => setSheetFor(item)}>
-                  <div className="t-row-main">
-                    <div className="t-row-top">
-                      <strong>{item.name}</strong>
-                      <span className={triagePill(item.triage)}>Spam</span>
-                    </div>
-                    <span className="t-row-sub">
-                      {item.phone} · {whenLabel(item.createdAt)}
-                    </span>
-                    {(item.summary || item.message) && (
-                      <span className="t-row-snip">{item.summary || item.message}</span>
-                    )}
-                  </div>
-                  <div className="t-row-side">
-                    <IconChevron />
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
 
       {sheetFor && (
@@ -252,17 +315,60 @@ export default function TradieInboxPage() {
           >
             <div className="t-more-handle" aria-hidden="true" />
             <p className="t-more-title">{sheetFor.name}</p>
-            <p className="muted-text" style={{ margin: "0 0 4px" }}>
-              <span className={triagePill(sheetFor.triage)}>{triageLabel(sheetFor.triage)}</span>
-              {" · "}
-              {whenLabel(sheetFor.createdAt)}
-            </p>
-            <p className="muted-text" style={{ margin: "0 0 12px" }}>
-              {sheetFor.summary || sheetFor.message || "No summary"}
-            </p>
-            {sheetFor.conversationSnippet && (
-              <p className="t-inbox-snippet">{sheetFor.conversationSnippet}</p>
+
+            <div className="t-sheet-meta">
+              <span className={originPill(sheetFor)}>{originLabel(sheetFor)}</span>
+              {sheetFor.urgency && (
+                <span className={`t-pill ${sheetFor.urgency === "ASAP" ? "t-pill--red" : "t-pill--slate"}`}>
+                  {URGENCY_LABEL[sheetFor.urgency] || sheetFor.urgency}
+                </span>
+              )}
+              <span
+                className={`t-age${ageTone(sheetFor.createdAt) ? ` t-age--${ageTone(sheetFor.createdAt)}` : ""}`}
+              >
+                {ageLabel(sheetFor.createdAt)}
+              </span>
+            </div>
+            <p className="t-sheet-stamp">{stampLabel(sheetFor.createdAt)}</p>
+
+            {(sheetFor.addressLine || sheetFor.postcode) && (
+              <p className="t-sheet-where">
+                {[sheetFor.addressLine, sheetFor.postcode].filter(Boolean).join(", ")}
+              </p>
             )}
+
+            {/*
+              The whole exchange, not a précis of it. What the customer actually
+              typed is the bit worth reading before ringing back — a summary is
+              where "it's coming through the ceiling" goes to die.
+            */}
+            {sheetFor.conversation.length > 0 ? (
+              <ul className="t-convo">
+                {sheetFor.conversation.map((turn, i) => (
+                  <li key={i} className={`t-convo-turn t-convo-turn--${turn.role}`}>
+                    <span className="t-convo-who">
+                      {turn.role === "user" ? sheetFor.name.split(" ")[0] : "Auto-reply"}
+                    </span>
+                    <p>{turn.text}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="t-sheet-message">
+                {sheetFor.message || sheetFor.summary || "No details taken."}
+              </p>
+            )}
+
+            {sheetFor.photoUrls.length > 0 && (
+              <div className="t-photo-row" style={{ marginBottom: 12 }}>
+                {sheetFor.photoUrls.map((url) => (
+                  <a key={url} className="t-photo-slot is-filled" href={url} target="_blank" rel="noreferrer">
+                    <img src={url} alt="" />
+                  </a>
+                ))}
+              </div>
+            )}
+
             {/*
               Ringing back comes first because it is what actually wins the job,
               and it's the one action that works whether or not the lead turns

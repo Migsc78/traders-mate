@@ -3453,3 +3453,62 @@ html.native-app .tradie-bottom-nav {
 .t-path-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .t-path-main strong { font-size: 15px; font-weight: 700; }
 .t-path-main .muted-text { font-size: 12.5px; line-height: 1.35; }
+
+/* ---------- inbox: age, timestamps and the full conversation ---------- */
+
+/* How long it has been waiting is the number that decides whether to ring now,
+   so it gets the right-hand column the eye already scans down. */
+.t-age {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--t-ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* An hour is roughly when a caller starts ringing round; four and it has
+   probably gone to whoever picked up. */
+.t-age--warn { color: var(--t-amber); }
+.t-age--alert { color: var(--t-red); }
+
+.t-sheet-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; }
+.t-sheet-stamp { margin: 0 0 8px; font-size: 12.5px; color: var(--t-ink-faint); }
+.t-sheet-where { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.t-sheet-message {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* The exchange, laid out as one. The customer'''s own words are what the tradie
+   is reading for, so they sit forward and the auto-reply steps back. */
+.t-convo {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  max-height: 34vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.t-convo-turn { margin-bottom: 8px; }
+.t-convo-turn p {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.t-convo-who {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-ink-faint);
+}
+.t-convo-turn--user p { background: var(--t-accent-soft); color: var(--t-ink); }
+.t-convo-turn--assistant p { background: var(--t-slate-soft); color: var(--t-ink-soft); }
+.t-convo-turn--assistant .t-convo-who { opacity: 0.75; }

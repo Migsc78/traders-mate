@@ -63,6 +63,11 @@ function daysAgo(days: number): Date {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
+/** For leads fresh enough that the Inbox shows an age in minutes. */
+function minutesAgo(mins: number): Date {
+  return new Date(Date.now() - mins * 60 * 1000);
+}
+
 async function main() {
   console.log("Wiping previous seed data…");
   console.log(await wipeSeedData());
@@ -456,10 +461,39 @@ async function main() {
       pipeline: "INBOX",
       triage: "LIKELY_JOB",
       summary: "Power shower not heating",
-      deliveredAt: daysAgo(0),
-      createdAt: daysAgo(0),
+      urgency: "THIS_WEEK",
+      // Fresh enough that the Inbox shows an age in minutes rather than a date —
+      // the state a tradie actually finds a new lead in.
+      deliveredAt: minutesAgo(38),
+      createdAt: minutesAgo(38),
     },
   });
+  // A lead the tradie took himself — someone who rang the mobile directly. It
+  // has no qualifier conversation, so the Inbox falls back to what he typed, and
+  // the badge says how it arrived rather than claiming the app judged it.
+  await prisma.enquiry.create({
+    data: {
+      clientId: demo.id,
+      name: "Fred Akel",
+      phone: "+447375628434",
+      email: "fred.akel@example.com",
+      message:
+        "Shower is leaking through the kitchen ceiling below. Turned the stopcock off for now. " +
+        "Rang the mobile directly — said he can be in any morning.",
+      addressLine: "20G York Road",
+      postcode: "GU22 7XH",
+      source: "manual",
+      status: "ROUTED",
+      pipeline: "INBOX",
+      triage: "LIKELY_JOB",
+      urgency: "ASAP",
+      summary: "Shower leaking through the kitchen ceiling",
+      deliveredAt: minutesAgo(96),
+      deliveryInfo: "Added manually in TradiesMate",
+      createdAt: minutesAgo(96),
+    },
+  });
+
   await prisma.enquiry.create({
     data: {
       clientId: trial.id,
@@ -857,8 +891,40 @@ async function main() {
         callerPhone: SEED_PHONES.customerDan,
         status: "CONVERTED",
         enquiryId: enqDan.id,
+        // A full exchange, because the Inbox shows the whole thing rather than a
+        // summary — and a demo with one line in it demonstrates nothing. This is
+        // roughly what the qualifier actually gets out of a caller.
         conversation: [
-          { role: "assistant", text: "Got it — creating a job card.", at: daysAgo(0).toISOString() },
+          {
+            role: "assistant",
+            text: "Sorry we missed your call — this is Demo Plumbing Co. What do you need help with?",
+            at: minutesAgo(38).toISOString(),
+          },
+          {
+            role: "user",
+            text: "Power shower in the en-suite has stopped heating up. Cold only.",
+            at: minutesAgo(36).toISOString(),
+          },
+          {
+            role: "assistant",
+            text: "Thanks. Is it just that shower, or is the hot water off everywhere?",
+            at: minutesAgo(35).toISOString(),
+          },
+          {
+            role: "user",
+            text: "Just the shower. Taps and the bath are fine.",
+            at: minutesAgo(33).toISOString(),
+          },
+          {
+            role: "assistant",
+            text: "Understood. What's the postcode, and when are you usually in?",
+            at: minutesAgo(33).toISOString(),
+          },
+          {
+            role: "user",
+            text: "KT14 6EE. I work from home so any day this week is fine, ideally before Friday.",
+            at: minutesAgo(30).toISOString(),
+          },
         ],
         callSid: "CA_seed_missed_2",
       },
