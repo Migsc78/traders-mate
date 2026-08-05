@@ -144,3 +144,31 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
 export function NeedsSignal({ children = "Needs signal to send." }: { children?: string }) {
   return <p className="t-needs-signal">{children}</p>;
 }
+
+/* ---- The three ways work starts, from the Inbox action sheet ---- */
+
+/** A priced document — the customer wants a number before committing. */
+export const IconQuoteFirst = ({ size = 22 }: IconProps) => (
+  <svg {...svgProps(size)}>
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v4h4" />
+    <path d="M9 13h6M9 17h4" />
+  </svg>
+);
+
+/** A toolbox — the work is agreed, it just needs a date. */
+export const IconBookWork = ({ size = 22 }: IconProps) => (
+  <svg {...svgProps(size)}>
+    <path d="M3 8h18v12H3z" />
+    <path d="M9 8V5h6v3" />
+    <path d="M3 13h18" />
+  </svg>
+);
+
+/** An eye over a site — go and look before saying a price. */
+export const IconSiteVisit = ({ size = 22 }: IconProps) => (
+  <svg {...svgProps(size)}>
+    <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+    <circle cx="12" cy="12" r="2.5" />
+  </svg>
+);

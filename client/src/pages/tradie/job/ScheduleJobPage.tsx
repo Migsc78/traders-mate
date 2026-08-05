@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sendOrQueue } from "../../../api/tradie";
 import { jobsApi } from "../../../api/jobs";
@@ -34,6 +34,7 @@ export default function ScheduleJobPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const offline = useOffline();
+  const [params] = useSearchParams();
 
   const detail = useQuery({
     queryKey: ["tradie-job", enquiryId],
@@ -44,7 +45,10 @@ export default function ScheduleJobPage() {
   const first = defaultStart();
   const [startsAt, setStartsAt] = useState(toLocalInput(first));
   const [hours, setHours] = useState(2);
-  const [kind, setKind] = useState("");
+  // Preset when the tradie arrived by choosing a path in the Inbox — landing on
+  // "Survey" already selected is the difference between confirming a decision
+  // they've made and making it a second time.
+  const [kind, setKind] = useState(params.get("kind") || "");
   const [notes, setNotes] = useState("");
   const [windowHours, setWindowHours] = useState(2);
 

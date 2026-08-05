@@ -2,7 +2,15 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tradieApi } from "../../api/tradie";
-import { EmptyState, QueryError, IconChevron, IconPhone } from "./ui";
+import {
+  EmptyState,
+  QueryError,
+  IconBookWork,
+  IconChevron,
+  IconPhone,
+  IconQuoteFirst,
+  IconSiteVisit,
+} from "./ui";
 
 type InboxItem = {
   id: string;
@@ -44,6 +52,33 @@ function triagePill(t: InboxItem["triage"]): string {
   }
 }
 
+type PathId = "visit" | "quote" | "book";
+
+/**
+ * The three ways a lead becomes work, in the order a tradie decides between
+ * them: go and look, price it, or just book it in.
+ */
+const PATHS: { id: PathId; label: string; hint: string; Icon: (p: { size?: number }) => JSX.Element }[] = [
+  {
+    id: "visit",
+    label: "Site visit first",
+    hint: "Inspect first, then decide scope or price.",
+    Icon: IconSiteVisit,
+  },
+  {
+    id: "quote",
+    label: "Quote first",
+    hint: "Customer wants a price before proceeding.",
+    Icon: IconQuoteFirst,
+  },
+  {
+    id: "book",
+    label: "Book the job",
+    hint: "Work already authorised — no quote needed.",
+    Icon: IconBookWork,
+  },
+];
+
 function whenLabel(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -70,13 +105,26 @@ export default function TradieInboxPage() {
     queryFn: () => tradieApi.inbox(),
   });
 
+  /**
+   * Promote the lead, then land on whatever that path actually needs next.
+   *
+   * All three create the same job — the difference is only where the tradie is
+   * dropped, because "quote first" and "book it in" want different screens and
+   * making them find the right tab afterwards is how a two-tap decision becomes
+   * a five-tap one. A site visit is booked as a Survey with no price committed.
+   */
   const promote = useMutation({
-    mutationFn: (id: string) => tradieApi.promoteJob(id),
-    onSuccess: (_r: { id: string }, id: string) => {
+    mutationFn: (opts: { id: string; path: PathId }) => tradieApi.promoteJob(opts.id),
+    onSuccess: (_r: { id: string }, opts) => {
       setSheetFor(null);
       void qc.invalidateQueries({ queryKey: ["tradie-inbox"] });
       void qc.invalidateQueries({ queryKey: ["tradie-jobs"] });
-      navigate(`/t/jobs/${id}`, { state: { from: "/t", fromLabel: "Jobs" } });
+      const state = { from: "/t/inbox", fromLabel: "Inbox" };
+      if (opts.path === "quote") {
+        navigate(`/t/jobs/${opts.id}?tab=quote`, { state });
+        return;
+      }
+      navigate(`/t/jobs/${opts.id}/schedule${opts.path === "visit" ? "?kind=Survey" : ""}`, { state });
     },
   });
 
@@ -215,26 +263,38 @@ export default function TradieInboxPage() {
             {sheetFor.conversationSnippet && (
               <p className="t-inbox-snippet">{sheetFor.conversationSnippet}</p>
             )}
-            <div className="tradie-actions" style={{ flexDirection: "column", gap: 8 }}>
-              <a className="primary t-btn--block" href={`tel:${sheetFor.phone}`}>
+            {/*
+              Ringing back comes first because it is what actually wins the job,
+              and it's the one action that works whether or not the lead turns
+              into anything. The three paths below it are the same three the PRD
+              puts behind a "New work" chooser — they belong here, at the moment
+              the tradie decides what this lead is, rather than on a screen of
+              their own that has to ask who the customer is all over again.
+            */}
+            <div className="t-sheet-actions">
+              <a className="primary t-btn--block t-sheet-call" href={`tel:${sheetFor.phone}`}>
                 <IconPhone /> Call back
               </a>
-              <button
-                type="button"
-                className="t-btn t-btn--block"
-                disabled={busy}
-                onClick={() => promote.mutate(sheetFor.id)}
-              >
-                {promote.isPending ? "Saving…" : "Make job"}
-              </button>
-              <Link
-                className="t-btn t-btn--block"
-                to={`/t/jobs/${sheetFor.id}`}
-                state={{ from: "/t/inbox", fromLabel: "Inbox" }}
-                onClick={() => setSheetFor(null)}
-              >
-                Open · quote or message
-              </Link>
+
+              {PATHS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="t-path-card"
+                  disabled={busy}
+                  onClick={() => promote.mutate({ id: sheetFor.id, path: p.id })}
+                >
+                  <span className={`t-path-icon t-path-icon--${p.id}`} aria-hidden="true">
+                    <p.Icon />
+                  </span>
+                  <span className="t-path-main">
+                    <strong>{p.label}</strong>
+                    <span className="muted-text">{p.hint}</span>
+                  </span>
+                  <IconChevron />
+                </button>
+              ))}
+
               <button
                 type="button"
                 className="danger t-btn--block"

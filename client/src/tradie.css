@@ -3410,3 +3410,46 @@ html.native-app .tradie-bottom-nav {
   font-size: 14px;
   line-height: 1;
 }
+
+/* ---------- inbox action sheet: the three paths ---------- */
+
+.t-sheet-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* Ringing back is what wins the job, so it keeps the full-width accent and a
+   little breathing room from the three decisions below it. */
+.tradie-shell .t-sheet-call { margin-bottom: 4px; }
+
+.tradie-shell .t-path-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 66px;
+  padding: 13px 14px;
+  text-align: left;
+  border: 1px solid var(--t-hairline);
+  border-radius: var(--t-radius);
+  background: var(--t-surface);
+  color: inherit;
+  font-weight: 500;
+}
+.tradie-shell .t-path-card:disabled { opacity: 0.55; }
+.t-path-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-slate-soft);
+  color: var(--t-ink-soft);
+}
+/* One colour each, so the three are told apart at a glance rather than read. */
+.t-path-icon--visit { background: var(--t-blue-soft); color: var(--t-blue); }
+.t-path-icon--quote { background: var(--t-accent-soft); color: var(--t-accent-ink); }
+.t-path-icon--book { background: var(--t-green-soft); color: var(--t-green); }
+
+.t-path-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t-path-main strong { font-size: 15px; font-weight: 700; }
+.t-path-main .muted-text { font-size: 12.5px; line-height: 1.35; }
