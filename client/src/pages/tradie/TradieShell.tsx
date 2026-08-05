@@ -51,6 +51,14 @@ function resolveDetailChrome(pathname: string, state: unknown, search = ""): Det
       subtitle: "New or existing customer",
     };
   }
+  if (pathname === "/t/inbox/new") {
+    return {
+      backTo: "/t/inbox",
+      backLabel: "Inbox",
+      title: "New Enquiry",
+      subtitle: "A lead you took yourself",
+    };
+  }
   const costSub = pathname.match(/^\/t\/jobs\/([^/]+)\/costs\/([^/]+)$/);
   if (costSub) {
     const [, jobId, leaf] = costSub;

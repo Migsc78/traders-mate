@@ -28,7 +28,7 @@ import {
   OPERATIONAL_LABEL,
   primaryAction,
 } from "../services/jobs/status.js";
-import { extractPostcode, normalizePostcode } from "../services/geo/postcode.js";
+import { distanceMilesBetween, extractPostcode, normalizePostcode } from "../services/geo/postcode.js";
 import { toE164UK } from "../services/messaging/sender.js";
 import { accessSelect, maskAccess } from "../services/customers/record.js";
 import { createInvoiceFromJob, previewJobInvoice } from "../services/jobs/invoice.js";
@@ -176,6 +176,109 @@ jobsRouter.post("/jobs", requireClient, requireActiveAccount, async (req, res, n
     next(err);
   }
 });
+
+/**
+ * A lead captured by hand, straight into the Inbox.
+ *
+ * Deliberately creates an enquiry and *not* a job. Someone who rang about a leak
+ * is not work yet — they're a prospect who might not answer the phone, might be
+ * ringing four other plumbers, might turn out to be nothing. Making a job of
+ * them here would put them in the pipeline as agreed work and quietly inflate
+ * every count on the Jobs screen. Promoting from the Inbox is the moment that
+ * decision gets made, and it already exists.
+ */
+jobsRouter.post(
+  "/inbox",
+  requireClient,
+  requireActiveAccount,
+  idempotent(async (req, res, next) => {
+    try {
+      const cid = clientId(req);
+      const body = z
+        .object({
+          id: z.string().optional(),
+          name: z.string().trim().min(1).max(120),
+          phone: z.string().trim().min(7).max(40),
+          email: z.string().trim().max(200).nullable().optional(),
+          addressLine: z.string().trim().max(200).nullable().optional(),
+          postcode: z.string().trim().max(16).nullable().optional(),
+          message: z.string().trim().max(2000).nullable().optional(),
+          urgency: z.enum(["ASAP", "THIS_WEEK", "FLEXIBLE"]).optional(),
+          photoUrls: z.array(z.string().url().max(600)).max(6).optional(),
+        })
+        .parse(req.body ?? {});
+
+      const phone = toE164UK(body.phone);
+      if (customerPhoneKey(phone).length < 8) {
+        throw new ApiError(400, "bad_phone", "Enter a valid UK mobile or landline");
+      }
+
+      // Prefer what was typed in the postcode box; fall back to anything that
+      // looks like a postcode in the description, same as the website intake.
+      const rawPc = body.postcode?.trim() || extractPostcode(body.message || "") || null;
+      const postcode = rawPc ? normalizePostcode(rawPc) || rawPc.toUpperCase() : null;
+
+      // Replayed from the outbox: the phone minted the id, so a second attempt
+      // updates the same lead rather than leaving two in the Inbox.
+      const existing = body.id
+        ? await prisma.enquiry.findFirst({ where: { id: body.id, clientId: cid } })
+        : null;
+      if (existing) {
+        return res.json(existing);
+      }
+
+      const enquiry = await prisma.enquiry.create({
+        data: {
+          ...(body.id ? { id: body.id } : {}),
+          clientId: cid,
+          name: body.name.trim(),
+          phone,
+          email: body.email?.trim() || null,
+          addressLine: body.addressLine?.trim() || null,
+          postcode,
+          message: body.message?.trim() || null,
+          urgency: body.urgency ?? null,
+          photoUrls: body.photoUrls ?? [],
+          source: "manual",
+          status: "ROUTED",
+          pipeline: "INBOX",
+          // A lead the tradie typed in himself is one he already believes in —
+          // it hasn't been through the missed-call qualifier, and defaulting it
+          // to "needs a look" would make him triage his own note.
+          triage: "LIKELY_JOB",
+          summary: body.message?.trim()?.slice(0, 160) || `Enquiry from ${body.name.trim()}`,
+          deliveredAt: new Date(),
+          deliveryInfo: "Added manually in TradiesMate",
+        },
+      });
+
+      res.status(201).json(enquiry);
+
+      // Mileage is worked out after the answer has gone back, never before it.
+      // Geocoding is a network call with retries, so a postcode the lookup
+      // doesn't recognise would leave the tradie holding a spinner for a second
+      // to earn a "~3 mi" on the card. A lead without a mileage is still a lead.
+      if (postcode) {
+        void (async () => {
+          try {
+            const client = await prisma.client.findUnique({
+              where: { id: cid },
+              select: { postcode: true },
+            });
+            const miles = await distanceMilesBetween(client?.postcode ?? null, postcode);
+            if (miles != null) {
+              await prisma.enquiry.update({ where: { id: enquiry.id }, data: { distanceMiles: miles } });
+            }
+          } catch {
+            /* nothing to tell the tradie — they already have their lead */
+          }
+        })();
+      }
+    } catch (err) {
+      next(err);
+    }
+  })
+);
 
 jobsRouter.post(
   "/jobs/from-quote/:quoteId",

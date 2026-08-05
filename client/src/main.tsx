@@ -19,6 +19,7 @@ import TradieSignupPage from "./pages/tradie/TradieSignupPage";
 import TradieShell from "./pages/tradie/TradieShell";
 import TradieJobsPage from "./pages/tradie/TradieJobsPage";
 import TradieInboxPage from "./pages/tradie/TradieInboxPage";
+import NewEnquiryPage from "./pages/tradie/NewEnquiryPage";
 import TradieArchivedPage from "./pages/tradie/TradieArchivedPage";
 import JobPage from "./pages/tradie/job/JobPage";
 import ScheduleJobPage from "./pages/tradie/job/ScheduleJobPage";
@@ -127,6 +128,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/t" element={<TradieShell />}>
             <Route index element={<TradieJobsPage />} />
             <Route path="inbox" element={<TradieInboxPage />} />
+            <Route path="inbox/new" element={<NewEnquiryPage />} />
             <Route path="archived" element={<TradieArchivedPage />} />
             <Route path="onboarding" element={<TradieOnboardingPage />} />
             <Route path="quotes" element={<TradieQuotesPage />} />

@@ -100,9 +100,16 @@ export default function TradieInboxPage() {
 
   return (
     <div>
-      <header className="t-page-head">
-        <h2>Inbox</h2>
-        <p>Missed calls, pre-qualified — call back, make a job, or kill</p>
+      <header className="t-page-head t-page-head--row">
+        <div>
+          <h2>Inbox</h2>
+          <p>Missed calls and new leads — call back, make a job, or kill</p>
+        </div>
+        <div className="t-head-actions">
+          <Link className="t-add-btn" to="/t/inbox/new" aria-label="Add enquiry">
+            +
+          </Link>
+        </div>
       </header>
 
       {inbox.isLoading && <p className="muted-text">Loading inbox…</p>}
@@ -111,10 +118,15 @@ export default function TradieInboxPage() {
       {/* Require real data (even stale/cached), not just "no error yet" — otherwise a
           failed fetch with no cache reads as a reassuring "Inbox is clear". */}
       {inbox.data && needsYou.length === 0 && caught.length === 0 && (
-        <EmptyState
-          title="Inbox is clear"
-          hint="When a call diverts, we’ll summarise it here with a spam or job guess."
-        />
+        <>
+          <EmptyState
+            title="Inbox is clear"
+            hint="When a call diverts, we’ll summarise it here with a spam or job guess."
+          />
+          <Link className="t-btn t-btn--block" to="/t/inbox/new" style={{ marginTop: 12 }}>
+            Add a lead yourself
+          </Link>
+        </>
       )}
 
       {needsYou.length > 0 && (

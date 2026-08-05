@@ -694,6 +694,14 @@ model Enquiry {
   email        String?
   message      String?
   postcode     String? // customer's job postcode, if given
+  /// Street address for a manually captured lead. Enquiries arriving from the
+  /// website or a missed call only ever give a postcode, so this stays null for
+  /// them rather than being faked from one.
+  addressLine  String?
+  /// ASAP | THIS_WEEK | FLEXIBLE — how fast the customer says they need it.
+  /// Free-ish text rather than an enum: it's the customer's words, and a new
+  /// option shouldn't cost a migration.
+  urgency      String?
   distanceMiles Float? // computed distance from client.postcode, if both are known
   photoUrls    String[]        @default([])
   source       String          @default("site") // site | widget | hosted | qr | missed_call | manual
@@ -1252,6 +1260,7 @@ model Invoice {
   @@index([clientId, status, createdAt])
   @@index([enquiryId])
   @@index([quoteId])
+  @@index([jobId])
 }
 
 model InvoiceLine {
