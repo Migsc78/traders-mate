@@ -123,6 +123,7 @@ export default function TradieInboxPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [sheetFor, setSheetFor] = useState<InboxItem | null>(null);
+  const [sheetError, setSheetError] = useState("");
   const { tab, setTab, query, setQuery, searchOpen, toggleSearch } = useListFilter("all");
 
   const inbox = useQuery({
@@ -151,6 +152,9 @@ export default function TradieInboxPage() {
       }
       navigate(`/t/jobs/${opts.id}/schedule${opts.path === "visit" ? "?kind=Survey" : ""}`, { state });
     },
+    // Without this a failure is indistinguishable from a slow success: the sheet
+    // just sits there. Silence is how a working button gets reported as broken.
+    onError: (err: Error) => setSheetError(err.message),
   });
 
   const kill = useMutation({
@@ -159,6 +163,7 @@ export default function TradieInboxPage() {
       setSheetFor(null);
       void qc.invalidateQueries({ queryKey: ["tradie-inbox"] });
     },
+    onError: (err: Error) => setSheetError(err.message),
   });
 
   const all: InboxItem[] = useMemo(() => inbox.data?.items || [], [inbox.data]);
@@ -244,7 +249,10 @@ export default function TradieInboxPage() {
               const tone = ageTone(item.createdAt);
               return (
                 <li key={item.id}>
-                  <button type="button" className="t-row t-row--btn" onClick={() => setSheetFor(item)}>
+                  <button type="button" className="t-row t-row--btn" onClick={() => {
+                      setSheetError("");
+                      setSheetFor(item);
+                    }}>
                     <div className="t-row-main">
                       <div className="t-row-top">
                         <strong>{item.name}</strong>
@@ -377,29 +385,41 @@ export default function TradieInboxPage() {
               the tradie decides what this lead is, rather than on a screen of
               their own that has to ask who the customer is all over again.
             */}
+            {sheetError && <p className="error">{sheetError}</p>}
+
             <div className="t-sheet-actions">
               <a className="primary t-btn--block t-sheet-call" href={`tel:${sheetFor.phone}`}>
                 <IconPhone /> Call back
               </a>
 
-              {PATHS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="t-path-card"
-                  disabled={busy}
-                  onClick={() => promote.mutate({ id: sheetFor.id, path: p.id })}
-                >
-                  <span className={`t-path-icon t-path-icon--${p.id}`} aria-hidden="true">
-                    <p.Icon />
-                  </span>
-                  <span className="t-path-main">
-                    <strong>{p.label}</strong>
-                    <span className="muted-text">{p.hint}</span>
-                  </span>
-                  <IconChevron />
-                </button>
-              ))}
+              {PATHS.map((p) => {
+                const working = promote.isPending && promote.variables?.path === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`t-path-card${working ? " is-working" : ""}`}
+                    disabled={busy}
+                    aria-busy={working}
+                    onClick={() => promote.mutate({ id: sheetFor.id, path: p.id })}
+                  >
+                    <span className={`t-path-icon t-path-icon--${p.id}`} aria-hidden="true">
+                      <p.Icon />
+                    </span>
+                    <span className="t-path-main">
+                      <strong>{p.label}</strong>
+                      {/*
+                        The tapped card says so the instant it's tapped. This write
+                        talks to the database before it can navigate, and on a slow
+                        connection that is seconds of a screen doing nothing — which
+                        a tradie reads as a broken button and taps again.
+                      */}
+                      <span className="muted-text">{working ? "Setting the job up…" : p.hint}</span>
+                    </span>
+                    {working ? <span className="t-spinner" aria-hidden="true" /> : <IconChevron />}
+                  </button>
+                );
+              })}
 
               <button
                 type="button"
@@ -407,7 +427,7 @@ export default function TradieInboxPage() {
                 disabled={busy}
                 onClick={() => kill.mutate({ id: sheetFor.id, reason: "spam" })}
               >
-                Spam
+                {kill.isPending && kill.variables?.reason === "spam" ? "Marking…" : "Spam"}
               </button>
               <button
                 type="button"
@@ -415,7 +435,7 @@ export default function TradieInboxPage() {
                 disabled={busy}
                 onClick={() => kill.mutate({ id: sheetFor.id, reason: "dead" })}
               >
-                Not interested
+                {kill.isPending && kill.variables?.reason === "dead" ? "Closing…" : "Not interested"}
               </button>
               <button type="button" className="t-btn t-btn--block" disabled={busy} onClick={() => setSheetFor(null)}>
                 Close

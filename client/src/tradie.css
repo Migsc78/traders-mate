@@ -3512,3 +3512,21 @@ html.native-app .tradie-bottom-nav {
 .t-convo-turn--user p { background: var(--t-accent-soft); color: var(--t-ink); }
 .t-convo-turn--assistant p { background: var(--t-slate-soft); color: var(--t-ink-soft); }
 .t-convo-turn--assistant .t-convo-who { opacity: 0.75; }
+
+/* A tap has to look like it landed. This write goes to the database before it
+   can navigate, and a card that sits there is read as a broken button. */
+.tradie-shell .t-path-card.is-working {
+  border-color: var(--t-accent);
+  background: var(--t-accent-soft);
+  opacity: 1;
+}
+.t-spinner {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--t-accent-soft);
+  border-top-color: var(--t-accent);
+  animation: t-spin 0.6s linear infinite;
+}
+@keyframes t-spin { to { transform: rotate(360deg); } }

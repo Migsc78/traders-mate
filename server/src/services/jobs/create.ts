@@ -151,8 +151,22 @@ export async function promoteEnquiryToJob(input: {
   });
   if (!enquiry) throw new ApiError(404, "not_found", "Not found");
 
-  return prisma.$transaction(async (tx) => {
-    const updatedEnquiry = await tx.enquiry.update({
+  /**
+   * Two statements, batched — not an interactive transaction.
+   *
+   * This runs while the tradie is looking at a sheet waiting for it, and the
+   * interactive form costs a round trip per statement plus BEGIN and COMMIT.
+   * Against a database that isn't in the same rack that was seven trips and
+   * two and a half seconds of nothing happening, which reads as a dead button.
+   *
+   * The upsert keyed on the enquiry's own id does the work the separate
+   * existence check used to: a replayed promote updates nothing and hands back
+   * the job that's already there. Reusing that id also matches the backfill, so
+   * /t/jobs/<id> resolves for migrated and newly promoted work alike and queued
+   * offline writes don't have to know which is which.
+   */
+  const [updatedEnquiry, job] = await prisma.$transaction([
+    prisma.enquiry.update({
       where: { id: enquiry.id },
       data: {
         pipeline: "JOB",
@@ -160,18 +174,11 @@ export async function promoteEnquiryToJob(input: {
         killedAt: null,
         triage: enquiry.triage === "SPAM" ? "LIKELY_JOB" : enquiry.triage,
       },
-    });
-
-    const existing = await tx.job.findFirst({
-      where: { clientId: input.clientId, enquiryId: enquiry.id },
-    });
-    if (existing) return { enquiry: updatedEnquiry, job: existing };
-
-    // Reuses the enquiry's id, matching the backfill: /t/jobs/<id> resolves for
-    // both migrated and newly promoted work, so links and queued offline writes
-    // don't have to know which is which.
-    const job = await tx.job.create({
-      data: {
+    }),
+    prisma.job.upsert({
+      where: { id: enquiry.id },
+      update: {},
+      create: {
         id: enquiry.id,
         clientId: input.clientId,
         enquiryId: enquiry.id,
@@ -182,19 +189,20 @@ export async function promoteEnquiryToJob(input: {
         scope: enquiry.message,
         operational: "UNSCHEDULED",
         commercial: "UNQUOTED",
+        // Nested, so the history costs nothing extra rather than another trip.
+        events: {
+          create: {
+            clientId: input.clientId,
+            type: "job.created",
+            summary: "Promoted from inbox",
+            payload: { enquiryId: enquiry.id, source: enquiry.source },
+          },
+        },
       },
-    });
+    }),
+  ]);
 
-    await appendJobEvent(tx, {
-      clientId: input.clientId,
-      jobId: job.id,
-      type: "job.created",
-      summary: "Promoted from inbox",
-      payload: { enquiryId: enquiry.id, source: enquiry.source },
-    });
-
-    return { enquiry: updatedEnquiry, job };
-  });
+  return { enquiry: updatedEnquiry, job };
 }
 
 /** Shared include for the list — enough for a card, no more. */
