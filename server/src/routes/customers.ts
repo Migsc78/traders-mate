@@ -523,7 +523,14 @@ customerRouter.get("/properties/:id", requireClient, async (req, res, next) => {
       },
     });
     if (!property) throw new ApiError(404, "not_found", "Property not found");
-    res.json({ ...property, access: maskAccess(property.access), openJobCount: property._count.enquiries });
+    const { toAccessUrl } = await import("../services/storage/signedUrls.js");
+    const files = property.files.map((f) => ({ ...f, url: toAccessUrl(f.url) ?? f.url }));
+    res.json({
+      ...property,
+      files,
+      access: maskAccess(property.access),
+      openJobCount: property._count.enquiries,
+    });
   } catch (err) {
     next(err);
   }
@@ -917,13 +924,16 @@ customerRouter.post("/customers/:id/files", requireClient, idempotent(async (req
           jobId: nested.jobId ?? null,
           category: body.category ?? "OTHER",
           filename: body.filename,
-          url: stored.url,
+          url: stored.storedUrl,
           contentType: body.contentType ?? null,
           sizeBytes: buffer.byteLength,
           issuedAt: body.issuedAt,
           expiresAt: body.expiresAt,
           visibility: body.visibility ?? "INTERNAL",
         },
+      }).then(async (row) => {
+        const { toAccessUrl } = await import("../services/storage/signedUrls.js");
+        return { ...row, url: toAccessUrl(row.url) ?? row.url };
       })
     );
   } catch (err) {

@@ -10,6 +10,7 @@ import { quoteLineInclude, ensurePriceBook } from "../services/quotes/priceBook.
 import { buildDraftQuoteFromTranscript } from "../services/quotes/draft.js";
 import { transcribeWithWhisper } from "../services/quotes/whisper.js";
 import { storeAudio } from "../services/storage/store.js";
+import { toAccessUrl } from "../services/storage/signedUrls.js";
 import { sendMessage } from "../services/messaging/sender.js";
 import { logMessage } from "../services/messaging/log.js";
 import {
@@ -691,7 +692,11 @@ jobsRouter.get("/jobs/:jobId/costs", requireClient, async (req, res, next) => {
       prisma.client.findUnique({ where: { id: cid }, select: { labourCostPerHourPence: true } }),
     ]);
     res.json({
-      costs,
+      costs: costs.map((c) =>
+        c.receiptFile
+          ? { ...c, receiptFile: { ...c.receiptFile, url: toAccessUrl(c.receiptFile.url) ?? c.receiptFile.url } }
+          : c
+      ),
       profit: computeProfit(job, costs, client?.labourCostPerHourPence ?? null),
       labourCostPerHourPence: client?.labourCostPerHourPence ?? null,
     });
@@ -1056,7 +1061,7 @@ jobsRouter.get("/jobs/:jobId/files", requireClient, async (req, res, next) => {
       files.map((f) => ({
         id: f.id,
         filename: f.filename,
-        url: f.url,
+        url: toAccessUrl(f.url) ?? f.url,
         category: f.category,
         visibility: f.visibility,
         createdAt: f.createdAt,
@@ -1136,7 +1141,7 @@ jobsRouter.post(
         data: {
           clientId: cid,
           enquiryId,
-          audioUrl: stored.url,
+          audioUrl: stored.storedUrl,
           status: "TRANSCRIBING",
           durationSec: body.durationSec ?? null,
         },

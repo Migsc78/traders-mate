@@ -1276,7 +1276,12 @@ tradieRouter.post("/quotes/:id/approve", requireClient, requireActiveAccount, as
       include: { lines: quoteLineInclude },
     });
     await scheduleQuoteFollowUps(quote.id, sentAt);
-    res.json({ ...updated, publicUrl });
+    const { toAccessUrl } = await import("../services/storage/signedUrls.js");
+    res.json({
+      ...updated,
+      publicUrl,
+      pdfUrl: toAccessUrl(updated.pdfUrl) ?? updated.pdfUrl,
+    });
   } catch (err) {
     next(err);
   }
@@ -1871,7 +1876,7 @@ tradieRouter.post("/quotes/:id/from-voice", requireClient, requireActiveAccount,
     const voice = await prisma.voiceNote.create({
       data: {
         clientId: clientId(req),
-        audioUrl: stored.url,
+        audioUrl: stored.storedUrl,
         status: "TRANSCRIBING",
         durationSec: body.durationSec ?? null,
       },
@@ -2061,6 +2066,7 @@ tradieRouter.get("/quotes", requireClient, async (req, res, next) => {
 // ---- Invoices ----
 tradieRouter.get("/invoices", requireClient, async (req, res, next) => {
   try {
+    const { toAccessUrl } = await import("../services/storage/signedUrls.js");
     const invoices = await prisma.invoice.findMany({
       where: { clientId: clientId(req), status: { not: "VOID" } },
       orderBy: { createdAt: "desc" },
@@ -2070,6 +2076,7 @@ tradieRouter.get("/invoices", requireClient, async (req, res, next) => {
     res.json(
       invoices.map((inv) => ({
         ...inv,
+        pdfUrl: toAccessUrl(inv.pdfUrl) ?? inv.pdfUrl,
         publicUrl: `${appPublicUrl()}/i/${inv.publicToken}`,
       }))
     );
@@ -2313,12 +2320,13 @@ tradieRouter.patch("/appointments/:id", requireClient, async (req, res, next) =>
 // ---- Certificates (file store + expiry reminders) ----
 tradieRouter.get("/certificates", requireClient, async (req, res, next) => {
   try {
+    const { withSignedCertPdf } = await import("../services/certs/certificates.js");
     const rows = await prisma.certificate.findMany({
       where: { clientId: clientId(req) },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    res.json(rows);
+    res.json(rows.map((r) => withSignedCertPdf(r)));
   } catch (err) {
     next(err);
   }
@@ -2378,11 +2386,12 @@ tradieRouter.post("/certificates", requireClient, requireActiveAccount, async (r
 
 tradieRouter.get("/certificates/:id", requireClient, async (req, res, next) => {
   try {
+    const { withSignedCertPdf } = await import("../services/certs/certificates.js");
     const row = await prisma.certificate.findFirst({
       where: { id: req.params.id, clientId: clientId(req) },
     });
     if (!row) throw new ApiError(404, "not_found", "Certificate not found");
-    res.json(row);
+    res.json(withSignedCertPdf(row));
   } catch (err) {
     next(err);
   }

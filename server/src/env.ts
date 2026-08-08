@@ -67,6 +67,8 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().default(""),
   OPENAI_API_KEY: z.string().default(""),
   MAGIC_LINK_SECRET: z.string().default(DEV_MAGIC_LINK_SECRET),
+  /** HMAC for private file URLs. Falls back to MAGIC_LINK_SECRET. */
+  FILE_SIGNING_SECRET: z.string().default(""),
   // Public URL for tradie PWA + customer quote pages (defaults to CLIENT_ORIGIN).
   APP_PUBLIC_URL: z.string().default(""),
 

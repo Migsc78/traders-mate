@@ -3,7 +3,6 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { UPLOADS_DIR } from "../storage/store.js";
 import { formatGbp } from "../quotes/money.js";
-import { env } from "../../env.js";
 
 export type PdfLine = {
   label: string;
@@ -48,12 +47,8 @@ async function tryLoadLogo(logoUrl: string | null | undefined): Promise<Buffer |
   }
 }
 
-/** Render a simple branded PDF and store under /uploads/pdfs/. Returns public URL path. */
+/** Render a simple branded PDF and store privately. Returns persisted URL (not signed). */
 export async function renderMoneyPdf(input: DocPdfInput): Promise<{ url: string; path: string }> {
-  await fs.mkdir(path.join(UPLOADS_DIR, "pdfs"), { recursive: true });
-  const filename = `${input.kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.pdf`;
-  const fullPath = path.join(UPLOADS_DIR, "pdfs", filename);
-
   const logo = await tryLoadLogo(input.logoUrl);
   const doc = new PDFDocument({ margin: 48, size: "A4" });
   const chunks: Buffer[] = [];
@@ -127,10 +122,12 @@ export async function renderMoneyPdf(input: DocPdfInput): Promise<{ url: string;
 
   doc.end();
   const buf = await done;
-  await fs.writeFile(fullPath, buf);
-
-  const base = env.PUBLIC_BASE_URL.replace(/\/$/, "");
-  return { url: `${base}/uploads/pdfs/${filename}`, path: fullPath };
+  const { storePrivatePdf } = await import("../storage/store.js");
+  const stored = await storePrivatePdf(
+    `${input.kind}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.pdf`,
+    buf
+  );
+  return { url: stored.storedUrl, path: stored.path || "" };
 }
 
 export type CertPdfInput = {

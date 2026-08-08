@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { ApiError } from "../middleware/error.js";
-import { KIND_LABEL } from "../services/certs/certificates.js";
+import { KIND_LABEL, withSignedCertPdf } from "../services/certs/certificates.js";
 
 export const certPublicRouter = Router();
 
@@ -11,19 +11,22 @@ function esc(s: string): string {
 
 certPublicRouter.get("/:token", async (req, res, next) => {
   try {
-    const cert = await prisma.certificate.findUnique({
+    const certRow = await prisma.certificate.findUnique({
       where: { publicToken: req.params.token },
       include: { client: { select: { businessName: true } } },
     });
-    if (!cert || !cert.pdfUrl) throw new ApiError(404, "not_found", "Certificate not found");
+    if (!certRow || !certRow.pdfUrl) throw new ApiError(404, "not_found", "Certificate not found");
     // Incomplete drafts without a filed copy stay private
-    if (cert.status === "DRAFT") throw new ApiError(404, "not_found", "Certificate not found");
+    if (certRow.status === "DRAFT") throw new ApiError(404, "not_found", "Certificate not found");
 
+    const cert = withSignedCertPdf(certRow, { forPublicPage: true });
     const label = KIND_LABEL[cert.kind] || "Compliance document";
-    const isImage = (cert.fileContentType || "").startsWith("image/") || /\.(jpe?g|png|webp|heic)(\?|$)/i.test(cert.pdfUrl);
+    const fileUrl = cert.pdfUrl!;
+    const isImage =
+      (cert.fileContentType || "").startsWith("image/") || /\.(jpe?g|png|webp|heic)(\?|$)/i.test(fileUrl);
 
     if (!isImage && req.query.download !== "0") {
-      return res.redirect(302, cert.pdfUrl);
+      return res.redirect(302, fileUrl);
     }
 
     res.type("html").send(`<!doctype html>
@@ -45,8 +48,8 @@ ${cert.serviceDueAt ? `<p class="muted">Next due ${esc(new Date(cert.serviceDueA
 <div class="card">
 ${
   isImage
-    ? `<img src="${esc(cert.pdfUrl)}" alt="${esc(label)}"/>`
-    : `<p><a href="${esc(cert.pdfUrl)}">Download / open file</a></p>`
+    ? `<img src="${esc(fileUrl)}" alt="${esc(label)}"/>`
+    : `<p><a href="${esc(fileUrl)}">Download / open file</a></p>`
 }
 </div>
 </body></html>`);

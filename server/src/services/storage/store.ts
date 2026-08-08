@@ -1,11 +1,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
-import { env } from "../../env.js";
+import { isPrivateStorageKey, publicBase, signFileUrl } from "./signedUrls.js";
+import { UPLOADS_DIR } from "./paths.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const UPLOADS_DIR = path.resolve(__dirname, "../../../uploads");
+export { UPLOADS_DIR } from "./paths.js";
 
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -30,13 +29,31 @@ const AUDIO_EXT: Record<string, string> = {
 };
 
 export interface StoredFile {
+  /** Relative key under uploads/ — persist this (or the permanent public URL) in DB. */
+  key: string;
+  /**
+   * Ready-to-fetch URL for the caller.
+   * Public objects: permanent `/uploads/...`.
+   * Private objects: short-lived signed `/api/files/...` (DB should store `key` or `/uploads/${key}`).
+   */
   url: string;
+  /** Canonical value to persist — always `/uploads/${key}` (not a signed URL). */
+  storedUrl: string;
   path?: string;
 }
 
 /** 16 random bytes → ~128 bits of filename entropy (unguessable). */
 function randomFileName(ext: string): string {
   return `${Date.now()}-${randomBytes(16).toString("hex")}.${ext}`;
+}
+
+function persistedUrl(key: string): string {
+  return `${publicBase()}/uploads/${key}`;
+}
+
+function accessUrlForKey(key: string): string {
+  if (isPrivateStorageKey(key)) return signFileUrl(key);
+  return persistedUrl(key);
 }
 
 /** Best-effort magic-byte check so clients cannot rename HTML/JS as images. */
@@ -73,9 +90,17 @@ export function assertPdfMagic(data: Buffer): void {
   }
 }
 
+async function writeUnder(subdir: string, name: string, data: Buffer): Promise<{ key: string; full: string }> {
+  const dir = subdir ? path.join(UPLOADS_DIR, subdir) : UPLOADS_DIR;
+  await fs.mkdir(dir, { recursive: true });
+  const full = path.join(dir, name);
+  await fs.writeFile(full, data);
+  const key = subdir ? `${subdir.replace(/\/$/, "")}/${name}` : name;
+  return { key, full };
+}
+
 /**
- * Local storage impl: writes to /uploads and returns a public URL.
- * Swap this for S3/R2 later by keeping the same signature.
+ * Public image (intake/widget/logo) — permanent /uploads URL, statically served.
  */
 export async function storeImage(contentType: string, data: Buffer): Promise<StoredFile> {
   const ext = EXT[contentType.toLowerCase()];
@@ -83,14 +108,12 @@ export async function storeImage(contentType: string, data: Buffer): Promise<Sto
   if (data.length > MAX_UPLOAD_BYTES) throw new Error("Image too large");
   assertImageMagic(contentType, data);
 
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
-  const name = randomFileName(ext);
-  const full = path.join(UPLOADS_DIR, name);
-  await fs.writeFile(full, data);
-  return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/${name}`, path: full };
+  const { key, full } = await writeUnder("", randomFileName(ext), data);
+  const storedUrl = persistedUrl(key);
+  return { key, storedUrl, url: storedUrl, path: full };
 }
 
-/** Photo or PDF of a real safety/compliance certificate. */
+/** Photo or PDF of a certificate / customer file — private, signed access only. */
 export async function storeCertFile(contentType: string, data: Buffer): Promise<StoredFile> {
   const mime = contentType.toLowerCase().split(";")[0]!.trim();
   const ext = EXT[mime];
@@ -99,19 +122,25 @@ export async function storeCertFile(contentType: string, data: Buffer): Promise<
   if (ext === "pdf") assertPdfMagic(data);
   else assertImageMagic(mime, data);
 
-  await fs.mkdir(path.join(UPLOADS_DIR, "certs"), { recursive: true });
-  const name = randomFileName(ext);
-  const full = path.join(UPLOADS_DIR, "certs", name);
-  await fs.writeFile(full, data);
-  return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/certs/${name}`, path: full };
+  const { key, full } = await writeUnder("private/certs", randomFileName(ext), data);
+  const storedUrl = persistedUrl(key);
+  return { key, storedUrl, url: accessUrlForKey(key), path: full };
 }
 
+/** Voice notes / greetings-on-disk — private. */
 export async function storeAudio(contentType: string, data: Buffer): Promise<StoredFile> {
   const ext = AUDIO_EXT[contentType.toLowerCase()] || "webm";
   if (data.length > MAX_AUDIO_BYTES) throw new Error("Audio too large");
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
-  const name = randomFileName(ext);
-  const full = path.join(UPLOADS_DIR, name);
-  await fs.writeFile(full, data);
-  return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/${name}`, path: full };
+
+  const { key, full } = await writeUnder("private/audio", randomFileName(ext), data);
+  const storedUrl = persistedUrl(key);
+  return { key, storedUrl, url: accessUrlForKey(key), path: full };
+}
+
+/** Quote/invoice PDFs — private; public pages mint signed links at render time. */
+export async function storePrivatePdf(filename: string, data: Buffer): Promise<StoredFile> {
+  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const { key, full } = await writeUnder("private/pdfs", safe, data);
+  const storedUrl = persistedUrl(key);
+  return { key, storedUrl, url: accessUrlForKey(key), path: full };
 }
