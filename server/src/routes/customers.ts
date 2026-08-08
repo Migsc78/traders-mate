@@ -41,6 +41,84 @@ function ownedCustomer(req: Parameters<typeof clientId>[0], id: string) {
   return prisma.customer.findFirst({ where: { id, clientId: clientId(req) } });
 }
 
+/** Resolve optional nested FKs to same-tenant ids, or reject cross-tenant refs. */
+async function ownedNestedRefs(
+  cid: string,
+  refs: {
+    siteContactId?: string | null;
+    billToCustomerId?: string | null;
+    propertyId?: string | null;
+    assetId?: string | null;
+    enquiryId?: string | null;
+    jobId?: string | null;
+    customerId?: string | null;
+  }
+) {
+  const out: {
+    siteContactId?: string | null;
+    billToCustomerId?: string | null;
+    propertyId?: string | null;
+    assetId?: string | null;
+    enquiryId?: string | null;
+    jobId?: string | null;
+  } = {};
+
+  if (refs.siteContactId !== undefined) {
+    if (refs.siteContactId == null) out.siteContactId = null;
+    else {
+      const row = await prisma.contact.findFirst({ where: { id: refs.siteContactId, clientId: cid } });
+      if (!row) throw new ApiError(400, "invalid_ref", "Site contact not found for this account");
+      out.siteContactId = row.id;
+    }
+  }
+  if (refs.billToCustomerId !== undefined) {
+    if (refs.billToCustomerId == null) out.billToCustomerId = null;
+    else {
+      const row = await prisma.customer.findFirst({ where: { id: refs.billToCustomerId, clientId: cid } });
+      if (!row) throw new ApiError(400, "invalid_ref", "Billing customer not found for this account");
+      out.billToCustomerId = row.id;
+    }
+  }
+  if (refs.propertyId !== undefined) {
+    if (refs.propertyId == null) out.propertyId = null;
+    else {
+      const where: { id: string; clientId: string; customerId?: string } = {
+        id: refs.propertyId,
+        clientId: cid,
+      };
+      if (refs.customerId) where.customerId = refs.customerId;
+      const row = await prisma.property.findFirst({ where });
+      if (!row) throw new ApiError(400, "invalid_ref", "Property not found for this account");
+      out.propertyId = row.id;
+    }
+  }
+  if (refs.assetId !== undefined) {
+    if (refs.assetId == null) out.assetId = null;
+    else {
+      const row = await prisma.asset.findFirst({ where: { id: refs.assetId, clientId: cid } });
+      if (!row) throw new ApiError(400, "invalid_ref", "Asset not found for this account");
+      out.assetId = row.id;
+    }
+  }
+  if (refs.enquiryId !== undefined) {
+    if (refs.enquiryId == null) out.enquiryId = null;
+    else {
+      const row = await prisma.enquiry.findFirst({ where: { id: refs.enquiryId, clientId: cid } });
+      if (!row) throw new ApiError(400, "invalid_ref", "Enquiry not found for this account");
+      out.enquiryId = row.id;
+    }
+  }
+  if (refs.jobId !== undefined) {
+    if (refs.jobId == null) out.jobId = null;
+    else {
+      const row = await prisma.job.findFirst({ where: { id: refs.jobId, clientId: cid } });
+      if (!row) throw new ApiError(400, "invalid_ref", "Job not found for this account");
+      out.jobId = row.id;
+    }
+  }
+  return out;
+}
+
 const CHANNELS = ["CALL", "SMS", "EMAIL", "WHATSAPP"] as const;
 const ROLES = ["OWNER", "TENANT", "SITE_CONTACT", "ACCOUNTS", "PROPERTY_MANAGER"] as const;
 const OCCUPANCY = ["OWNER_OCCUPIED", "TENANTED", "EMPTY"] as const;
@@ -383,10 +461,23 @@ customerRouter.post("/customers/:id/properties", requireClient, idempotent(async
 
     const existing = body.id ? await prisma.property.findFirst({ where: { id: body.id, clientId: cid } }) : null;
     if (existing) {
-      res.json(await prisma.property.update({ where: { id: existing.id }, data: { ...body, id: undefined } }));
+      const nested = await ownedNestedRefs(cid, {
+        siteContactId: body.siteContactId,
+        billToCustomerId: body.billToCustomerId,
+      });
+      res.json(
+        await prisma.property.update({
+          where: { id: existing.id },
+          data: { ...body, id: undefined, ...nested },
+        })
+      );
       return;
     }
 
+    const nested = await ownedNestedRefs(cid, {
+      siteContactId: body.siteContactId,
+      billToCustomerId: body.billToCustomerId,
+    });
     const count = await prisma.property.count({ where: { customerId: owned.id } });
     const created = await prisma.property.create({
       data: {
@@ -400,8 +491,8 @@ customerRouter.post("/customers/:id/properties", requireClient, idempotent(async
         postcode: body.postcode ?? null,
         propertyType: body.propertyType ?? null,
         occupancy: body.occupancy ?? null,
-        siteContactId: body.siteContactId ?? null,
-        billToCustomerId: body.billToCustomerId ?? null,
+        siteContactId: nested.siteContactId ?? null,
+        billToCustomerId: nested.billToCustomerId ?? null,
         sort: body.sort ?? count,
         // Always give a property an access row. A tradie shouldn't have to
         // "create access details" before recording that there's a dog.
@@ -417,16 +508,17 @@ customerRouter.post("/customers/:id/properties", requireClient, idempotent(async
 
 customerRouter.get("/properties/:id", requireClient, async (req, res, next) => {
   try {
+    const cid = clientId(req);
     const property = await prisma.property.findFirst({
-      where: { id: req.params.id, clientId: clientId(req) },
+      where: { id: req.params.id, clientId: cid },
       include: {
         access: { select: { ...accessSelect, accessCode: true } },
-        assets: { orderBy: { sort: "asc" }, select: assetSelect },
+        assets: { where: { clientId: cid }, orderBy: { sort: "asc" }, select: assetSelect },
         siteContact: { select: contactSelect },
         customer: { select: { id: true, name: true, phone: true } },
-        files: { orderBy: { createdAt: "desc" } },
-        propertyNotes: { orderBy: [{ pinned: "desc" }, { createdAt: "desc" }] },
-        reminders: { where: { active: true }, orderBy: { dueAt: "asc" } },
+        files: { where: { clientId: cid }, orderBy: { createdAt: "desc" } },
+        propertyNotes: { where: { clientId: cid }, orderBy: [{ pinned: "desc" }, { createdAt: "desc" }] },
+        reminders: { where: { active: true, clientId: cid }, orderBy: { dueAt: "asc" } },
         _count: { select: { enquiries: true } },
       },
     });
@@ -439,10 +531,20 @@ customerRouter.get("/properties/:id", requireClient, async (req, res, next) => {
 
 customerRouter.patch("/properties/:id", requireClient, idempotent(async (req, res, next) => {
   try {
-    const owned = await prisma.property.findFirst({ where: { id: req.params.id, clientId: clientId(req) } });
+    const cid = clientId(req);
+    const owned = await prisma.property.findFirst({ where: { id: req.params.id, clientId: cid } });
     if (!owned) throw new ApiError(404, "not_found", "Property not found");
     const body = propertySchema.partial().parse(req.body ?? {});
-    res.json(await prisma.property.update({ where: { id: owned.id }, data: { ...body, id: undefined } }));
+    const nested = await ownedNestedRefs(cid, {
+      siteContactId: body.siteContactId,
+      billToCustomerId: body.billToCustomerId,
+    });
+    res.json(
+      await prisma.property.update({
+        where: { id: owned.id },
+        data: { ...body, id: undefined, ...nested },
+      })
+    );
   } catch (err) {
     next(err);
   }
@@ -687,9 +789,27 @@ customerRouter.post("/customers/:id/notes", requireClient, idempotent(async (req
       .parse(req.body ?? {});
     const cid = clientId(req);
 
+    const nested = await ownedNestedRefs(cid, {
+      propertyId: body.propertyId,
+      assetId: body.assetId,
+      enquiryId: body.enquiryId,
+      customerId: owned.id,
+    });
+
     const existing = body.id ? await prisma.customerNote.findFirst({ where: { id: body.id, clientId: cid } }) : null;
     if (existing) {
-      res.json(await prisma.customerNote.update({ where: { id: existing.id }, data: { ...body, id: undefined } }));
+      res.json(
+        await prisma.customerNote.update({
+          where: { id: existing.id },
+          data: {
+            ...body,
+            id: undefined,
+            propertyId: nested.propertyId !== undefined ? nested.propertyId : body.propertyId,
+            assetId: nested.assetId !== undefined ? nested.assetId : body.assetId,
+            enquiryId: nested.enquiryId !== undefined ? nested.enquiryId : body.enquiryId,
+          },
+        })
+      );
       return;
     }
 
@@ -699,9 +819,9 @@ customerRouter.post("/customers/:id/notes", requireClient, idempotent(async (req
           ...(body.id ? { id: body.id } : {}),
           clientId: cid,
           customerId: owned.id,
-          propertyId: body.propertyId ?? null,
-          assetId: body.assetId ?? null,
-          enquiryId: body.enquiryId ?? null,
+          propertyId: nested.propertyId ?? null,
+          assetId: nested.assetId ?? null,
+          enquiryId: nested.enquiryId ?? null,
           type: body.type ?? "CUSTOMER",
           body: body.body,
           pinned: body.pinned ?? false,
@@ -772,6 +892,14 @@ customerRouter.post("/customers/:id/files", requireClient, idempotent(async (req
       .parse(req.body ?? {});
     const cid = clientId(req);
 
+    const nested = await ownedNestedRefs(cid, {
+      propertyId: body.propertyId,
+      assetId: body.assetId,
+      enquiryId: body.enquiryId,
+      jobId: body.jobId,
+      customerId: owned.id,
+    });
+
     // storeCertFile, not storeImage: the categories here are certificates,
     // manuals and warranties, and storeImage rejects PDFs outright.
     const buffer = Buffer.from(body.dataBase64, "base64");
@@ -783,10 +911,10 @@ customerRouter.post("/customers/:id/files", requireClient, idempotent(async (req
           ...(body.id ? { id: body.id } : {}),
           clientId: cid,
           customerId: owned.id,
-          propertyId: body.propertyId ?? null,
-          assetId: body.assetId ?? null,
-          enquiryId: body.enquiryId ?? null,
-          jobId: body.jobId ?? null,
+          propertyId: nested.propertyId ?? null,
+          assetId: nested.assetId ?? null,
+          enquiryId: nested.enquiryId ?? null,
+          jobId: nested.jobId ?? null,
           category: body.category ?? "OTHER",
           filename: body.filename,
           url: stored.url,
@@ -837,14 +965,20 @@ customerRouter.post("/customers/:id/reminders", requireClient, idempotent(async 
       .parse(req.body ?? {});
     const cid = clientId(req);
 
+    const nested = await ownedNestedRefs(cid, {
+      propertyId: body.propertyId,
+      assetId: body.assetId,
+      customerId: owned.id,
+    });
+
     const existing = body.id ? await prisma.reminder.findFirst({ where: { id: body.id, clientId: cid } }) : null;
     const data = {
       kind: body.kind ?? "OTHER",
       label: body.label,
       dueAt: new Date(body.dueAt),
       everyMonths: body.everyMonths ?? null,
-      propertyId: body.propertyId ?? null,
-      assetId: body.assetId ?? null,
+      propertyId: nested.propertyId ?? null,
+      assetId: nested.assetId ?? null,
       active: body.active ?? true,
     };
     if (existing) {

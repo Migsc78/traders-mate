@@ -91,6 +91,10 @@ const schema = z.object({
   // Prefer OPERATOR_ADMIN_PASSWORD for /admin/login; OPERATOR_API_TOKEN still works for API tooling.
   OPERATOR_API_TOKEN: z.string().default(""),
   OPERATOR_ADMIN_PASSWORD: z.string().default(""),
+  /** HMAC key for operator sessions. Falls back to OPERATOR_API_TOKEN / MAGIC_LINK_SECRET. */
+  OPERATOR_SESSION_SECRET: z.string().default(""),
+  /** Optional dedicated secret for POST /api/followups/tick (falls back to MAGIC_LINK_SECRET). */
+  CRON_SECRET: z.string().default(""),
 
   // Self-serve trial length (days).
   TRIAL_DAYS: z.coerce.number().default(14),
@@ -135,10 +139,16 @@ function assertProductionSecrets(parsed: z.infer<typeof schema>) {
       "OPERATOR_ADMIN_PASSWORD (or OPERATOR_API_TOKEN) is required — CRM is otherwise open"
     );
   }
-  // Warn instead of crash: throwing here fails Railway healthchecks and freezes deploys
-  // on the previous revision (which is why voicemail never went live).
+  if (parsed.STRIPE_SECRET_KEY?.trim() && !parsed.STRIPE_WEBHOOK_SECRET?.trim()) {
+    problems.push(
+      "STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set — unsigned webhooks are rejected"
+    );
+  }
+  // Fail closed in production: refuse to boot with weak/missing auth secrets.
   if (problems.length) {
-    console.error("[env] PRODUCTION SECRET WARNINGS (fix ASAP):\n- " + problems.join("\n- "));
+    throw new Error(
+      "[env] PRODUCTION SECRET ERRORS (refusing to start):\n- " + problems.join("\n- ")
+    );
   }
 }
 

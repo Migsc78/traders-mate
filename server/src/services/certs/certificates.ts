@@ -72,6 +72,16 @@ export async function createCertificate(opts: {
   const stored = await parseOptionalFile(opts.file);
   if (!stored) throw new ApiError(400, "file_required", "Upload a photo or PDF of the certificate");
 
+  let enquiryId: string | null = null;
+  if (opts.enquiryId) {
+    const enq = await prisma.enquiry.findFirst({
+      where: { id: opts.enquiryId, clientId: opts.clientId },
+      select: { id: true },
+    });
+    if (!enq) throw new ApiError(400, "invalid_ref", "Enquiry not found for this account");
+    enquiryId = enq.id;
+  }
+
   const issuedAt = opts.issuedAt ?? new Date();
   const serviceDueAt = opts.serviceDueAt ?? defaultDueAt(issuedAt);
   const formData: Record<string, unknown> = {};
@@ -80,7 +90,7 @@ export async function createCertificate(opts: {
   const row = await prisma.certificate.create({
     data: {
       clientId: opts.clientId,
-      enquiryId: opts.enquiryId || null,
+      enquiryId,
       kind: opts.kind,
       siteAddress: opts.siteAddress || null,
       customerName: opts.customerName || null,
