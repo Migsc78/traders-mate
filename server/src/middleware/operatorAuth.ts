@@ -1,7 +1,8 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 import { env } from "../env.js";
 import { isProduction } from "../lib/production.js";
+import { secretsEqual } from "../lib/secureCompare.js";
 import { ApiError } from "./error.js";
 
 /**
@@ -18,16 +19,14 @@ let warnedOpen = false;
 const SESSION_DAYS = 14;
 
 function tokensMatch(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return secretsEqual(provided, expected);
 }
 
+/** Prefer dedicated session secret — never fall back to the login password. */
 function sessionSigningSecret(): string {
   return (
+    env.OPERATOR_SESSION_SECRET?.trim() ||
     env.OPERATOR_API_TOKEN?.trim() ||
-    env.OPERATOR_ADMIN_PASSWORD?.trim() ||
     env.MAGIC_LINK_SECRET
   );
 }

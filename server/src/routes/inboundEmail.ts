@@ -33,10 +33,14 @@ inboundEmailRouter.post("/", async (req, res, next) => {
       throw new ApiError(503, "misconfigured", "Inbound email webhook secret not configured");
     }
     if (expectedSecret) {
-      const hdr = String(req.headers["x-inbound-secret"] || body.secret || "");
-      if (hdr !== expectedSecret) {
+      const { secretsEqual } = await import("../lib/secureCompare.js");
+      // Prefer header; body.secret kept for legacy providers but header wins when both sent.
+      const provided = String(req.headers["x-inbound-secret"] || body.secret || "");
+      if (!provided || !secretsEqual(provided, expectedSecret)) {
         throw new ApiError(401, "unauthorized", "Bad inbound email secret");
       }
+    } else if (!isProduction()) {
+      console.warn("[inbound-email] INBOUND_EMAIL_WEBHOOK_SECRET unset — accepting unsigned webhook (dev only)");
     }
 
     const toAddr = body.to.includes("<") ? (body.to.match(/<([^>]+)>/)?.[1] || body.to) : body.to;

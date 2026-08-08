@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { env, clientOrigins } from "./env.js";
 import { searchRouter } from "./routes/search.js";
 import { leadsRouter } from "./routes/leads.js";
@@ -68,6 +69,14 @@ const crmCors = cors({
   maxAge: 86400,
 });
 
+const operatorLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: "rate_limited", message: "Too many login attempts — try again later." } },
+});
+
 // Stripe webhook needs the RAW body for signature verification (before json parsing).
 app.use("/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookRouter);
 
@@ -99,7 +108,20 @@ app.use("/uploads", express.static(UPLOADS_DIR));
 app.use("/api", crmCors);
 app.use(express.json({ limit: "1mb" }));
 
-app.get("/api/health", async (_req, res) => {
+/** Public liveness + minimal flags the admin UI needs before login. */
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    placesConfigured: !!getGooglePlacesApiKey(),
+    operatorAuthRequired: operatorAuthConfigured(),
+    signupsOpen: env.SIGNUPS_OPEN,
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    time: new Date().toISOString(),
+  });
+});
+
+/** Operator-only diagnostics (integrations, pool, commit). */
+app.get("/api/health/detail", requireOperator, async (_req, res) => {
   const { getTwilioUkBundleSid } = await import("./services/appConfig.js");
   const { countAvailablePoolNumbers } = await import("./services/twilio/numberPool.js");
   const ukBundle = await getTwilioUkBundleSid().catch(() => "");
@@ -133,7 +155,7 @@ app.get("/api/operator/session", requireOperator, (_req, res) => {
 });
 
 /** Password login → signed session (14 days). */
-app.post("/api/operator/login", (req, res, next) => {
+app.post("/api/operator/login", operatorLoginLimiter, (req, res, next) => {
   try {
     if (!operatorAuthConfigured()) {
       res.json({ ok: true, open: true, sessionToken: null, expiresAt: null });

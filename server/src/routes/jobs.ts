@@ -711,6 +711,16 @@ jobsRouter.post(
       const job = await prisma.job.findFirst({ where: { id: req.params.jobId, clientId: cid } });
       if (!job) throw new ApiError(404, "not_found", "Job not found");
 
+      let receiptFileId: string | null = null;
+      if (body.receiptFileId) {
+        const file = await prisma.customerFile.findFirst({
+          where: { id: body.receiptFileId, clientId: cid },
+          select: { id: true },
+        });
+        if (!file) throw new ApiError(400, "invalid_ref", "Receipt file not found for this account");
+        receiptFileId = file.id;
+      }
+
       const count = await prisma.jobCost.count({ where: { jobId: job.id } });
       const created = await prisma.$transaction(async (tx) => {
         const cost = await tx.jobCost.create({
@@ -732,7 +742,7 @@ jobsRouter.post(
             // record of the agreement is the valuable part, not a workflow.
             agreedAt: body.isExtra ? new Date() : null,
             agreedVia: body.isExtra ? (body.agreedVia ?? null) : null,
-            receiptFileId: body.receiptFileId ?? null,
+            receiptFileId,
             source: body.priceBookItemId ? "BOOK" : "MANUAL",
             sort: count,
           },
@@ -770,6 +780,16 @@ jobsRouter.patch(
       if (!cost) throw new ApiError(404, "not_found", "Cost line not found");
       if (cost.invoicedAt) throw new ApiError(400, "invoiced", "That line is already on an invoice");
 
+      let receiptFileId: string | null | undefined = body.receiptFileId;
+      if (body.receiptFileId) {
+        const file = await prisma.customerFile.findFirst({
+          where: { id: body.receiptFileId, clientId: cid },
+          select: { id: true },
+        });
+        if (!file) throw new ApiError(400, "invalid_ref", "Receipt file not found for this account");
+        receiptFileId = file.id;
+      }
+
       const updated = await prisma.jobCost.update({
         where: { id: cost.id },
         data: {
@@ -784,7 +804,7 @@ jobsRouter.patch(
           billable: body.billable,
           isExtra: body.isExtra,
           agreedVia: body.agreedVia,
-          receiptFileId: body.receiptFileId,
+          receiptFileId,
         },
       });
       res.json(updated);

@@ -313,13 +313,15 @@ quotePublicRouter.post("/:token/decline", async (req, res, next) => {
   }
 });
 
-/** Internal cron tick — protect with shared secret header in production. */
+/** Internal cron tick — requires x-cron-secret (CRON_SECRET or MAGIC_LINK_SECRET). */
 export const followupsRouter = Router();
 followupsRouter.post("/tick", async (req, res, next) => {
   try {
-    const secret = req.headers["x-cron-secret"];
-    if (env.MAGIC_LINK_SECRET && secret && secret !== env.MAGIC_LINK_SECRET) {
-      throw new ApiError(401, "unauthorized", "Bad cron secret");
+    const { secretsEqual } = await import("../lib/secureCompare.js");
+    const expected = (env.CRON_SECRET?.trim() || env.MAGIC_LINK_SECRET?.trim() || "");
+    const provided = String(req.headers["x-cron-secret"] || "");
+    if (!expected || !provided || !secretsEqual(provided, expected)) {
+      throw new ApiError(401, "unauthorized", "Cron secret required");
     }
     const result = await tickFollowUps();
     res.json(result);

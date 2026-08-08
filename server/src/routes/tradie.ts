@@ -141,9 +141,13 @@ tradieRouter.post("/auth/magic", magicLoginLimiter, async (req, res, next) => {
   }
 });
 
-/** Direct login for seed test accounts only (`seed_tm_*` route keys) — no SMS. */
+/** Direct login for seed test accounts only (`seed_tm_*` route keys) — no SMS. Dev/test only. */
 tradieRouter.post("/auth/seed-login", async (req, res, next) => {
   try {
+    const { isProduction } = await import("../lib/production.js");
+    if (isProduction()) {
+      throw new ApiError(403, "forbidden", "Seed login is disabled in production");
+    }
     const body = z.object({ routeKey: z.string().min(3) }).parse(req.body ?? {});
     const routeKey = body.routeKey.trim();
     if (!routeKey.startsWith("seed_tm_")) {
@@ -1612,13 +1616,15 @@ tradieRouter.post("/templates/:id/duplicate", requireClient, requireActiveAccoun
     if (!source) throw new ApiError(404, "not_found", "Template not found");
 
     if (body.id) {
-      const clash = await prisma.quoteTemplate.findUnique({ where: { id: body.id }, select: { id: true } });
+      const clash = await prisma.quoteTemplate.findUnique({
+        where: { id: body.id },
+        include: { items: { orderBy: { sortOrder: "asc" } } },
+      });
       if (clash) {
-        const existing = await prisma.quoteTemplate.findUnique({
-          where: { id: body.id },
-          include: { items: { orderBy: { sortOrder: "asc" } } },
-        });
-        res.status(200).json(existing);
+        if (clash.clientId !== clientId(req)) {
+          throw new ApiError(409, "id_conflict", "Template id already in use");
+        }
+        res.status(200).json(clash);
         return;
       }
     }
@@ -2233,20 +2239,21 @@ tradieRouter.post("/appointments", requireClient, requireActiveAccount, idempote
     let customerName = body.customerName || null;
     let customerPhone = body.customerPhone ? toE164UK(body.customerPhone) : null;
     let address = body.address?.trim() || null;
+    let enquiryId: string | null = null;
     if (body.enquiryId) {
       const enq = await prisma.enquiry.findFirst({
         where: { id: body.enquiryId, clientId: clientId(req) },
       });
-      if (enq) {
-        customerName = customerName || enq.name;
-        customerPhone = customerPhone || toE164UK(enq.phone);
-        address = address || enq.postcode || null;
-      }
+      if (!enq) throw new ApiError(400, "invalid_ref", "Enquiry not found for this account");
+      enquiryId = enq.id;
+      customerName = customerName || enq.name;
+      customerPhone = customerPhone || toE164UK(enq.phone);
+      address = address || enq.postcode || null;
     }
 
     const result = await createAppointment({
       clientId: clientId(req),
-      enquiryId: body.enquiryId,
+      enquiryId,
       title: body.title,
       notes: body.notes,
       startsAt: new Date(body.startsAt),
@@ -2340,10 +2347,19 @@ tradieRouter.post("/certificates", requireClient, requireActiveAccount, async (r
           .optional(),
       })
       .parse(req.body ?? {});
+    let enquiryId: string | null = null;
+    if (body.enquiryId) {
+      const enq = await prisma.enquiry.findFirst({
+        where: { id: body.enquiryId, clientId: clientId(req) },
+        select: { id: true },
+      });
+      if (!enq) throw new ApiError(400, "invalid_ref", "Enquiry not found for this account");
+      enquiryId = enq.id;
+    }
     const row = await createCertificate({
       clientId: clientId(req),
       kind: body.kind,
-      enquiryId: body.enquiryId,
+      enquiryId,
       siteAddress: body.siteAddress,
       customerName: body.customerName,
       customerPhone: body.customerPhone,

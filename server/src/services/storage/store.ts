@@ -34,6 +34,45 @@ export interface StoredFile {
   path?: string;
 }
 
+/** 16 random bytes → ~128 bits of filename entropy (unguessable). */
+function randomFileName(ext: string): string {
+  return `${Date.now()}-${randomBytes(16).toString("hex")}.${ext}`;
+}
+
+/** Best-effort magic-byte check so clients cannot rename HTML/JS as images. */
+export function assertImageMagic(contentType: string, data: Buffer): void {
+  const mime = contentType.toLowerCase().split(";")[0]!.trim();
+  if (mime === "image/heic") return; // variable container; skip strict check
+  if (mime === "image/jpeg" || mime === "image/jpg") {
+    if (data.length < 3 || data[0] !== 0xff || data[1] !== 0xd8 || data[2] !== 0xff) {
+      throw new Error("Image bytes do not match JPEG content type");
+    }
+    return;
+  }
+  if (mime === "image/png") {
+    const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    if (data.length < 8 || !data.subarray(0, 8).equals(sig)) {
+      throw new Error("Image bytes do not match PNG content type");
+    }
+    return;
+  }
+  if (mime === "image/webp") {
+    if (
+      data.length < 12 ||
+      data.toString("ascii", 0, 4) !== "RIFF" ||
+      data.toString("ascii", 8, 12) !== "WEBP"
+    ) {
+      throw new Error("Image bytes do not match WebP content type");
+    }
+  }
+}
+
+export function assertPdfMagic(data: Buffer): void {
+  if (data.length < 5 || data.toString("ascii", 0, 5) !== "%PDF-") {
+    throw new Error("File bytes do not match PDF content type");
+  }
+}
+
 /**
  * Local storage impl: writes to /uploads and returns a public URL.
  * Swap this for S3/R2 later by keeping the same signature.
@@ -42,9 +81,10 @@ export async function storeImage(contentType: string, data: Buffer): Promise<Sto
   const ext = EXT[contentType.toLowerCase()];
   if (!ext || ext === "pdf") throw new Error("Unsupported image type");
   if (data.length > MAX_UPLOAD_BYTES) throw new Error("Image too large");
+  assertImageMagic(contentType, data);
 
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
-  const name = `${Date.now()}-${randomBytes(5).toString("hex")}.${ext}`;
+  const name = randomFileName(ext);
   const full = path.join(UPLOADS_DIR, name);
   await fs.writeFile(full, data);
   return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/${name}`, path: full };
@@ -56,9 +96,11 @@ export async function storeCertFile(contentType: string, data: Buffer): Promise<
   const ext = EXT[mime];
   if (!ext) throw new Error("Unsupported file type — use a photo (JPEG/PNG/WebP) or PDF");
   if (data.length > MAX_CERT_FILE_BYTES) throw new Error("File too large (max 12 MB)");
+  if (ext === "pdf") assertPdfMagic(data);
+  else assertImageMagic(mime, data);
 
   await fs.mkdir(path.join(UPLOADS_DIR, "certs"), { recursive: true });
-  const name = `${Date.now()}-${randomBytes(5).toString("hex")}.${ext}`;
+  const name = randomFileName(ext);
   const full = path.join(UPLOADS_DIR, "certs", name);
   await fs.writeFile(full, data);
   return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/certs/${name}`, path: full };
@@ -68,7 +110,7 @@ export async function storeAudio(contentType: string, data: Buffer): Promise<Sto
   const ext = AUDIO_EXT[contentType.toLowerCase()] || "webm";
   if (data.length > MAX_AUDIO_BYTES) throw new Error("Audio too large");
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
-  const name = `${Date.now()}-${randomBytes(5).toString("hex")}.${ext}`;
+  const name = randomFileName(ext);
   const full = path.join(UPLOADS_DIR, name);
   await fs.writeFile(full, data);
   return { url: `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/uploads/${name}`, path: full };

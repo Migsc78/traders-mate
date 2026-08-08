@@ -59,10 +59,14 @@ stripeWebhookRouter.post("/", async (req, res) => {
   const sig = req.header("stripe-signature") || "";
   const payload = (req.body as Buffer)?.toString("utf8") || "";
 
-  if (env.STRIPE_WEBHOOK_SECRET) {
-    if (!verifyStripeSignature(payload, sig, env.STRIPE_WEBHOOK_SECRET)) {
-      return res.status(400).json({ error: "invalid signature" });
-    }
+  const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim() || "";
+  // Fail closed: never apply billing side-effects without a verified signature.
+  if (!webhookSecret) {
+    console.error("[stripe] STRIPE_WEBHOOK_SECRET unset — rejecting webhook");
+    return res.status(503).json({ error: "webhook not configured" });
+  }
+  if (!verifyStripeSignature(payload, sig, webhookSecret)) {
+    return res.status(400).json({ error: "invalid signature" });
   }
 
   let event: { type?: string; data?: { object?: Record<string, unknown> } };
