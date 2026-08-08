@@ -133,6 +133,7 @@ export interface Client {
   destPhone: string;
   destChannel: Channel;
   status: ClientStatus;
+  twilioNumber?: string | null;
   stripeCustomerId?: string | null;
   stripeSubId?: string | null;
   allowedOrigins: string[];

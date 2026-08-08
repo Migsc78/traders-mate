@@ -130,6 +130,86 @@ export async function releaseClientNumberToPool(
   return { phoneNumber: client.twilioNumber, sid: client.twilioNumberSid };
 }
 
+/**
+ * Assign a specific AVAILABLE pool number to a chosen client.
+ *
+ * If the client already has a number, that one is returned to the pool first
+ * so operators can reassign during testing without orphaning inventory.
+ */
+export async function assignPoolNumberToClient(opts: {
+  poolId: string;
+  clientId: string;
+}): Promise<{ phoneNumber: string; sid: string; releasedPrevious: string | null }> {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const spare = await tx.twilioNumberPool.findUnique({ where: { id: opts.poolId } });
+    if (!spare) throw new Error("Pool number not found");
+    if (spare.status !== "AVAILABLE") {
+      throw new Error(`Number ${spare.phoneNumber} is ${spare.status}, not AVAILABLE`);
+    }
+
+    const client = await tx.client.findUnique({
+      where: { id: opts.clientId },
+      select: { id: true, businessName: true, twilioNumber: true, twilioNumberSid: true },
+    });
+    if (!client) throw new Error("Client not found");
+
+    let releasedPrevious: string | null = null;
+    if (client.twilioNumber && client.twilioNumberSid) {
+      releasedPrevious = client.twilioNumber;
+      await tx.twilioNumberPool.upsert({
+        where: { sid: client.twilioNumberSid },
+        create: {
+          phoneNumber: client.twilioNumber,
+          sid: client.twilioNumberSid,
+          status: "AVAILABLE",
+          assignedClientId: null,
+          notes: `Released when assigning ${spare.phoneNumber} to ${client.businessName}`,
+        },
+        update: {
+          phoneNumber: client.twilioNumber,
+          status: "AVAILABLE",
+          assignedClientId: null,
+          notes: `Released when assigning ${spare.phoneNumber} to ${client.businessName}`,
+        },
+      });
+    } else if (client.twilioNumber) {
+      // Manual/seed number with no SID — clear the client field so the new
+      // assignment can take over; we can't put the old one back in the pool.
+      releasedPrevious = client.twilioNumber;
+    }
+
+    await tx.twilioNumberPool.update({
+      where: { id: spare.id },
+      data: {
+        status: "ASSIGNED",
+        assignedClientId: client.id,
+        notes: `Assigned to ${client.businessName}`,
+      },
+    });
+    await tx.client.update({
+      where: { id: client.id },
+      data: {
+        twilioNumber: spare.phoneNumber,
+        twilioNumberSid: spare.sid,
+      },
+    });
+
+    return {
+      phoneNumber: spare.phoneNumber,
+      sid: spare.sid,
+      releasedPrevious,
+    };
+  });
+
+  try {
+    await configureNumberWebhooks(result.phoneNumber);
+  } catch (e) {
+    console.warn("[number-pool] configure webhooks failed after assign", result.phoneNumber, e);
+  }
+
+  return result;
+}
+
 export async function countAvailablePoolNumbers(): Promise<number> {
   return prisma.twilioNumberPool.count({ where: { status: "AVAILABLE" } });
 }

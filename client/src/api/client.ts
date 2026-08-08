@@ -527,6 +527,18 @@ export const api = {
 
   getTwilioAdmin: () => request<TwilioAdminStats>("/api/twilio-admin"),
 
+  assignTwilioPoolNumber: (body: { poolId: string; clientId: string }) =>
+    request<{ ok: boolean; phoneNumber: string; sid: string; releasedPrevious: string | null }>(
+      "/api/twilio-admin/pool/assign",
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+
+  releaseTwilioPoolNumber: (clientId: string) =>
+    request<{ ok: boolean; phoneNumber: string; sid: string }>("/api/twilio-admin/pool/release", {
+      method: "POST",
+      body: JSON.stringify({ clientId }),
+    }),
+
   listEarlyAccess: (status?: string) =>
     request<
       {

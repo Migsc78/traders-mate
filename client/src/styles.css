@@ -808,9 +808,40 @@ button.linkish:hover { color: var(--text); background: none; }
   white-space: nowrap;
   font-weight: 600;
 }
+.twilio-assign-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+  gap: 12px 14px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.twilio-assign-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+.twilio-assign-form select {
+  font-weight: 500;
+  color: var(--navy);
+}
+.twilio-assign-form > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.twilio-assign-form .hint {
+  font-weight: 400;
+}
 
 @media (max-width: 720px) {
   .twilio-meta-grid { grid-template-columns: 1fr; }
+  .twilio-assign-form { grid-template-columns: 1fr; }
 }
 
 

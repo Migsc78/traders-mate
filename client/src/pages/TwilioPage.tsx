@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, type TwilioAdminStats, type TwilioUsageBlock } from "../api/client";
 
 type TwilioNumberRow = TwilioAdminStats["numbers"]["rows"][number];
 type TwilioMissingClient = TwilioAdminStats["numbers"]["clientsMissing"][number];
+type PoolRow = NonNullable<TwilioAdminStats["pool"]>["rows"][number];
 
 function n(v: number): string {
   return new Intl.NumberFormat("en-GB").format(v);
@@ -103,6 +105,92 @@ function msgCount(d: TwilioAdminStats, period: "7d" | "30d", key: string): numbe
   return bag[key] ?? 0;
 }
 
+function AssignPoolForm({ available }: { available: PoolRow[] }) {
+  const qc = useQueryClient();
+  const clientsQ = useQuery({ queryKey: ["clients"], queryFn: api.listClients });
+  const [poolId, setPoolId] = useState(available[0]?.id ?? "");
+  const [clientId, setClientId] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!available.some((r) => r.id === poolId)) {
+      setPoolId(available[0]?.id ?? "");
+    }
+  }, [available, poolId]);
+
+  const clients = useMemo(
+    () =>
+      (clientsQ.data ?? [])
+        .slice()
+        .sort((a, b) => a.businessName.localeCompare(b.businessName, "en-GB")),
+    [clientsQ.data]
+  );
+
+  const assign = useMutation({
+    mutationFn: () => api.assignTwilioPoolNumber({ poolId, clientId }),
+    onSuccess: (r) => {
+      const released = r.releasedPrevious ? ` (released ${r.releasedPrevious} back to pool)` : "";
+      setMsg(`Assigned ${r.phoneNumber}${released}`);
+      setClientId("");
+      void qc.invalidateQueries({ queryKey: ["twilio-admin"] });
+      void qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (e: Error) => setMsg(e.message),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    if (!poolId || !clientId) {
+      setMsg("Pick a spare number and a client.");
+      return;
+    }
+    assign.mutate();
+  }
+
+  if (available.length === 0) {
+    return (
+      <p className="muted-text">No AVAILABLE numbers to assign — restore or buy into the pool first.</p>
+    );
+  }
+
+  return (
+    <form className="twilio-assign-form" onSubmit={onSubmit}>
+      <label>
+        Spare number
+        <select value={poolId} onChange={(e) => setPoolId(e.target.value)} required>
+          {available.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.phoneNumber}
+              {r.notes ? ` — ${r.notes}` : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Client account
+        <select value={clientId} onChange={(e) => setClientId(e.target.value)} required>
+          <option value="">Select a tradie…</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.businessName}
+              {c.twilioNumber ? ` (has ${c.twilioNumber})` : ""} — {c.status}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="submit" disabled={assign.isPending || !poolId || !clientId}>
+        {assign.isPending ? "Assigning…" : "Assign to client"}
+      </button>
+      {msg ? <p className={assign.isError ? "error" : "muted-text"}>{msg}</p> : null}
+      <p className="hint">
+        If the client already has a number, that one returns to the spare pool and webhooks are pointed at
+        the new number.
+      </p>
+    </form>
+  );
+}
+
 export default function TwilioPage() {
   const q = useQuery({
     queryKey: ["twilio-admin"],
@@ -148,6 +236,8 @@ export default function TwilioPage() {
 
   if (!d) return null;
 
+  const availablePool = (d.pool?.rows ?? []).filter((r) => r.status === "AVAILABLE");
+
   return (
     <div>
       <header className="page-head">
@@ -178,301 +268,289 @@ export default function TwilioPage() {
       {d.twilioError && <p className="error">Twilio API error: {d.twilioError}</p>}
 
       <div className="dash-layout">
-          <section className="dash-kpi-grid" aria-label="Twilio overview">
-            <Kpi
-              label="Account"
-              value={d.account.status || (d.configured ? "Connected" : "Off")}
-              hint={
-                d.account.friendlyName
-                  ? `${d.account.friendlyName}${d.account.sidHint ? ` · ${d.account.sidHint}` : ""}`
-                  : d.account.sidHint || "Configure in Settings"
-              }
-              tone={d.configured && d.account.status === "active" ? "good" : d.configured ? "warn" : "bad"}
-            />
-            <Kpi
-              label="Balance"
-              value={
-                d.balance ? money(d.balance.balance, d.balance.currency) : d.configured ? "—" : "—"
-              }
-              hint="Twilio account balance"
-              tone={
-                d.balance && Number(d.balance.balance) < 5
-                  ? "warn"
-                  : d.balance
-                    ? "good"
-                    : "neutral"
-              }
-            />
-            <Kpi
-              label="Numbers on account"
-              value={n(d.numbers.totalOnTwilio)}
-              hint={`${n(d.numbers.assignedToClients)} assigned · ${n(d.pool?.available ?? 0)} spare in pool`}
-            />
-            <Kpi
-              label="This month (Twilio)"
-              value={money(d.usage.thisMonth.totalPrice, d.usage.thisMonth.priceUnit)}
-              hint={`Today ${money(d.usage.today.totalPrice, d.usage.today.priceUnit)}`}
-              tone="neutral"
-            />
-            <Kpi
-              label="SMS out (30d)"
-              value={n(msgCount(d, "30d", "OUTBOUND_SMS"))}
-              hint={`${n(msgCount(d, "7d", "OUTBOUND_SMS"))} in last 7 days`}
-            />
-            <Kpi
-              label="WhatsApp out (30d)"
-              value={n(msgCount(d, "30d", "OUTBOUND_WHATSAPP"))}
-              hint={`${n(d.local.outboundWithTwilioSid30)} with Twilio SID`}
-            />
-            <Kpi
-              label="Missed-call sessions (30d)"
-              value={n(d.local.missedCalls30)}
-              hint={`Converted ${n(d.local.missedByStatus30.CONVERTED ?? 0)}`}
-            />
-            <Kpi
-              label="Delivery issues (30d)"
-              value={n(d.local.failedOrUndelivered30)}
-              hint="Failed / undelivered messages in DB"
-              tone={d.local.failedOrUndelivered30 > 0 ? "bad" : "good"}
-            />
+        <section className="dash-kpi-grid" aria-label="Twilio overview">
+          <Kpi
+            label="Account"
+            value={d.account.status || (d.configured ? "Connected" : "Off")}
+            hint={
+              d.account.friendlyName
+                ? `${d.account.friendlyName}${d.account.sidHint ? ` · ${d.account.sidHint}` : ""}`
+                : d.account.sidHint || "Configure in Settings"
+            }
+            tone={d.configured && d.account.status === "active" ? "good" : d.configured ? "warn" : "bad"}
+          />
+          <Kpi
+            label="Balance"
+            value={d.balance ? money(d.balance.balance, d.balance.currency) : d.configured ? "—" : "—"}
+            hint="Twilio account balance"
+            tone={
+              d.balance && Number(d.balance.balance) < 5 ? "warn" : d.balance ? "good" : "neutral"
+            }
+          />
+          <Kpi
+            label="Numbers on account"
+            value={n(d.numbers.totalOnTwilio)}
+            hint={`${n(d.numbers.assignedToClients)} assigned · ${n(d.pool?.available ?? 0)} spare in pool`}
+          />
+          <Kpi
+            label="This month (Twilio)"
+            value={money(d.usage.thisMonth.totalPrice, d.usage.thisMonth.priceUnit)}
+            hint={`Today ${money(d.usage.today.totalPrice, d.usage.today.priceUnit)}`}
+            tone="neutral"
+          />
+          <Kpi
+            label="SMS out (30d)"
+            value={n(msgCount(d, "30d", "OUTBOUND_SMS"))}
+            hint={`${n(msgCount(d, "7d", "OUTBOUND_SMS"))} in last 7 days`}
+          />
+          <Kpi
+            label="WhatsApp out (30d)"
+            value={n(msgCount(d, "30d", "OUTBOUND_WHATSAPP"))}
+            hint={`${n(d.local.outboundWithTwilioSid30)} with Twilio SID`}
+          />
+          <Kpi
+            label="Missed-call sessions (30d)"
+            value={n(d.local.missedCalls30)}
+            hint={`Converted ${n(d.local.missedByStatus30.CONVERTED ?? 0)}`}
+          />
+          <Kpi
+            label="Delivery issues (30d)"
+            value={n(d.local.failedOrUndelivered30)}
+            hint="Failed / undelivered messages in DB"
+            tone={d.local.failedOrUndelivered30 > 0 ? "bad" : "good"}
+          />
+        </section>
+
+        <div className="dash-money-grid">
+          <section className="card settings-section dash-panel">
+            <div className="settings-section-head">
+              <h2>Senders & webhooks</h2>
+              <p>Default From numbers and the URLs every subscribed number should point at.</p>
+            </div>
+            <div className="twilio-meta-grid">
+              <div>
+                <span className="dash-usage-label">SMS From</span>
+                <strong>{d.account.smsFrom || "Not set"}</strong>
+              </div>
+              <div>
+                <span className="dash-usage-label">WhatsApp From</span>
+                <strong>{d.account.whatsappFrom || "Not set"}</strong>
+              </div>
+              <div className="span-2">
+                <span className="dash-usage-label">Expected Voice URL</span>
+                <code className="twilio-url">{d.account.expectedVoiceUrl}</code>
+              </div>
+              <div className="span-2">
+                <span className="dash-usage-label">Expected SMS URL</span>
+                <code className="twilio-url">{d.account.expectedSmsUrl}</code>
+              </div>
+            </div>
+            <p className="dash-footnote">
+              Change credentials under <Link to="/admin/settings">Settings → Messaging</Link>.
+            </p>
           </section>
-
-          <div className="dash-money-grid">
-            <section className="card settings-section dash-panel">
-              <div className="settings-section-head">
-                <h2>Senders & webhooks</h2>
-                <p>Default From numbers and the URLs every subscribed number should point at.</p>
-              </div>
-              <div className="twilio-meta-grid">
-                <div>
-                  <span className="dash-usage-label">SMS From</span>
-                  <strong>{d.account.smsFrom || "Not set"}</strong>
-                </div>
-                <div>
-                  <span className="dash-usage-label">WhatsApp From</span>
-                  <strong>{d.account.whatsappFrom || "Not set"}</strong>
-                </div>
-                <div className="span-2">
-                  <span className="dash-usage-label">Expected Voice URL</span>
-                  <code className="twilio-url">{d.account.expectedVoiceUrl}</code>
-                </div>
-                <div className="span-2">
-                  <span className="dash-usage-label">Expected SMS URL</span>
-                  <code className="twilio-url">{d.account.expectedSmsUrl}</code>
-                </div>
-              </div>
-              <p className="dash-footnote">
-                Change credentials under <Link to="/admin/settings">Settings → Messaging</Link>.
-              </p>
-            </section>
-
-            <section className="card settings-section dash-panel">
-              <div className="settings-section-head">
-                <h2>Local cost estimate (30d)</h2>
-                <p>Fallback when you want a quick GBP view from app volume (not Twilio invoices).</p>
-              </div>
-              <div className="dash-money-row">
-                <div>
-                  <div className="dash-money-label">Estimated COGS</div>
-                  <div className="dash-money-hint">{d.local.estimatedCost30.note}</div>
-                </div>
-                <div className="dash-money-value">{gbp(d.local.estimatedCost30.totalPence)}</div>
-              </div>
-              <div className="dash-usage">
-                <div>
-                  <span className="dash-usage-label">SMS out</span>
-                  <strong>{n(d.local.estimatedCost30.breakdown.smsOutbound)}</strong>
-                </div>
-                <div>
-                  <span className="dash-usage-label">WhatsApp out</span>
-                  <strong>{n(d.local.estimatedCost30.breakdown.whatsappOutbound)}</strong>
-                </div>
-                <div>
-                  <span className="dash-usage-label">Voice sessions</span>
-                  <strong>{n(d.local.estimatedCost30.breakdown.missedCallSessions)}</strong>
-                </div>
-              </div>
-            </section>
-          </div>
 
           <section className="card settings-section dash-panel">
             <div className="settings-section-head">
-              <h2>Spare number pool</h2>
-              <p>
-                Available numbers are given to the next paying tradie before buying a new one from Twilio.
-              </p>
+              <h2>Local cost estimate (30d)</h2>
+              <p>Fallback when you want a quick GBP view from app volume (not Twilio invoices).</p>
             </div>
-            {(d.pool?.rows?.length ?? 0) === 0 ? (
-              <p className="muted-text">Pool empty — next signup will purchase a new UK mobile.</p>
-            ) : (
-              <div className="table-wrap">
+            <div className="dash-money-row">
+              <div>
+                <div className="dash-money-label">Estimated COGS</div>
+                <div className="dash-money-hint">{d.local.estimatedCost30.note}</div>
+              </div>
+              <div className="dash-money-value">{gbp(d.local.estimatedCost30.totalPence)}</div>
+            </div>
+            <div className="dash-usage">
+              <div>
+                <span className="dash-usage-label">SMS out</span>
+                <strong>{n(d.local.estimatedCost30.breakdown.smsOutbound)}</strong>
+              </div>
+              <div>
+                <span className="dash-usage-label">WhatsApp out</span>
+                <strong>{n(d.local.estimatedCost30.breakdown.whatsappOutbound)}</strong>
+              </div>
+              <div>
+                <span className="dash-usage-label">Voice sessions</span>
+                <strong>{n(d.local.estimatedCost30.breakdown.missedCallSessions)}</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="card settings-section dash-panel">
+          <div className="settings-section-head">
+            <h2>Spare number pool</h2>
+            <p>
+              Available numbers are given to the next paying tradie before buying a new one from Twilio.
+              You can also hand a spare to a specific account (handy while testing).
+            </p>
+          </div>
+          <AssignPoolForm available={availablePool} />
+          {(d.pool?.rows?.length ?? 0) === 0 ? (
+            <p className="muted-text">Pool empty — next signup will purchase a new UK mobile.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Number</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.pool!.rows.map((r: PoolRow) => (
+                    <tr key={r.id}>
+                      <td>
+                        <code>{r.phoneNumber}</code>
+                      </td>
+                      <td>
+                        <span className={r.status === "AVAILABLE" ? "badge green" : "badge"}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="muted-text">{r.notes || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="card settings-section dash-panel">
+          <div className="settings-section-head">
+            <h2>Numbers subscribed</h2>
+            <p>
+              Incoming phone numbers on the Twilio account, mapped to TradiesMate clients and webhook
+              health.
+            </p>
+          </div>
+
+          {d.numbers.clientsWithNumberMissingOnTwilio > 0 && (
+            <div className="twilio-alert">
+              <strong>
+                {n(d.numbers.clientsWithNumberMissingOnTwilio)} client
+                {d.numbers.clientsWithNumberMissingOnTwilio === 1 ? "" : "s"} have a number not found on
+                this Twilio account
+              </strong>
+              <ul className="dash-list">
+                {d.numbers.clientsMissing.map((c: TwilioMissingClient) => (
+                  <li key={c.id}>
+                    <Link to={`/admin/clients/${c.id}`}>{c.businessName}</Link> — {c.twilioNumber} (
+                    {c.status})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {d.numbers.rows.length === 0 ? (
+            <p className="muted-text">
+              {d.configured
+                ? "No incoming numbers on this Twilio account yet."
+                : "Configure Twilio to list numbers."}
+            </p>
+          ) : (
+            <>
+              <div className="table-wrap desktop-only">
                 <table className="data-table">
                   <thead>
                     <tr>
                       <th>Number</th>
-                      <th>Status</th>
-                      <th>Notes</th>
+                      <th>Client</th>
+                      <th>Mode</th>
+                      <th>Voice webhook</th>
+                      <th>SMS webhook</th>
+                      <th>Caps</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {d.pool!.rows.map(
-                      (r: {
-                        id: string;
-                        phoneNumber: string;
-                        sid: string;
-                        status: string;
-                        notes: string | null;
-                      }) => (
-                      <tr key={r.id}>
+                    {d.numbers.rows.map((row: TwilioNumberRow) => (
+                      <tr key={row.sid}>
                         <td>
-                          <code>{r.phoneNumber}</code>
+                          <strong>{row.phoneNumber}</strong>
+                          {row.friendlyName ? <div className="hint">{row.friendlyName}</div> : null}
                         </td>
                         <td>
-                          <span className={r.status === "AVAILABLE" ? "badge green" : "badge"}>
-                            {r.status}
+                          {row.assignedClient ? (
+                            <>
+                              <Link to={`/admin/clients/${row.assignedClient.id}`}>
+                                {row.assignedClient.businessName}
+                              </Link>
+                              <div className="hint">{row.assignedClient.status}</div>
+                            </>
+                          ) : (
+                            <span className="badge amber">Unassigned</span>
+                          )}
+                        </td>
+                        <td>
+                          {row.assignedClient ? (
+                            <span className="hint">{row.assignedClient.missedCallMode}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td>
+                          <span className={`badge ${row.voiceOk ? "green" : "red"}`}>
+                            {row.voiceOk ? "OK" : "Mismatch"}
                           </span>
                         </td>
-                        <td className="muted-text">{r.notes || "—"}</td>
+                        <td>
+                          <span className={`badge ${row.smsOk ? "green" : "red"}`}>
+                            {row.smsOk ? "OK" : "Mismatch"}
+                          </span>
+                        </td>
+                        <td className="hint">
+                          {[
+                            row.capabilities.voice ? "Voice" : null,
+                            row.capabilities.sms ? "SMS" : null,
+                            row.capabilities.mms ? "MMS" : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "—"}
+                        </td>
                       </tr>
-                    )
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </section>
 
-          <section className="card settings-section dash-panel">
-            <div className="settings-section-head">
-              <h2>Numbers subscribed</h2>
-              <p>
-                Incoming phone numbers on the Twilio account, mapped to TradiesMate clients and webhook
-                health.
-              </p>
-            </div>
-
-            {d.numbers.clientsWithNumberMissingOnTwilio > 0 && (
-              <div className="twilio-alert">
-                <strong>
-                  {n(d.numbers.clientsWithNumberMissingOnTwilio)} client
-                  {d.numbers.clientsWithNumberMissingOnTwilio === 1 ? "" : "s"} have a number not found
-                  on this Twilio account
-                </strong>
-                <ul className="dash-list">
-                  {d.numbers.clientsMissing.map((c: TwilioMissingClient) => (
-                    <li key={c.id}>
-                      <Link to={`/admin/clients/${c.id}`}>{c.businessName}</Link> — {c.twilioNumber} (
-                      {c.status})
-                    </li>
-                  ))}
-                </ul>
+              <div className="mobile-only mobile-card-list">
+                {d.numbers.rows.map((row: TwilioNumberRow) => (
+                  <article key={row.sid} className="mobile-card">
+                    <div className="mobile-card-top">
+                      <strong>{row.phoneNumber}</strong>
+                      <span className={`badge ${row.webhooksOk ? "green" : "red"}`}>
+                        {row.webhooksOk ? "Webhooks OK" : "Fix webhooks"}
+                      </span>
+                    </div>
+                    <div className="mobile-card-meta">
+                      {row.assignedClient ? (
+                        <Link to={`/admin/clients/${row.assignedClient.id}`}>
+                          {row.assignedClient.businessName}
+                        </Link>
+                      ) : (
+                        <span>Unassigned</span>
+                      )}
+                      {row.friendlyName ? <span>{row.friendlyName}</span> : null}
+                    </div>
+                  </article>
+                ))}
               </div>
-            )}
+            </>
+          )}
+        </section>
 
-            {d.numbers.rows.length === 0 ? (
-              <p className="muted-text">
-                {d.configured
-                  ? "No incoming numbers on this Twilio account yet."
-                  : "Configure Twilio to list numbers."}
-              </p>
-            ) : (
-              <>
-                <div className="table-wrap desktop-only">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Number</th>
-                        <th>Client</th>
-                        <th>Mode</th>
-                        <th>Voice webhook</th>
-                        <th>SMS webhook</th>
-                        <th>Caps</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {d.numbers.rows.map((row: TwilioNumberRow) => (
-                        <tr key={row.sid}>
-                          <td>
-                            <strong>{row.phoneNumber}</strong>
-                            {row.friendlyName ? <div className="hint">{row.friendlyName}</div> : null}
-                          </td>
-                          <td>
-                            {row.assignedClient ? (
-                              <>
-                                <Link to={`/admin/clients/${row.assignedClient.id}`}>
-                                  {row.assignedClient.businessName}
-                                </Link>
-                                <div className="hint">{row.assignedClient.status}</div>
-                              </>
-                            ) : (
-                              <span className="badge amber">Unassigned</span>
-                            )}
-                          </td>
-                          <td>
-                            {row.assignedClient ? (
-                              <span className="hint">{row.assignedClient.missedCallMode}</span>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td>
-                            <span className={`badge ${row.voiceOk ? "green" : "red"}`}>
-                              {row.voiceOk ? "OK" : "Mismatch"}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`badge ${row.smsOk ? "green" : "red"}`}>
-                              {row.smsOk ? "OK" : "Mismatch"}
-                            </span>
-                          </td>
-                          <td className="hint">
-                            {[
-                              row.capabilities.voice ? "Voice" : null,
-                              row.capabilities.sms ? "SMS" : null,
-                              row.capabilities.mms ? "MMS" : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ") || "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+        <UsageTable title="Usage & cost — today" block={d.usage.today} />
+        <UsageTable title="Usage & cost — this month" block={d.usage.thisMonth} />
+        <UsageTable title="Usage & cost — last month" block={d.usage.lastMonth} />
 
-                <div className="mobile-only mobile-card-list">
-                  {d.numbers.rows.map((row: TwilioNumberRow) => (
-                    <article key={row.sid} className="mobile-card">
-                      <div className="mobile-card-top">
-                        <strong>{row.phoneNumber}</strong>
-                        <span className={`badge ${row.webhooksOk ? "green" : "red"}`}>
-                          {row.webhooksOk ? "Webhooks OK" : "Fix webhooks"}
-                        </span>
-                      </div>
-                      <div className="mobile-card-meta">
-                        {row.assignedClient ? (
-                          <Link to={`/admin/clients/${row.assignedClient.id}`}>
-                            {row.assignedClient.businessName}
-                          </Link>
-                        ) : (
-                          <span>Unassigned</span>
-                        )}
-                        {row.friendlyName ? <span>{row.friendlyName}</span> : null}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
-
-          <UsageTable title="Usage & cost — today" block={d.usage.today} />
-          <UsageTable title="Usage & cost — this month" block={d.usage.thisMonth} />
-          <UsageTable title="Usage & cost — last month" block={d.usage.lastMonth} />
-
-          <p className="dash-updated muted-text">
-            Updated {new Date(d.generatedAt).toLocaleString("en-GB")}
-          </p>
+        <p className="dash-updated muted-text">
+          Updated {new Date(d.generatedAt).toLocaleString("en-GB")}
+        </p>
       </div>
     </div>
   );

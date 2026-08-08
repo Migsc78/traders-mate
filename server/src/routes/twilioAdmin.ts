@@ -1,5 +1,7 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../db.js";
+import { ApiError } from "../middleware/error.js";
 import {
   getTwilioAccountSid,
   getTwilioSmsFrom,
@@ -315,6 +317,46 @@ twilioAdminRouter.get("/", async (_req, res, next) => {
         },
       },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/twilio-admin/pool/assign — give a specific AVAILABLE pool number to a client. */
+twilioAdminRouter.post("/pool/assign", async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        poolId: z.string().min(1),
+        clientId: z.string().min(1),
+      })
+      .parse(req.body ?? {});
+
+    const { assignPoolNumberToClient } = await import("../services/twilio/numberPool.js");
+    try {
+      const result = await assignPoolNumberToClient(body);
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("not found")) throw new ApiError(404, "not_found", msg);
+      if (msg.includes("not AVAILABLE")) throw new ApiError(409, "conflict", msg);
+      throw new ApiError(400, "assign_failed", msg);
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /api/twilio-admin/pool/release — detach a client's number back to AVAILABLE. */
+twilioAdminRouter.post("/pool/release", async (req, res, next) => {
+  try {
+    const body = z.object({ clientId: z.string().min(1) }).parse(req.body ?? {});
+    const { releaseClientNumberToPool } = await import("../services/twilio/numberPool.js");
+    const result = await releaseClientNumberToPool(body.clientId, "Released by admin");
+    if (!result) {
+      throw new ApiError(404, "not_found", "Client has no provisioned Twilio number to release");
+    }
+    res.json({ ok: true, ...result });
   } catch (err) {
     next(err);
   }
