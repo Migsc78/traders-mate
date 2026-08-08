@@ -104,6 +104,9 @@ invoicePublicRouter.get("/:token", async (req, res, next) => {
       });
     }
 
+    const { toAccessUrl } = await import("../services/storage/signedUrls.js");
+    const pdfHref = toAccessUrl(invoice.pdfUrl, { forPublicPage: true });
+
     const linesHtml = invoice.lines
       .map(
         (l) =>
@@ -193,7 +196,7 @@ invoicePublicRouter.get("/:token", async (req, res, next) => {
   </div>
 
   ${bankBlock}
-  ${invoice.pdfUrl ? `<p class="note"><a href="${esc(invoice.pdfUrl)}">Download PDF</a></p>` : ""}
+  ${pdfHref ? `<p class="note"><a href="${esc(pdfHref)}">Download PDF</a></p>` : ""}
   ${actions}
 </div></article></div>
 </body></html>`);

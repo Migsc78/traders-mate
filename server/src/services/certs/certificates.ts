@@ -2,6 +2,7 @@ import { prisma } from "../../db.js";
 import { ApiError } from "../../middleware/error.js";
 import { newPublicToken, appPublicUrl } from "../quotes/magicAuth.js";
 import { storeCertFile } from "../storage/store.js";
+import { toAccessUrl } from "../storage/signedUrls.js";
 import { sendMessage } from "../messaging/sender.js";
 import { logMessage } from "../messaging/log.js";
 import type { Prisma } from "@prisma/client";
@@ -14,6 +15,14 @@ export const KIND_LABEL: Record<string, string> = {
   EICR: "EICR",
   OTHER: "Compliance document",
 };
+
+export function withSignedCertPdf<T extends { pdfUrl?: string | null }>(
+  row: T,
+  opts?: { forPublicPage?: boolean }
+): T {
+  if (!row.pdfUrl) return row;
+  return { ...row, pdfUrl: toAccessUrl(row.pdfUrl, opts) ?? row.pdfUrl };
+}
 
 export type CertKind = "GAS_SAFETY" | "MINOR_WORKS" | "EICR" | "OTHER";
 
@@ -52,7 +61,7 @@ async function parseOptionalFile(file?: { contentType: string; dataBase64: strin
     : file.dataBase64;
   const buf = Buffer.from(raw, "base64");
   const stored = await storeCertFile(file.contentType, buf);
-  return { url: stored.url, contentType: file.contentType.split(";")[0]!.trim().toLowerCase() };
+  return { url: stored.storedUrl, contentType: file.contentType.split(";")[0]!.trim().toLowerCase() };
 }
 
 export async function createCertificate(opts: {
@@ -114,7 +123,7 @@ export async function createCertificate(opts: {
     serviceDueAt: row.serviceDueAt,
   });
 
-  return row;
+  return withSignedCertPdf(row);
 }
 
 export async function updateCertificate(
@@ -177,10 +186,8 @@ export async function updateCertificate(
     });
   }
 
-  return updated;
+  return withSignedCertPdf(updated);
 }
-
-/** @deprecated Kept for old clients — filing replaces sign+generate. */
 export async function signCertificate(clientId: string, id: string, _signatureDataUrl: string) {
   const row = await prisma.certificate.findFirst({ where: { id, clientId } });
   if (!row) throw new ApiError(404, "not_found", "Certificate not found");

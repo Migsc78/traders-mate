@@ -37,6 +37,7 @@ import { certPublicRouter } from "./routes/certPublic.js";
 import { twilioHooksRouter } from "./routes/twilioHooks.js";
 import { publicGreetingRouter } from "./routes/publicGreeting.js";
 import { inboundEmailRouter } from "./routes/inboundEmail.js";
+import { filesRouter } from "./routes/files.js";
 
 const app = express();
 // Railway / reverse proxies — needed for correct client IP on rate limits.
@@ -100,8 +101,25 @@ app.use("/api/followups", express.json(), followupsRouter);
 app.use("/api/twilio", cors(), express.urlencoded({ extended: true }), express.json(), twilioHooksRouter);
 app.use("/api/public/greeting", cors(), publicGreetingRouter);
 app.use("/api/inbound-email", cors(), express.json({ limit: "2mb" }), inboundEmailRouter);
+app.use("/api/files", cors(), filesRouter);
 app.use("/c", redirectRouter);
 app.use(widgetRouter); // GET /widget.js
+// Public uploads only — block private/certs/pdfs trees (signed /api/files required).
+app.use("/uploads", (req, res, next) => {
+  const p = (req.path || "").replace(/^\/+/, "");
+  if (
+    p.startsWith("private/") ||
+    p.startsWith("certs/") ||
+    p.startsWith("pdfs/") ||
+    p === "private" ||
+    p === "certs" ||
+    p === "pdfs"
+  ) {
+    res.status(404).json({ error: { code: "not_found", message: "Use a signed file URL" } });
+    return;
+  }
+  next();
+});
 app.use("/uploads", express.static(UPLOADS_DIR));
 
 // CRM / admin API — allow configured origins + *.vercel.app
