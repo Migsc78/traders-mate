@@ -254,19 +254,28 @@ html.native-app .t-appbar--detail {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: var(--t-ink);
+  background: var(--t-accent);
   color: #fff;
   font-size: 26px;
   font-weight: 500;
   line-height: 1;
   text-decoration: none;
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 0 rgba(255, 90, 31, 0.2);
 }
-.t-add-btn:hover { filter: brightness(1.06); color: #fff; }
+.tradie-shell a.t-add-btn,
+.tradie-shell a.t-add-btn:visited,
+.tradie-shell a.t-add-btn:hover,
+.tradie-shell a.t-add-btn:active {
+  color: #fff;
+  background: var(--t-accent);
+}
+.t-add-btn:hover { filter: brightness(1.06); }
 button.t-add-btn {
   border: none;
   cursor: pointer;
   font-family: inherit;
+  color: #fff;
+  background: var(--t-accent);
 }
 .t-week-bar {
   display: flex;
@@ -387,6 +396,27 @@ button.t-add-btn {
 .t-pill--amber { background: var(--t-amber-soft); color: var(--t-amber); }
 .t-pill--grey { background: var(--t-slate-soft); color: var(--t-ink-faint); }
 .t-pill--orange { background: var(--t-accent-soft); color: var(--t-accent-ink); }
+
+/* Quiet list status — title case, no shouty caps or dots */
+.t-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.t-status--slate { background: var(--t-slate-soft); color: var(--t-slate); }
+.t-status--blue { background: var(--t-blue-soft); color: var(--t-blue); }
+.t-status--green { background: var(--t-green-soft); color: var(--t-green); }
+.t-status--red { background: var(--t-red-soft); color: var(--t-red); }
+.t-status--amber { background: var(--t-amber-soft); color: var(--t-amber); }
+.t-status--grey { background: var(--t-slate-soft); color: var(--t-ink-faint); }
+.t-status--orange { background: var(--t-accent-soft); color: var(--t-accent-ink); }
 
 /* ---------- money ---------- */
 .t-money {
@@ -530,15 +560,15 @@ button.t-add-btn {
   align-items: center;
   gap: 14px;
   background: var(--t-surface);
-  border: 1px solid var(--t-hairline);
-  border-radius: var(--t-radius);
-  box-shadow: var(--t-shadow);
-  padding: 15px 16px;
+  border: 1px solid var(--t-hairline-2);
+  border-radius: var(--t-radius-sm);
+  box-shadow: none;
+  padding: 14px 14px;
   text-decoration: none;
   color: var(--t-ink);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition: transform 0.12s ease, background 0.12s ease;
 }
-a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38, 0.06); }
+a.t-row:active { transform: scale(0.985); background: var(--t-hairline-2); }
 .t-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .t-row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .t-row-top strong {
@@ -562,7 +592,7 @@ a.t-row:active { transform: scale(0.985); box-shadow: 0 1px 2px rgba(19, 28, 38,
   gap: 8px;
   flex: none;
 }
-.t-row-side .t-money { font-size: 16px; }
+.t-row-side .t-money { font-size: 17px; font-weight: 800; }
 .t-chevron { color: var(--t-ink-faint); flex: none; }
 
 .t-avatar {
@@ -3223,7 +3253,8 @@ html.native-app .tradie-bottom-nav {
   gap: 5px;
   margin-top: 7px;
 }
-.t-badge-row .t-pill { font-size: 11.5px; }
+.t-badge-row .t-pill,
+.t-badge-row .t-status { font-size: 11.5px; }
 
 /* Unbilled work is the one count on this screen worth interrupting for. */
 .t-tab-count.is-accent {

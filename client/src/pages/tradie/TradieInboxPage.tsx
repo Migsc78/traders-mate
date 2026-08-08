@@ -301,15 +301,10 @@ export default function TradieInboxPage() {
       )}
 
       {inbox.data && total === 0 && !needle && (tab === "all" || tab === "needs") && (
-        <>
-          <EmptyState
-            title="Inbox is clear"
-            hint="When a call diverts, we’ll summarise it here with a spam or job guess."
-          />
-          <Link className="t-btn t-btn--block" to="/t/inbox/new" style={{ marginTop: 12 }}>
-            Add a lead yourself
-          </Link>
-        </>
+        <EmptyState
+          title="Inbox is clear"
+          hint="When a call diverts, we’ll summarise it here with a spam or job guess. Tap + to add a lead yourself."
+        />
       )}
 
       {sheetFor && (

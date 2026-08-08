@@ -112,9 +112,13 @@ const PILL_TONES: Record<string, string> = {
   SIGNED: "blue",
 };
 
-export function StatusPill({ status }: { status: string }) {
+export function StatusPill({ status, quiet = false }: { status: string; quiet?: boolean }) {
   const tone = PILL_TONES[status] ?? "slate";
-  const label = status.replace(/_/g, " ").toLowerCase();
+  const label = status
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  if (quiet) return <span className={`t-status t-status--${tone}`}>{label}</span>;
   return <span className={`t-pill t-pill--${tone}`}>{label}</span>;
 }
 

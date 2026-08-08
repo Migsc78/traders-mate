@@ -38,22 +38,29 @@ export function dayLabel(value: string | Date, now: Date = new Date(), allowFutu
   if (Number.isNaN(d.getTime())) return "Undated";
 
   const ago = daysAgo(d, now);
+  /** en-GB sometimes inserts commas ("Fri, 14 Nov"); keep headings comma-free. */
+  const shortDate = (includeYear: boolean) =>
+    d
+      .toLocaleDateString(
+        "en-GB",
+        includeYear
+          ? { weekday: "short", day: "numeric", month: "short", year: "numeric" }
+          : { weekday: "short", day: "numeric", month: "short" }
+      )
+      .replace(/,/g, "");
 
   if (ago === 0) return "Today";
   if (ago < 0) {
     if (!allowFuture) return "Today";
     if (ago === -1) return "Tomorrow";
-    if (ago > -7) return d.toLocaleDateString("en-GB", { weekday: "long" });
+    if (ago > -7) return shortDate(false);
   } else {
     if (ago === 1) return "Yesterday";
-    if (ago < 7) return d.toLocaleDateString("en-GB", { weekday: "long" });
+    if (ago < 7) return shortDate(false);
   }
 
   const sameYear = d.getFullYear() === now.getFullYear();
-  return d.toLocaleDateString(
-    "en-GB",
-    sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" }
-  );
+  return shortDate(!sameYear);
 }
 
 export type DayGroup<T> = { key: string; label: string; rows: T[] };

@@ -75,9 +75,9 @@ export default function TradieArchivedPage() {
                     <div className="t-row-top">
                       <strong>{j.name}</strong>
                       {j.latestQuote ? (
-                        <StatusPill status={j.latestQuote.status} />
+                        <StatusPill status={j.latestQuote.status} quiet />
                       ) : (
-                        <span className="t-pill t-pill--grey">Archived</span>
+                        <span className="t-status t-status--grey">Archived</span>
                       )}
                     </div>
                     <span className="t-row-sub">
@@ -124,11 +124,14 @@ export default function TradieArchivedPage() {
                   >
                     <div className="t-row-top">
                       <strong>{q.enquiry?.name || "Quote"}</strong>
-                      <StatusPill status={q.statusBeforeArchive || "ARCHIVED"} />
+                      <StatusPill status={q.statusBeforeArchive || "ARCHIVED"} quiet />
                     </div>
                     <span className="t-row-sub">
-                      {q.sentAt ? `Sent ${new Date(q.sentAt).toLocaleDateString("en-GB")}` : "Draft"}
-                      {" · archived"}
+                      {q.enquiry?.postcode || "Quote"}
+                      {q.sentAt
+                        ? ` · ${new Date(q.sentAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+                        : " · Not sent"}
+                      {" · Archived"}
                     </span>
                   </Link>
                   <div className="t-row-side t-row-side--stack">

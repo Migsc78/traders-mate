@@ -30,12 +30,12 @@ check("yesterday", dayLabel(at(2026, 8, 2, 23, 55), now) === "Yesterday");
 check("late last night is yesterday", dayLabel(at(2026, 8, 2, 23, 30), now) === "Yesterday");
 check("early this morning is today", dayLabel(at(2026, 8, 3, 0, 30), now) === "Today");
 
-check("two days back names the weekday", dayLabel(at(2026, 8, 1), now) === "Saturday", dayLabel(at(2026, 8, 1), now));
-check("six days back still a weekday", dayLabel(at(2026, 7, 28), now) === "Tuesday", dayLabel(at(2026, 7, 28), now));
-check("a week back becomes a date", dayLabel(at(2026, 7, 27), now) === "27 Jul", dayLabel(at(2026, 7, 27), now));
+check("two days back names the weekday", dayLabel(at(2026, 8, 1), now) === "Sat 1 Aug", dayLabel(at(2026, 8, 1), now));
+check("six days back still a weekday", dayLabel(at(2026, 7, 28), now) === "Tue 28 Jul", dayLabel(at(2026, 7, 28), now));
+check("a week back becomes a date", dayLabel(at(2026, 7, 27), now) === "Mon 27 Jul", dayLabel(at(2026, 7, 27), now));
 check(
   "last year carries the year",
-  dayLabel(at(2025, 11, 14), now) === "14 Nov 2025",
+  dayLabel(at(2025, 11, 14), now) === "Fri 14 Nov 2025",
   dayLabel(at(2025, 11, 14), now)
 );
 
@@ -65,7 +65,7 @@ type Row = { id: string; createdAt: Date };
   const groups = groupByDay(rows, (r) => r.createdAt, now);
 
   check("three days, three headings", groups.length === 3, `got ${groups.length}`);
-  check("headings in order", groups.map((g) => g.label).join("|") === "Today|Yesterday|20 Jul", groups.map((g) => g.label).join("|"));
+  check("headings in order", groups.map((g) => g.label).join("|") === "Today|Yesterday|Mon 20 Jul", groups.map((g) => g.label).join("|"));
   check("today holds both of today's rows", groups[0].rows.length === 2);
   check("row order preserved inside a group", groups[0].rows.map((r) => r.id).join("") === "ab");
 }
@@ -106,12 +106,12 @@ check("tomorrow, when the future is allowed", dayLabel(at(2026, 8, 4, 9), now, t
 check("today is still today with future allowed", dayLabel(at(2026, 8, 3, 18), now, true) === "Today");
 check(
   "later this week names the day",
-  dayLabel(at(2026, 8, 6, 9), now, true) === "Thursday",
+  dayLabel(at(2026, 8, 6, 9), now, true) === "Thu 6 Aug",
   dayLabel(at(2026, 8, 6, 9), now, true)
 );
 check(
   "beyond a week falls back to a date",
-  dayLabel(at(2026, 8, 20, 9), now, true) === "20 Aug",
+  dayLabel(at(2026, 8, 20, 9), now, true) === "Thu 20 Aug",
   dayLabel(at(2026, 8, 20, 9), now, true)
 );
 check("yesterday unaffected by the flag", dayLabel(at(2026, 8, 2, 9), now, true) === "Yesterday");
@@ -132,7 +132,7 @@ check("yesterday unaffected by the flag", dayLabel(at(2026, 8, 2, 9), now, true)
   check("two visit days", groups.length === 2, `got ${groups.length}`);
   check("tomorrow first", groups[0].label === "Tomorrow", groups[0].label);
   check("both of tomorrow's visits together", groups[0].rows.length === 2);
-  check("then Thursday", groups[1].label === "Thursday", groups[1].label);
+  check("then Thursday", groups[1].label === "Thu 6 Aug", groups[1].label);
 }
 
 if (failures > 0) throw new Error(`${failures} date-group failure(s)`);

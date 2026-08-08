@@ -22,8 +22,8 @@ import {
 const PRIMARY_TABS = [
   { to: "/t/diary", label: "Diary", Icon: IconDiary },
   { to: "/t/inbox", label: "Inbox", Icon: IconInbox },
-  { to: "/t", label: "Jobs", end: true, Icon: IconJobs },
   { to: "/t/quotes", label: "Quotes", Icon: IconQuotes },
+  { to: "/t", label: "Jobs", end: true, Icon: IconJobs },
   { to: "/t/customers", label: "Customers", Icon: IconCustomers },
 ] as const;
 

@@ -116,7 +116,7 @@ export function ListToolbar({
               onClick={() => onTab(t.id)}
             >
               {t.label}
-              {count ? (
+              {count && on ? (
                 <span className={`t-tab-count${accent ? " is-accent" : ""}`}>{count}</span>
               ) : null}
             </button>

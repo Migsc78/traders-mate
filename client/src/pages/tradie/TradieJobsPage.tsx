@@ -9,7 +9,7 @@ import {
   type JobBucket,
   type JobCard,
 } from "../../api/jobs";
-import { EmptyState, QueryError, IconChevron } from "./ui";
+import { EmptyState, QueryError } from "./ui";
 import { SwipeListRow } from "./SwipeListRow";
 import { IconSearch, ListToolbar, useListFilter, type ListTab } from "./ListToolbar";
 import { groupByDay } from "../../lib/dateGroups";
@@ -215,7 +215,6 @@ export default function TradieJobsPage() {
       <header className="t-page-head t-page-head--row">
         <div>
           <h2>Jobs</h2>
-          <p>Swipe right to archive · left to delete</p>
         </div>
         <div className="t-head-actions">
           <button
@@ -270,7 +269,7 @@ export default function TradieJobsPage() {
                       >
                         <div className="t-row-top">
                           <strong>{j.title || j.name}</strong>
-                          <span className="t-pill t-pill--grey">Archived</span>
+                          <span className="t-status t-status--grey">Archived</span>
                         </div>
                         <span className="t-row-sub">
                           {[j.name, j.postcode].filter(Boolean).join(" · ")}
@@ -321,10 +320,10 @@ export default function TradieJobsPage() {
                         <div className="t-badge-row">
                           {/* Two badges, never merged. One saying both is what
                               made unbilled work invisible in the first place. */}
-                          <span className={`t-pill ${operationalTone(j.operational)}`}>
+                          <span className={operationalTone(j.operational).replace("t-pill", "t-status")}>
                             {j.operationalLabel}
                           </span>
-                          <span className={`t-pill ${commercialTone(j.commercial)}`}>
+                          <span className={commercialTone(j.commercial).replace("t-pill", "t-status")}>
                             {j.commercialLabel}
                           </span>
                         </div>
@@ -335,7 +334,6 @@ export default function TradieJobsPage() {
                         ) : j.latestQuote ? (
                           <span className="t-money">{formatGbp(j.latestQuote.totalPence)}</span>
                         ) : null}
-                        <IconChevron />
                       </div>
                     </SwipeListRow>
                   );
@@ -367,20 +365,10 @@ export default function TradieJobsPage() {
       )}
 
       {!loading && total === 0 && !needle && tab === "all" && (
-        <>
-          <EmptyState
-            title="No jobs yet"
-            hint="Promote something from Inbox, or tap + to add a walk-up job."
-          />
-          <div className="tradie-actions" style={{ marginTop: 12, flexDirection: "column", gap: 8 }}>
-            <Link className="primary t-btn--block" to="/t/jobs/new">
-              Add a job
-            </Link>
-            <Link className="t-btn t-btn--block" to="/t/inbox">
-              Open Inbox
-            </Link>
-          </div>
-        </>
+        <EmptyState
+          title="No jobs yet"
+          hint="Promote something from Inbox, or tap + to add a walk-up job."
+        />
       )}
     </div>
   );
